@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { timeAgo } from '@/lib/format'
 import { ContactAvatar, PriorityFlag, StatusBadge } from '@/features/inbox/components/atoms'
 import { ApprovalCard } from '@/features/inbox/components/ApprovalCard'
+import { SlaCard } from '@/features/inbox/components/SlaCard'
 import { TagsEditor } from '@/features/inbox/components/TagsEditor'
 import { inboxApi, type Conversation } from '@/features/inbox/api'
 import { useConversationTags, usePendingApprovals } from '@/features/inbox/hooks'
@@ -72,6 +73,10 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
             onAdd={(id) => tags.add.mutate(id)}
             onRemove={(id) => tags.remove.mutate(id)}
           />
+        </Section>
+
+        <Section title="SLA">
+          <SlaCard conversationId={conversation.id} />
         </Section>
 
         {pending.length ? (

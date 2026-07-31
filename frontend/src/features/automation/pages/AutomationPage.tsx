@@ -1,11 +1,13 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useHasPerm } from '@/stores/auth'
 
+import { MacrosTab } from '../components/MacrosTab'
 import { RulesTab } from '../components/RulesTab'
 import { WebhooksTab } from '../components/WebhooksTab'
 
 export function Component() {
   const canReadRules = useHasPerm('automations:read')
+  const canReadMacros = useHasPerm('conversations:read')
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -18,9 +20,10 @@ export function Component() {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-4xl">
-          <Tabs defaultValue={canReadRules ? 'rules' : 'webhooks'}>
+          <Tabs defaultValue={canReadRules ? 'rules' : canReadMacros ? 'macros' : 'webhooks'}>
             <TabsList>
               <TabsTrigger value="rules">Rules</TabsTrigger>
+              <TabsTrigger value="macros">Macros</TabsTrigger>
               <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
             </TabsList>
             <TabsContent value="rules" className="mt-4">
@@ -29,6 +32,15 @@ export function Component() {
               ) : (
                 <p className="rounded-md border p-6 text-center text-sm text-muted-foreground">
                   You don’t have access to automation rules.
+                </p>
+              )}
+            </TabsContent>
+            <TabsContent value="macros" className="mt-4">
+              {canReadMacros ? (
+                <MacrosTab />
+              ) : (
+                <p className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+                  You don’t have access to macros.
                 </p>
               )}
             </TabsContent>

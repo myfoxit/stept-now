@@ -5,10 +5,11 @@
 
 import type { components } from '@/api/schema'
 
-import { ACTION_SPECS, LIST_OPS, VALUELESS_OPS } from './constants'
+import { ACTION_SPECS, LIST_OPS, MACRO_ACTION_SPECS, VALUELESS_OPS } from './constants'
 
 export type Condition = components['schemas']['Condition']
 export type Action = components['schemas']['Action']
+export type MacroAction = components['schemas']['MacroAction']
 
 let counter = 0
 /** Stable-enough local id for React keys on unsaved rows. */
@@ -87,6 +88,28 @@ export function deserializeAction(action: Action): ActionRow {
     params[key] = value == null ? '' : String(value)
   }
   return { id: localId('act'), type: action.type ?? 'set_status', params }
+}
+
+/** Same shape as serializeAction but against the macro action catalog. */
+export function serializeMacroAction(row: ActionRow): MacroAction {
+  const spec = MACRO_ACTION_SPECS[row.type]
+  const params: Record<string, unknown> = {}
+  if (spec) {
+    for (const field of spec.params) {
+      const raw = row.params[field.key]
+      if (raw !== undefined && raw !== '') params[field.key] = raw
+    }
+  }
+  return { type: row.type as MacroAction['type'], params }
+}
+
+/** MacroOut.actions come back as loose dicts; coerce into editable rows. */
+export function deserializeMacroAction(action: Record<string, unknown>): ActionRow {
+  const params: Record<string, string> = {}
+  for (const [key, value] of Object.entries((action.params as Record<string, unknown>) ?? {})) {
+    params[key] = value == null ? '' : String(value)
+  }
+  return { id: localId('act'), type: (action.type as string) ?? 'set_status', params }
 }
 
 /** Human summary of a condition, e.g. "status is open". */

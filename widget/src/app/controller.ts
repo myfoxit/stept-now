@@ -5,7 +5,7 @@
  * hook.
  */
 
-import { ApiError, WidgetApi, widgetWsUrl } from '../api'
+import { ApiError, sendMessageFeedback, triggerCampaign, WidgetApi, widgetWsUrl } from '../api'
 import { MSG } from '../protocol'
 import type {
   ArticleDetail,
@@ -13,6 +13,7 @@ import type {
   BootResponse,
   BootWorkspace,
   ConversationSummary,
+  FeedbackRating,
   Identity,
   WidgetArticlesResponse,
   WidgetConfig,
@@ -84,6 +85,7 @@ export class Controller {
   private api: WidgetApi
   private socket: WidgetSocket | null = null
   private token: string | null = null
+  private unbindBridge: (() => void) | null = null
   private seenIds = new Set<string>()
   private typingTimer: ReturnType<typeof setTimeout> | null = null
   private agentTypingTimer: ReturnType<typeof setTimeout> | null = null
@@ -91,6 +93,19 @@ export class Controller {
   constructor(params: BootParams) {
     this.params = params
     this.api = new WidgetApi(params.apiBase)
+  }
+
+  /** Public widget key — namespaces per-widget localStorage (e.g. feedback). */
+  get widgetKey(): string {
+    return this.params.workspaceKey
+  }
+
+  /** Detach global listeners (bridge + socket). Teardown/test hook. */
+  dispose(): void {
+    this.unbindBridge?.()
+    this.unbindBridge = null
+    this.socket?.close()
+    this.socket = null
   }
 
   // --- store plumbing ------------------------------------------------------
@@ -149,11 +164,36 @@ export class Controller {
     this.emitReady()
   }
 
-  /** React to loader → app messages (currently: refresh on open). */
+  /** React to loader → app messages (refresh on open; trigger due campaigns). */
   private bindBridge(): void {
-    bridge.on((env) => {
-      if (env.type === MSG.OPEN) void this.refreshConversations()
+    this.unbindBridge?.()
+    this.unbindBridge = bridge.on((env) => {
+      if (env.type === MSG.OPEN) {
+        void this.refreshConversations()
+      } else if (env.type === MSG.CAMPAIGN_DUE) {
+        const payload = (env.payload || {}) as { campaignId?: unknown }
+        if (typeof payload.campaignId === 'string' && payload.campaignId) {
+          void this.onCampaignDue(payload.campaignId)
+        }
+      }
     })
+  }
+
+  /**
+   * The loader says an ongoing campaign is due: POST the trigger with our
+   * visitor token. When the backend created the proactive conversation, refresh
+   * the list (home screen updates if visible) and push the unread count so the
+   * launcher badge bumps. Skipped/error outcomes are silently ignored — the
+   * loader already marked the campaign seen. Never opens the panel.
+   */
+  private async onCampaignDue(campaignId: string): Promise<void> {
+    if (!this.token) return
+    try {
+      const result = await triggerCampaign(this.params.apiBase, this.token, campaignId)
+      if (result.conversation_id) await this.refreshConversations()
+    } catch {
+      /* skipped / disabled / race — non-intrusive by design */
+    }
   }
 
   private emitReady(): void {
@@ -421,6 +461,23 @@ export class Controller {
       this.set({ csatDone: { ...this.state.csatDone, [conversationId]: true } })
     } catch {
       /* surfaced as no state change; UI can retry */
+    }
+  }
+
+  // --- answer feedback (AI thumbs) ------------------------------------------
+
+  /**
+   * POST the visitor's thumbs rating for an agent/AI answer in the open thread.
+   * The bubble keeps the chosen state locally (component state + localStorage);
+   * the backend upserts, so switching ratings just re-posts.
+   */
+  async submitMessageFeedback(messageId: string, rating: FeedbackRating): Promise<void> {
+    const { screen } = this.state
+    if (screen.name !== 'thread' || !screen.conversationId || !this.token) return
+    try {
+      await sendMessageFeedback(this.params.apiBase, this.token, screen.conversationId, messageId, rating)
+    } catch {
+      /* non-blocking — the thumb stays selected locally */
     }
   }
 

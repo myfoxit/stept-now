@@ -1,7 +1,9 @@
-import { screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it } from 'vitest'
 
-import { renderApp } from '@/test/helpers'
+import { useAuthStore } from '@/stores/auth'
+import { mockFetch, renderApp } from '@/test/helpers'
 import { MessageBubble } from '@/features/inbox/components/MessageBubble'
 import type { Message } from '@/features/inbox/api'
 
@@ -74,5 +76,120 @@ describe('MessageBubble', () => {
       />
     )
     expect(screen.getByText(/sending/i)).toBeInTheDocument()
+  })
+})
+
+describe('MessageBubble feedback thumbs', () => {
+  function setupAuth(permissions: string[] = ['conversations:read', 'conversations:write']) {
+    useAuthStore.setState({
+      accessToken: 't',
+      user: { id: 'u1', email: 'me@stept.co', name: 'Me' },
+      workspaceId: 'ws1',
+      bootstrapped: true,
+      memberships: [
+        {
+          id: 'me',
+          role: 'agent',
+          is_available: true,
+          permissions,
+          workspace: { id: 'ws1', name: 'WS', slug: 'ws', settings: {} },
+        },
+      ],
+    })
+  }
+
+  const agentReply = (): Message =>
+    makeMessage({ direction: 'out', author_type: 'agent', author_name: 'Sage' })
+
+  afterEach(() => {
+    cleanup()
+    useAuthStore.setState({ accessToken: null, memberships: [], workspaceId: null, user: null })
+  })
+
+  it('renders thumbs only for public outbound agent messages', async () => {
+    setupAuth()
+    mockFetch({ 'GET /api/v1/w/ws1/conversations/c1/messages/m1/feedback': () => ({ body: [] }) })
+
+    const { unmount } = renderApp(<MessageBubble message={agentReply()} />)
+    expect(await screen.findByRole('button', { name: /good response/i })).toBeInTheDocument()
+    unmount()
+
+    // Human agent reply → no thumbs.
+    renderApp(<MessageBubble message={makeMessage({ direction: 'out', author_type: 'user' })} />)
+    expect(screen.queryByRole('button', { name: /good response/i })).not.toBeInTheDocument()
+    cleanup()
+
+    // AI private note → no thumbs.
+    renderApp(
+      <MessageBubble
+        message={makeMessage({ direction: 'out', author_type: 'agent', visibility: 'note' })}
+      />
+    )
+    expect(screen.queryByRole('button', { name: /good response/i })).not.toBeInTheDocument()
+  })
+
+  it('POSTs the rating and toggles the highlighted thumb', async () => {
+    setupAuth()
+    const bodies: unknown[] = []
+    mockFetch({
+      'GET /api/v1/w/ws1/conversations/c1/messages/m1/feedback': () => ({ body: [] }),
+      'POST /api/v1/w/ws1/conversations/c1/messages/m1/feedback': (init) => {
+        bodies.push(JSON.parse(init!.body as string))
+        return {
+          status: 201,
+          body: {
+            id: 'f1',
+            message_id: 'm1',
+            conversation_id: 'c1',
+            rating: 'up',
+            comment: null,
+            actor_type: 'user',
+            actor_id: 'u1',
+            created_at: new Date().toISOString(),
+          },
+        }
+      },
+    })
+
+    renderApp(<MessageBubble message={agentReply()} />)
+    const up = await screen.findByRole('button', { name: /good response/i })
+    const down = screen.getByRole('button', { name: /bad response/i })
+
+    await userEvent.click(up)
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toEqual({ rating: 'up' })
+    expect(up).toHaveAttribute('aria-pressed', 'true')
+    expect(down).toHaveAttribute('aria-pressed', 'false')
+
+    // Switching to the other thumb re-POSTs and moves the highlight.
+    await userEvent.click(down)
+    await waitFor(() => expect(bodies).toHaveLength(2))
+    expect(bodies[1]).toEqual({ rating: 'down' })
+    expect(down).toHaveAttribute('aria-pressed', 'true')
+    expect(up).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('seeds the highlighted thumb from stored feedback', async () => {
+    setupAuth()
+    mockFetch({
+      'GET /api/v1/w/ws1/conversations/c1/messages/m1/feedback': () => ({
+        body: [
+          {
+            id: 'f1',
+            message_id: 'm1',
+            conversation_id: 'c1',
+            rating: 'down',
+            comment: null,
+            actor_type: 'user',
+            actor_id: 'u1',
+            created_at: new Date().toISOString(),
+          },
+        ],
+      }),
+    })
+
+    renderApp(<MessageBubble message={agentReply()} />)
+    const down = await screen.findByRole('button', { name: /bad response/i })
+    await waitFor(() => expect(down).toHaveAttribute('aria-pressed', 'true'))
   })
 })

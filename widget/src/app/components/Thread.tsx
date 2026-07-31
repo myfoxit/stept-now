@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks'
 
+import type { FeedbackRating } from '../../types'
 import type { UiMessage } from '../controller'
 import { Composer } from './Composer'
 import { Csat } from './Csat'
@@ -14,10 +15,12 @@ export function Thread({
   status,
   csatDone,
   greeting,
+  widgetKey,
   onSend,
   onTyping,
   onLoadMore,
   onCsat,
+  onFeedback,
 }: {
   messages: UiMessage[]
   agentTyping: boolean
@@ -26,10 +29,12 @@ export function Thread({
   status: string | null
   csatDone: boolean
   greeting: string
+  widgetKey: string
   onSend: (text: string) => void
   onTyping: (isTyping: boolean) => void
   onLoadMore: () => void
   onCsat: (rating: number, feedback?: string) => void
+  onFeedback: (messageId: string, rating: FeedbackRating) => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
@@ -64,7 +69,7 @@ export function Thread({
           </div>
         )}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble key={m.id} message={m} widgetKey={widgetKey} onFeedback={onFeedback} />
         ))}
         {agentTyping && <TypingDots />}
         {resolved && (

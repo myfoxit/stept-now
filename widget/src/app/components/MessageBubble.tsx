@@ -1,12 +1,105 @@
+import { useEffect, useRef, useState } from 'preact/hooks'
+
+import type { FeedbackRating } from '../../types'
 import type { UiMessage } from '../controller'
 import { clockTime, initials } from '../format'
 import { renderMarkdown } from '../md'
 
+/** localStorage key remembering the visitor's rating for one answer. */
+export function feedbackStorageKey(widgetKey: string, messageId: string): string {
+  return `stept:${widgetKey}:fb:${messageId}`
+}
+
+function storedRating(widgetKey: string, messageId: string): FeedbackRating | null {
+  try {
+    const v = window.localStorage.getItem(feedbackStorageKey(widgetKey, messageId))
+    return v === 'up' || v === 'down' ? v : null
+  } catch {
+    return null
+  }
+}
+
+function storeRating(widgetKey: string, messageId: string, rating: FeedbackRating): void {
+  try {
+    window.localStorage.setItem(feedbackStorageKey(widgetKey, messageId), rating)
+  } catch {
+    /* private mode — session only */
+  }
+}
+
+function ThumbIcon({ down = false }: { down?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="13"
+      height="13"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      {down ? (
+        <>
+          <path d="M17 14V2" />
+          <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />
+        </>
+      ) : (
+        <>
+          <path d="M7 10v12" />
+          <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+        </>
+      )}
+    </svg>
+  )
+}
+
 /** A single chat bubble. Visitor messages sit right; agent/AI/user left. */
-export function MessageBubble({ message }: { message: UiMessage }) {
+export function MessageBubble({
+  message,
+  widgetKey = '',
+  onFeedback,
+}: {
+  message: UiMessage
+  /** Namespaces the persisted thumb state; required for feedback to render. */
+  widgetKey?: string
+  /** Present on ratable threads: posts the rating (AI answers only). */
+  onFeedback?: (messageId: string, rating: FeedbackRating) => void
+}) {
   const mine = message.direction === 'in'
   const system = message.author_type === 'system'
   const citations = message.meta?.citations ?? []
+
+  // AI answers (public outbound agent messages) get the feedback thumbs.
+  const ratable =
+    Boolean(onFeedback) &&
+    message.author_type === 'agent' &&
+    message.direction === 'out' &&
+    !message.pending &&
+    !message.failed
+
+  const [rating, setRating] = useState<FeedbackRating | null>(() =>
+    ratable ? storedRating(widgetKey, message.id) : null,
+  )
+  const [thanks, setThanks] = useState(false)
+  const thanksTimer = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (thanksTimer.current !== null) window.clearTimeout(thanksTimer.current)
+    },
+    [],
+  )
+
+  const rate = (value: FeedbackRating): void => {
+    if (rating === value) return // backend upserts; switching allowed, repeats are a no-op
+    setRating(value)
+    storeRating(widgetKey, message.id, value)
+    onFeedback?.(message.id, value)
+    setThanks(true)
+    if (thanksTimer.current !== null) window.clearTimeout(thanksTimer.current)
+    thanksTimer.current = window.setTimeout(() => setThanks(false), 2500)
+  }
 
   if (system) {
     return (
@@ -53,6 +146,33 @@ export function MessageBubble({ message }: { message: UiMessage }) {
             </div>
           )}
         </div>
+        {ratable && (
+          <div class="sw-fb">
+            <button
+              type="button"
+              class={`sw-fb-btn ${rating === 'up' ? 'sw-fb-on' : ''}`}
+              aria-label="Helpful"
+              aria-pressed={rating === 'up'}
+              onClick={() => rate('up')}
+            >
+              <ThumbIcon />
+            </button>
+            <button
+              type="button"
+              class={`sw-fb-btn ${rating === 'down' ? 'sw-fb-on' : ''}`}
+              aria-label="Not helpful"
+              aria-pressed={rating === 'down'}
+              onClick={() => rate('down')}
+            >
+              <ThumbIcon down />
+            </button>
+            {thanks && (
+              <span class="sw-fb-thanks" role="status">
+                Thanks for the feedback
+              </span>
+            )}
+          </div>
+        )}
         <div class="sw-meta">
           {message.failed ? (
             <span class="sw-failed">Not delivered</span>

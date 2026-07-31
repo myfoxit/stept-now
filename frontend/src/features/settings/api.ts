@@ -19,6 +19,9 @@ export type Inbox = components['schemas']['InboxOut']
 export type InboxCreate = components['schemas']['InboxCreate']
 export type InboxUpdate = components['schemas']['InboxUpdate']
 export type User = components['schemas']['UserOut']
+export type SlaPolicy = components['schemas']['SlaPolicyOut']
+export type SlaPolicyCreate = components['schemas']['SlaPolicyCreate']
+export type SlaPolicyUpdate = components['schemas']['SlaPolicyUpdate']
 
 interface OffsetPage<T> {
   items: T[]
@@ -65,6 +68,13 @@ export const channelsApi = {
   create: (body: InboxCreate) => api.post<Inbox>(ws('/inboxes'), body),
   update: (id: string, body: InboxUpdate) => api.patch<Inbox>(ws(`/inboxes/${id}`), body),
   remove: (id: string) => api.delete<{ message: string }>(ws(`/inboxes/${id}`)),
+}
+
+export const slasApi = {
+  list: () => api.get<SlaPolicy[]>(ws('/slas')),
+  create: (body: SlaPolicyCreate) => api.post<SlaPolicy>(ws('/slas'), body),
+  update: (id: string, body: SlaPolicyUpdate) => api.patch<SlaPolicy>(ws(`/slas/${id}`), body),
+  remove: (id: string) => api.delete<{ message: string }>(ws(`/slas/${id}`)),
 }
 
 export const profileApi = {

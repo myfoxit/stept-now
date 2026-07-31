@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ChannelIcon, StatusBadge } from '@/features/inbox/components/atoms'
+import { RunMacroMenu } from '@/features/inbox/components/RunMacroMenu'
 import { usePatchConversation, useMembers, useTeams } from '@/features/inbox/hooks'
 import type { Conversation, Priority } from '@/features/inbox/api'
 
@@ -150,6 +151,9 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
         {teamName ? (
           <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">{teamName}</span>
         ) : null}
+
+        {/* Run macro */}
+        <RunMacroMenu conversationId={conversation.id} />
 
         {/* Snooze */}
         <Popover>

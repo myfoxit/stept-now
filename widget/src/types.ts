@@ -148,6 +148,39 @@ export interface Tour {
 
 export type TourEventName = 'started' | 'step_viewed' | 'completed' | 'dismissed'
 
+/**
+ * Ongoing proactive campaign, mirrored from schemas/campaigns.py
+ * (WidgetCampaignOut). Trigger rules are evaluated client-side by the loader.
+ */
+export interface CampaignTriggerRules {
+  /** fnmatch-style glob (`*` wildcards) matched against `location.href`. */
+  url_pattern?: string
+  /** Seconds on the page before the campaign fires. Absent/0 → immediately. */
+  time_on_page_seconds?: number
+  [key: string]: unknown
+}
+
+export interface Campaign {
+  id: string
+  message: string
+  trigger_rules: CampaignTriggerRules
+  sender_name: string
+}
+
+/** POST /campaigns/{id}/trigger result (WidgetCampaignTriggerOut). */
+export interface CampaignTriggerResult {
+  skipped: boolean
+  conversation_id: string | null
+}
+
+/** Visitor's thumbs rating on an agent/AI answer. */
+export type FeedbackRating = 'up' | 'down'
+
+export interface MessageFeedbackAck {
+  ok: boolean
+  rating: string
+}
+
 /** Realtime envelope pushed by /ws/widget. */
 export interface RealtimeMessage {
   type: string

@@ -1,4 +1,4 @@
-import { Code2, Copy, Inbox as InboxIcon, Plus, Trash2 } from 'lucide-react'
+import { Code2, Copy, Inbox as InboxIcon, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -40,12 +40,18 @@ import { useHasPerm } from '@/stores/auth'
 
 import type { Inbox, InboxCreate } from '../api'
 import { useCreateInbox, useDeleteInbox, useInboxes, useUpdateInbox } from '../hooks'
+import { CHANNEL_CONFIG_SPECS, InboxConfigDialog } from './InboxConfigDialog'
 
 const CHANNEL_TYPES = [
   { value: 'widget', label: 'Website widget' },
   { value: 'email', label: 'Email' },
   { value: 'slack', label: 'Slack' },
   { value: 'telegram', label: 'Telegram' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'messenger', label: 'Facebook Messenger' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'sms', label: 'SMS (Twilio)' },
+  { value: 'line', label: 'LINE' },
   { value: 'api', label: 'API' },
 ]
 
@@ -69,6 +75,7 @@ export function ChannelsPanel() {
   const [name, setName] = useState('')
   const [channelType, setChannelType] = useState('widget')
   const [deleting, setDeleting] = useState<Inbox | null>(null)
+  const [configuring, setConfiguring] = useState<Inbox | null>(null)
 
   async function submit() {
     if (!name.trim()) return
@@ -143,6 +150,16 @@ export function ChannelsPanel() {
                           updateInbox.mutate({ id: inbox.id, body: { enabled: checked } })
                         }
                       />
+                      {canManage && CHANNEL_CONFIG_SPECS[inbox.channel_type] ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Configure ${inbox.name}`}
+                          onClick={() => setConfiguring(inbox)}
+                        >
+                          <Settings2 className="size-4" />
+                        </Button>
+                      ) : null}
                       {canManage ? (
                         <Button
                           variant="ghost"
@@ -225,6 +242,12 @@ export function ChannelsPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <InboxConfigDialog
+        inbox={configuring}
+        open={configuring !== null}
+        onOpenChange={(open) => !open && setConfiguring(null)}
+      />
 
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>

@@ -128,6 +128,50 @@ export const ACTION_TYPES: Option[] = Object.entries(ACTION_SPECS).map(([value, 
   label: spec.label,
 }))
 
+/**
+ * Action types a macro may contain (app/schemas/macros.py MacroAction). Same row
+ * builder as automation rules, but a slightly different catalog: `remove_tag`
+ * exists, `assign_user` accepts the literal "self", and notify/webhook don't apply.
+ */
+export const MACRO_ACTION_SPECS: Record<string, { label: string; params: ParamField[] }> = {
+  assign_user: {
+    label: 'Assign to member',
+    params: [{ key: 'user_id', label: 'Member ID', kind: 'text', placeholder: 'user id or "self"' }],
+  },
+  assign_team: {
+    label: 'Assign to team',
+    params: [{ key: 'team_id', label: 'Team ID', kind: 'text', placeholder: 'team id' }],
+  },
+  set_priority: {
+    label: 'Set priority',
+    params: [{ key: 'priority', label: 'Priority', kind: 'select', options: PRIORITY_OPTIONS }],
+  },
+  set_status: {
+    label: 'Set status',
+    params: [{ key: 'status', label: 'Status', kind: 'select', options: STATUS_OPTIONS }],
+  },
+  add_tag: {
+    label: 'Add tag',
+    params: [{ key: 'tag', label: 'Tag name', kind: 'text', placeholder: 'e.g. vip' }],
+  },
+  remove_tag: {
+    label: 'Remove tag',
+    params: [{ key: 'tag', label: 'Tag name', kind: 'text', placeholder: 'e.g. vip' }],
+  },
+  send_reply: {
+    label: 'Send reply',
+    params: [{ key: 'content', label: 'Message', kind: 'textarea', placeholder: 'Reply text…' }],
+  },
+  send_note: {
+    label: 'Add private note',
+    params: [{ key: 'content', label: 'Note', kind: 'textarea', placeholder: 'Internal note…' }],
+  },
+}
+
+export const MACRO_ACTION_TYPES: Option[] = Object.entries(MACRO_ACTION_SPECS).map(
+  ([value, spec]) => ({ value, label: spec.label })
+)
+
 /** Domain events a webhook can subscribe to (app/core/events.py EventNames) + "*". */
 export const WEBHOOK_EVENTS: string[] = [
   '*',

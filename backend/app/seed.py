@@ -70,6 +70,7 @@ async def _seed_domains(session: AsyncSession, ctx: SeedContext) -> None:
         "app.agents.seed",
         "app.automation.seed",
         "app.dap.seed",
+        "app.services.parity_seed",
     ):
         try:
             module = __import__(module_name, fromlist=["seed"])

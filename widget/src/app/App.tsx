@@ -85,12 +85,14 @@ export function App({ controller }: { controller: Controller }) {
           status={active?.status ?? null}
           csatDone={screen.conversationId ? Boolean(state.csatDone[screen.conversationId]) : false}
           greeting={state.config.greeting || 'Hi there 👋'}
+          widgetKey={controller.widgetKey}
           onSend={(text) => void controller.send(text)}
           onTyping={(t) => controller.emitTyping(t)}
           onLoadMore={() => void controller.loadOlderMessages()}
           onCsat={(rating, feedback) =>
             screen.conversationId && void controller.submitCsat(screen.conversationId, rating, feedback)
           }
+          onFeedback={(messageId, rating) => void controller.submitMessageFeedback(messageId, rating)}
         />
       )
       break

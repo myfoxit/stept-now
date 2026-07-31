@@ -8,6 +8,11 @@ export type Webhook = components['schemas']['WebhookOut']
 export type WebhookCreate = components['schemas']['WebhookCreate']
 export type WebhookUpdate = components['schemas']['WebhookUpdate']
 export type WebhookDelivery = components['schemas']['WebhookDeliveryOut']
+export type Macro = components['schemas']['MacroOut']
+export type MacroCreate = components['schemas']['MacroCreate']
+export type MacroUpdate = components['schemas']['MacroUpdate']
+export type MacroRunOut = components['schemas']['MacroRunOut']
+export type MacroActionResult = components['schemas']['MacroActionResult']
 
 interface OffsetPage<T> {
   items: T[]
@@ -25,6 +30,15 @@ export const automationApi = {
   toggle: (id: string) => api.post<AutomationRule>(ws(`/automations/${id}/toggle`)),
   reorder: (orderedIds: string[]) =>
     api.post<AutomationRule[]>(ws('/automations/reorder'), { ordered_ids: orderedIds }),
+}
+
+export const macrosApi = {
+  list: () => api.get<Macro[]>(ws('/macros')),
+  create: (body: MacroCreate) => api.post<Macro>(ws('/macros'), body),
+  update: (id: string, body: MacroUpdate) => api.patch<Macro>(ws(`/macros/${id}`), body),
+  remove: (id: string) => api.delete<{ message: string }>(ws(`/macros/${id}`)),
+  run: (id: string, conversationId: string) =>
+    api.post<MacroRunOut>(ws(`/macros/${id}/run`), { conversation_id: conversationId }),
 }
 
 export const webhooksApi = {

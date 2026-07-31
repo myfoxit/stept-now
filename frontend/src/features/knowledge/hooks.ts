@@ -82,7 +82,20 @@ export function useInvalidateKnowledge() {
 
 export function useSearch() {
   return useMutation({
-    mutationFn: (vars: { query: string; k?: number; source_ids?: string[] | null }) =>
-      knowledgeApi.search(vars),
+    mutationFn: (vars: {
+      query: string
+      k?: number
+      source_ids?: string[] | null
+      rerank?: boolean
+    }) => knowledgeApi.search(vars),
+  })
+}
+
+/** Search-analytics overview for the last N days (7/30/90). */
+export function useKnowledgeAnalytics(days: number) {
+  const workspaceId = currentWorkspaceId()
+  return useQuery({
+    queryKey: knowledgeKeys.analytics(workspaceId, days),
+    queryFn: () => knowledgeApi.analytics(days),
   })
 }

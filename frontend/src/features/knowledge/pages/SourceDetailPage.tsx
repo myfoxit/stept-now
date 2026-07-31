@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileText, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileText, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -26,11 +26,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { fullDateTime, timeAgo } from '@/lib/format'
 import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
 
-import { knowledgeApi, knowledgeKeys } from '../api'
+import { knowledgeApi, knowledgeKeys, REMOTE_SOURCE_TYPES } from '../api'
 import { AddDocumentDialog } from '../components/AddDocumentDialog'
+import { AddSourceDialog } from '../components/AddSourceDialog'
 import { ErrorState, ListSkeleton, PageHeader, PageShell, ScrollBody } from '../components/shell'
-import { DocStatusBadge, SourceStatusBadge, SourceTypeIcon } from '../components/status'
+import {
+  AutoSyncBadge,
+  CredentialsBadge,
+  DocStatusBadge,
+  SourceStatusBadge,
+  SourceTypeIcon,
+} from '../components/status'
 import { useDocument, useDocuments, useSource } from '../hooks'
+import { refreshMinutes, sourceTypeLabel } from '../lib'
 
 export function Component() {
   const { sourceId = '' } = useParams()
@@ -40,6 +48,7 @@ export function Component() {
   const source = useSource(sourceId)
   const documents = useDocuments(sourceId)
   const [addOpen, setAddOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [previewId, setPreviewId] = useState<string | null>(null)
 
   const syncMutation = useMutation({
@@ -73,7 +82,7 @@ export function Component() {
 
   const docs = documents.data?.items ?? []
   const src = source.data
-  const canSync = src && (src.type === 'urls' || src.type === 'articles')
+  const canSync = src && REMOTE_SOURCE_TYPES.includes(src.type)
   const canAdd = src && (src.type === 'files' || src.type === 'text')
 
   return (
@@ -98,6 +107,11 @@ export function Component() {
                 <RefreshCw className="size-4" /> Re-sync
               </Button>
             ) : null}
+            {canWrite && src ? (
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Pencil className="size-4" /> Edit
+              </Button>
+            ) : null}
             {canWrite && canAdd ? (
               <Button size="sm" onClick={() => setAddOpen(true)}>
                 <Plus className="size-4" /> Add document
@@ -114,9 +128,20 @@ export function Component() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-medium">{src.name}</p>
-              <p className="text-sm capitalize text-muted-foreground">{src.type} source</p>
+              <p className="text-sm text-muted-foreground">
+                {sourceTypeLabel(src.type)} source
+                {src.last_synced_at ? (
+                  <span title={fullDateTime(src.last_synced_at)}>
+                    {' · '}last synced {timeAgo(src.last_synced_at)} ago
+                  </span>
+                ) : null}
+              </p>
             </div>
-            <SourceStatusBadge status={src.status} error={src.error} />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <SourceStatusBadge status={src.status} error={src.error} />
+              <AutoSyncBadge minutes={refreshMinutes(src.config)} />
+              <CredentialsBadge hasSecrets={src.has_secrets} />
+            </div>
           </div>
         ) : null}
 
@@ -209,6 +234,7 @@ export function Component() {
       {src && canAdd ? (
         <AddDocumentDialog source={src} open={addOpen} onOpenChange={setAddOpen} />
       ) : null}
+      {src ? <AddSourceDialog source={src} open={editOpen} onOpenChange={setEditOpen} /> : null}
       <DocumentPreviewDialog id={previewId} onClose={() => setPreviewId(null)} />
     </PageShell>
   )

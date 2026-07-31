@@ -6,8 +6,14 @@ import {
   Clock,
   FileText,
   Files,
+  Github,
   Globe,
+  KeyRound,
+  Link2,
   Loader2,
+  Map,
+  NotebookText,
+  RefreshCw,
   Type,
   XCircle,
 } from 'lucide-react'
@@ -19,8 +25,12 @@ import { cn } from '@/lib/utils'
 
 const SOURCE_ICONS: Record<string, LucideIcon> = {
   files: Files,
-  urls: Globe,
+  urls: Link2,
   text: Type,
+  sitemap: Map,
+  crawl: Globe,
+  github: Github,
+  notion: NotebookText,
   articles: FileText,
 }
 
@@ -68,6 +78,26 @@ const DOC_STATUS: Record<
   processing: { label: 'Processing', icon: Loader2, className: 'text-blue-600 dark:text-blue-400', spin: true },
   pending: { label: 'Pending', icon: Clock, className: 'text-amber-600 dark:text-amber-400' },
   failed: { label: 'Failed', icon: XCircle, className: 'text-destructive' },
+}
+
+/** "Auto-sync: every Nm" pill for sources with a configured refresh interval. */
+export function AutoSyncBadge({ minutes }: { minutes: number | null }) {
+  if (minutes === null) return null
+  return (
+    <Badge variant="secondary" className="gap-1">
+      <RefreshCw className="size-3" /> Auto-sync: every {minutes}m
+    </Badge>
+  )
+}
+
+/** Shown when a source has an encrypted secret (e.g. GitHub / Notion token) stored. */
+export function CredentialsBadge({ hasSecrets }: { hasSecrets: boolean }) {
+  if (!hasSecrets) return null
+  return (
+    <Badge variant="outline" className="gap-1">
+      <KeyRound className="size-3" /> Credentials set
+    </Badge>
+  )
 }
 
 export function DocStatusBadge({ status, error }: { status: string; error?: string | null }) {

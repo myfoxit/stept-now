@@ -19,6 +19,10 @@ export type CopilotResult = components['schemas']['CopilotResult']
 export type FileOut = components['schemas']['FileOut']
 export type Member = components['schemas']['MembershipOut']
 export type Team = components['schemas']['TeamOut']
+export type ConversationSla = components['schemas']['ConversationSlaOut']
+export type SlaPolicy = components['schemas']['SlaPolicyOut']
+export type SlaEvent = components['schemas']['SlaEventOut']
+export type MessageFeedback = components['schemas']['MessageFeedbackOut']
 export type { Tag } from '@/features/contacts/api'
 
 export interface AttachmentRef {
@@ -96,6 +100,28 @@ export const approvalsApi = {
   listPending: () => api.get<Approval[]>(ws('/ai/approvals') + qs({ status: 'pending' })),
   decide: (id: string, approved: boolean, note?: string) =>
     api.post<Approval>(ws(`/ai/approvals/${id}/decide`), { approved, note }),
+}
+
+export const slaApi = {
+  get: (conversationId: string) =>
+    api.get<ConversationSla>(ws(`/conversations/${conversationId}/sla`)),
+  apply: (conversationId: string, slaPolicyId: string | null) =>
+    api.put<ConversationSla>(ws(`/conversations/${conversationId}/sla`), {
+      sla_policy_id: slaPolicyId,
+    }),
+  listPolicies: () => api.get<SlaPolicy[]>(ws('/slas')),
+}
+
+export const feedbackApi = {
+  list: (conversationId: string, messageId: string) =>
+    api.get<MessageFeedback[]>(
+      ws(`/conversations/${conversationId}/messages/${messageId}/feedback`)
+    ),
+  submit: (conversationId: string, messageId: string, rating: 'up' | 'down') =>
+    api.post<MessageFeedback>(
+      ws(`/conversations/${conversationId}/messages/${messageId}/feedback`),
+      { rating }
+    ),
 }
 
 /** Read citations out of a message's meta (agent/AI replies). */

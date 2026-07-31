@@ -11,6 +11,7 @@ import { ChannelsPanel } from '../components/ChannelsPanel'
 import { MembersPanel } from '../components/MembersPanel'
 import { ProfilePanel } from '../components/ProfilePanel'
 import { RolesPanel } from '../components/RolesPanel'
+import { SlaPanel } from '../components/SlaPanel'
 import { WorkspacePanel } from '../components/WorkspacePanel'
 import { SECTIONS } from '../sections'
 
@@ -19,6 +20,7 @@ const PANELS: Record<string, () => ReactElement> = {
   members: () => <MembersPanel />,
   roles: () => <RolesPanel />,
   channels: () => <ChannelsPanel />,
+  sla: () => <SlaPanel />,
   'api-keys': () => <ApiKeysPanel />,
   audit: () => <AuditPanel />,
   profile: () => <ProfilePanel />,

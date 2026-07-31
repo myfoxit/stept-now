@@ -41,6 +41,7 @@ const KNOWLEDGE_TABS = [
   { to: '/knowledge', label: 'Sources', end: true },
   { to: '/knowledge/articles', label: 'Help center', end: false },
   { to: '/knowledge/search', label: 'Search playground', end: false },
+  { to: '/knowledge/analytics', label: 'Analytics', end: false },
 ]
 
 export function KnowledgeNav() {

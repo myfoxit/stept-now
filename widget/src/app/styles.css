@@ -355,6 +355,39 @@ body {
   color: var(--sw-accent);
 }
 
+/* answer feedback (AI thumbs) */
+.sw-fb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 3px 0 0 2px;
+}
+.sw-fb-btn {
+  border: 0;
+  background: transparent;
+  color: var(--sw-muted);
+  padding: 3px 5px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.65;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.sw-fb-btn:hover {
+  opacity: 1;
+  background: var(--sw-bubble-them);
+}
+.sw-fb-on {
+  opacity: 1;
+  color: var(--sw-accent);
+}
+.sw-fb-thanks {
+  font-size: 11px;
+  color: var(--sw-muted);
+  margin-left: 4px;
+}
+
 /* typing dots */
 .sw-typing {
   display: inline-flex;

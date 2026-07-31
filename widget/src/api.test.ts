@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, fetchTours, normalizeBase, WidgetApi, widgetWsUrl } from './api'
+import {
+  ApiError,
+  fetchCampaigns,
+  fetchTours,
+  normalizeBase,
+  sendMessageFeedback,
+  triggerCampaign,
+  WidgetApi,
+  widgetWsUrl,
+} from './api'
 
 interface FetchCall {
   url: string
@@ -77,6 +86,40 @@ describe('tour helpers', () => {
     expect(url.searchParams.get('widget_key')).toBe('wk_x')
     expect(url.searchParams.get('url')).toBe('https://site.test/pricing')
     expect(calls[0]!.init.headers!['X-Widget-Token']).toBe('tok')
+  })
+})
+
+describe('campaign helpers', () => {
+  it('fetchCampaigns GETs the public list with widget_key only (no token header)', async () => {
+    const calls = mockFetch({ body: [] })
+    await fetchCampaigns('http://api:8600/', 'wk_x')
+    const url = new URL(calls[0]!.url)
+    expect(url.pathname).toBe('/api/widget/campaigns')
+    expect(url.searchParams.get('widget_key')).toBe('wk_x')
+    expect(calls[0]!.init.method).toBeUndefined()
+    expect(calls[0]!.init.headers ?? {}).not.toHaveProperty('X-Widget-Token')
+  })
+
+  it('triggerCampaign POSTs with the widget token header and parses the result', async () => {
+    const calls = mockFetch({ body: { skipped: false, conversation_id: 'conv9' } })
+    const result = await triggerCampaign('http://api:8600', 'tok-1', 'camp1')
+    expect(calls[0]!.url).toBe('http://api:8600/api/widget/campaigns/camp1/trigger')
+    expect(calls[0]!.init.method).toBe('POST')
+    expect(calls[0]!.init.headers!['X-Widget-Token']).toBe('tok-1')
+    expect(result).toEqual({ skipped: false, conversation_id: 'conv9' })
+  })
+})
+
+describe('sendMessageFeedback', () => {
+  it('POSTs the rating body to the message feedback endpoint with the token', async () => {
+    const calls = mockFetch({ body: { ok: true, rating: 'up' } })
+    await sendMessageFeedback('http://api:8600', 'tok-2', 'conv1', 'm7', 'up')
+    expect(calls[0]!.url).toBe(
+      'http://api:8600/api/widget/conversations/conv1/messages/m7/feedback',
+    )
+    expect(calls[0]!.init.method).toBe('POST')
+    expect(JSON.parse(calls[0]!.init.body!)).toEqual({ rating: 'up' })
+    expect(calls[0]!.init.headers!['X-Widget-Token']).toBe('tok-2')
   })
 })
 

@@ -9,11 +9,15 @@
 
 import type {
   BootResult,
+  Campaign,
+  CampaignTriggerResult,
   ConversationSummary,
   CsatOut,
   CursorPage,
   ArticleDetail,
+  FeedbackRating,
   Identity,
+  MessageFeedbackAck,
   Tour,
   TourEventName,
   WidgetArticlesResponse,
@@ -195,4 +199,42 @@ export async function postTourEvent(
     headers,
     body: JSON.stringify({ event, step_index: stepIndex }),
   })
+}
+
+// --- campaigns + answer feedback --------------------------------------------
+
+/** GET the enabled ongoing campaigns for this widget inbox (public key, no token). */
+export function fetchCampaigns(base: string, widgetKey: string): Promise<Campaign[]> {
+  const q = `?widget_key=${encodeURIComponent(widgetKey)}`
+  return request<Campaign[]>(base, `/api/widget/campaigns${q}`)
+}
+
+/**
+ * POST a due campaign trigger (visitor token). The backend enforces the
+ * fresh-visitor semantics and answers `{conversation_id}` or `{skipped: true}`.
+ */
+export function triggerCampaign(
+  base: string,
+  token: string,
+  campaignId: string,
+): Promise<CampaignTriggerResult> {
+  return request<CampaignTriggerResult>(base, `/api/widget/campaigns/${campaignId}/trigger`, {
+    method: 'POST',
+    token,
+  })
+}
+
+/** POST the visitor's thumbs rating on an agent/AI answer (upserts server-side). */
+export function sendMessageFeedback(
+  base: string,
+  token: string,
+  conversationId: string,
+  messageId: string,
+  rating: FeedbackRating,
+): Promise<MessageFeedbackAck> {
+  return request<MessageFeedbackAck>(
+    base,
+    `/api/widget/conversations/${conversationId}/messages/${messageId}/feedback`,
+    { method: 'POST', token, body: JSON.stringify({ rating }) },
+  )
 }

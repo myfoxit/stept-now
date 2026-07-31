@@ -8,17 +8,31 @@
  *  - bridge the host page and the iframe over postMessage;
  *  - expose the `window.Stept(cmd, …)` queue API;
  *  - run the host-DOM product-tour player: on boot and on SPA URL changes it
- *    fetches eligible tours and auto-starts the first one, reporting telemetry.
+ *    fetches eligible tours and auto-starts the first one, reporting telemetry;
+ *  - run the proactive-campaign engine: evaluate ongoing campaigns against the
+ *    current URL + time-on-page and nudge the iframe (which holds the visitor
+ *    token) to trigger at most one per page view — badge only, never auto-open.
  *
  * No framework, no external deps. Kept small; the testable pieces live in
  * loader-core.ts, tour-player.ts and api.ts.
  */
 
-import { fetchTours, postTourEvent } from './api'
-import { installStept, type SteptCommandHandlers, type SteptFn } from './loader-core'
+import { fetchCampaigns, fetchTours, postTourEvent } from './api'
+import {
+  campaignDelayMs,
+  campaignSeenKey,
+  firstDueCampaign,
+  installStept,
+  pruneSeenCampaigns,
+  readSeenSet,
+  selectEligibleCampaigns,
+  writeSeenSet,
+  type SteptCommandHandlers,
+  type SteptFn,
+} from './loader-core'
 import { envelope, MSG, type MessageType, parseEnvelope } from './protocol'
 import { selectFirstEligibleTour, TourPlayer } from './tour-player'
-import type { SteptSettings, Tour, TourEventName } from './types'
+import type { Campaign, SteptSettings, Tour, TourEventName } from './types'
 
 const currentScript = document.currentScript as HTMLScriptElement | null
 
@@ -82,6 +96,11 @@ class WidgetHost {
 
   private tourPlayer: TourPlayer
   private lastTourUrl = ''
+
+  /** Ongoing campaigns, fetched once per page session (reset on re-boot). */
+  private campaigns: Campaign[] | null = null
+  private campaignTimer: number | null = null
+  private lastCampaignUrl = ''
 
   constructor(settings: SteptSettings) {
     this.settings = settings
@@ -188,6 +207,9 @@ class WidgetHost {
 
   shutdown(): void {
     window.removeEventListener('message', this.onMessage)
+    this.clearCampaignTimer()
+    this.campaigns = null
+    this.lastCampaignUrl = ''
     this.launcher?.remove()
     this.frame?.remove()
     this.launcher = this.frame = this.badge = null
@@ -235,7 +257,8 @@ class WidgetHost {
           this.applyPosition(payload.position)
         }
         this.setUnread(Number(payload.unread ?? 0))
-        this.checkTours(true)
+        void this.checkTours(true)
+        void this.checkCampaigns(true)
         break
       case MSG.UNREAD:
         this.setUnread(Number(payload.count ?? 0))
@@ -279,7 +302,10 @@ class WidgetHost {
   private activeTourId: string | null = null
 
   private watchUrlChanges(): void {
-    const fire = () => void this.checkTours(false)
+    const fire = () => {
+      void this.checkTours(false)
+      void this.checkCampaigns(false)
+    }
     for (const method of ['pushState', 'replaceState'] as const) {
       const original = history[method]
       history[method] = function (this: History, ...args: Parameters<History['pushState']>) {
@@ -356,6 +382,66 @@ class WidgetHost {
 
   private seenKey(): string {
     return `stept:tours-seen:${this.widgetKey}`
+  }
+
+  // --- proactive campaigns -------------------------------------------------
+
+  /**
+   * Mirror of the tour check: on READY and on SPA URL changes, evaluate the
+   * ongoing campaigns against the current URL and arm ONE timer for the first
+   * due campaign. Firing marks it seen (optimistically) and asks the iframe —
+   * which holds the visitor token — to POST the trigger. Never opens the panel.
+   */
+  private async checkCampaigns(force: boolean): Promise<void> {
+    const url = window.location.href
+    if (!force && url === this.lastCampaignUrl) return
+    this.lastCampaignUrl = url
+    this.clearCampaignTimer()
+    if (!this.token) return // wait for READY — the iframe does the authed trigger
+    try {
+      if (!this.campaigns) {
+        this.campaigns = await fetchCampaigns(this.apiBase, this.widgetKey)
+      }
+    } catch (err) {
+      console.warn('[stept] campaign check failed', err)
+      return
+    }
+    const campaigns = this.campaigns
+    if (!campaigns?.length) return
+    const storage = this.storage()
+    const key = campaignSeenKey(this.widgetKey)
+    const seen = pruneSeenCampaigns(readSeenSet(storage, key), campaigns)
+    writeSeenSet(storage, key, seen)
+    const due = firstDueCampaign(selectEligibleCampaigns(campaigns, url, seen))
+    if (!due) return
+    this.campaignTimer = window.setTimeout(() => this.fireCampaign(due), campaignDelayMs(due))
+  }
+
+  private fireCampaign(campaign: Campaign): void {
+    this.campaignTimer = null
+    // Mark seen before the trigger round-trips so it can never fire twice
+    // locally; skipped/error outcomes intentionally stay seen too.
+    const storage = this.storage()
+    const key = campaignSeenKey(this.widgetKey)
+    const seen = readSeenSet(storage, key)
+    seen.add(campaign.id)
+    writeSeenSet(storage, key, seen)
+    this.post(MSG.CAMPAIGN_DUE, { campaignId: campaign.id })
+  }
+
+  private clearCampaignTimer(): void {
+    if (this.campaignTimer !== null) {
+      window.clearTimeout(this.campaignTimer)
+      this.campaignTimer = null
+    }
+  }
+
+  private storage(): Storage | null {
+    try {
+      return window.localStorage
+    } catch {
+      return null
+    }
   }
 }
 

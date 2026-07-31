@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, MoreVertical, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { BookOpen, MoreVertical, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -21,9 +21,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
+import { timeAgo } from '@/lib/format'
 import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
 
-import { knowledgeApi, knowledgeKeys } from '../api'
+import { knowledgeApi, knowledgeKeys, REMOTE_SOURCE_TYPES, type Source } from '../api'
 import { AddSourceDialog } from '../components/AddSourceDialog'
 import {
   ErrorState,
@@ -33,8 +34,14 @@ import {
   PageShell,
   ScrollBody,
 } from '../components/shell'
-import { SourceStatusBadge, SourceTypeIcon } from '../components/status'
+import {
+  AutoSyncBadge,
+  CredentialsBadge,
+  SourceStatusBadge,
+  SourceTypeIcon,
+} from '../components/status'
 import { useSources } from '../hooks'
+import { refreshMinutes, sourceTypeLabel } from '../lib'
 
 export function Component() {
   const navigate = useNavigate()
@@ -42,6 +49,7 @@ export function Component() {
   const workspaceId = currentWorkspaceId()
   const canWrite = useHasPerm('knowledge:write')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editSource, setEditSource] = useState<Source | null>(null)
   const { data: sources, isLoading, isError, refetch } = useSources()
 
   const syncMutation = useMutation({
@@ -89,7 +97,8 @@ export function Component() {
               </EmptyMedia>
               <EmptyTitle>No knowledge sources yet</EmptyTitle>
               <EmptyDescription>
-                Upload files, crawl URLs or paste text so your AI agents have something to cite.
+                Upload files, crawl sites, or connect GitHub and Notion so your AI agents have
+                something to cite.
               </EmptyDescription>
             </EmptyHeader>
             {canWrite ? (
@@ -102,72 +111,84 @@ export function Component() {
           </Empty>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {sources.map((source) => (
-              <Card
-                key={source.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/knowledge/sources/${source.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') navigate(`/knowledge/sources/${source.id}`)
-                }}
-                className="cursor-pointer transition-colors hover:border-primary/40"
-              >
-                <CardContent className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex size-9 items-center justify-center rounded-md bg-muted">
-                      <SourceTypeIcon type={source.type} />
+            {sources.map((source) => {
+              const isRemote = REMOTE_SOURCE_TYPES.includes(source.type)
+              const autoSync = refreshMinutes(source.config)
+              return (
+                <Card
+                  key={source.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/knowledge/sources/${source.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navigate(`/knowledge/sources/${source.id}`)
+                  }}
+                  className="cursor-pointer transition-colors hover:border-primary/40"
+                >
+                  <CardContent className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex size-9 items-center justify-center rounded-md bg-muted">
+                        <SourceTypeIcon type={source.type} />
+                      </div>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {canWrite && isRemote ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-8"
+                            aria-label="Re-sync source"
+                            disabled={syncMutation.isPending}
+                            onClick={() => syncMutation.mutate(source.id)}
+                          >
+                            <RefreshCw className="size-4" />
+                          </Button>
+                        ) : null}
+                        {canWrite ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-8"
+                                aria-label="Source actions"
+                              >
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditSource(source)}>
+                                <Pencil className="size-4" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => deleteMutation.mutate(source.id)}
+                              >
+                                <Trash2 className="size-4" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      {canWrite && (source.type === 'urls' || source.type === 'articles') ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-8"
-                          aria-label="Re-sync source"
-                          disabled={syncMutation.isPending}
-                          onClick={() => syncMutation.mutate(source.id)}
-                        >
-                          <RefreshCw className="size-4" />
-                        </Button>
-                      ) : null}
-                      {canWrite ? (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="size-8"
-                              aria-label="Source actions"
-                            >
-                              <MoreVertical className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => deleteMutation.mutate(source.id)}
-                            >
-                              <Trash2 className="size-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      ) : null}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{source.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {source.document_count}{' '}
+                        {source.document_count === 1 ? 'document' : 'documents'}
+                        {' · '}
+                        {sourceTypeLabel(source.type)}
+                        {source.last_synced_at ? ` · synced ${timeAgo(source.last_synced_at)} ago` : ''}
+                      </p>
                     </div>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{source.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {source.document_count}{' '}
-                      {source.document_count === 1 ? 'document' : 'documents'}
-                      {' · '}
-                      <span className="capitalize">{source.type}</span>
-                    </p>
-                  </div>
-                  <SourceStatusBadge status={source.status} error={source.error} />
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <SourceStatusBadge status={source.status} error={source.error} />
+                      <AutoSyncBadge minutes={autoSync} />
+                      <CredentialsBadge hasSecrets={source.has_secrets} />
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
       </ScrollBody>
@@ -176,6 +197,15 @@ export function Component() {
         onOpenChange={setDialogOpen}
         onCreated={(source) => navigate(`/knowledge/sources/${source.id}`)}
       />
+      {editSource ? (
+        <AddSourceDialog
+          source={editSource}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditSource(null)
+          }}
+        />
+      ) : null}
     </PageShell>
   )
 }

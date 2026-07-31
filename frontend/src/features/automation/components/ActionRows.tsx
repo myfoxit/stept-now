@@ -5,15 +5,20 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 
-import { ACTION_SPECS, ACTION_TYPES } from '../constants'
+import { ACTION_SPECS, ACTION_TYPES, type Option, type ParamField } from '../constants'
 import { emptyActionRow, localId, type ActionRow } from '../lib'
 
 export function ActionRows({
   rows,
   onChange,
+  specs = ACTION_SPECS,
+  types = ACTION_TYPES,
 }: {
   rows: ActionRow[]
   onChange: (rows: ActionRow[]) => void
+  /** Action catalog to build against — defaults to automation-rule actions. */
+  specs?: Record<string, { label: string; params: ParamField[] }>
+  types?: Option[]
 }) {
   function update(id: string, patch: Partial<ActionRow>) {
     onChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))
@@ -33,7 +38,7 @@ export function ActionRows({
   return (
     <div className="grid gap-3">
       {rows.map((row) => {
-        const spec = ACTION_SPECS[row.type]
+        const spec = specs[row.type]
         return (
           <div
             key={row.id}
@@ -47,7 +52,7 @@ export function ActionRows({
                 value={row.type}
                 onChange={(event) => update(row.id, { type: event.target.value, params: {} })}
               >
-                {ACTION_TYPES.map((option) => (
+                {types.map((option) => (
                   <NativeSelectOption key={option.value} value={option.value}>
                     {option.label}
                   </NativeSelectOption>

@@ -11,6 +11,7 @@ import {
   membersApi,
   profileApi,
   rolesApi,
+  slasApi,
   workspaceApi,
   type ApiKeyCreate,
   type InboxCreate,
@@ -19,6 +20,8 @@ import {
   type MemberUpdate,
   type RoleCreate,
   type RoleUpdate,
+  type SlaPolicyCreate,
+  type SlaPolicyUpdate,
   type WorkspaceUpdate,
 } from './api'
 
@@ -240,6 +243,51 @@ export function useDeleteInbox() {
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete channel')),
+  })
+}
+
+// --- sla policies -----------------------------------------------------------
+
+export function useSlaPolicies() {
+  return useQuery({ queryKey: useKey('slas'), queryFn: slasApi.list })
+}
+
+export function useCreateSlaPolicy() {
+  const queryClient = useQueryClient()
+  const key = useKey('slas')
+  return useMutation({
+    mutationFn: (body: SlaPolicyCreate) => slasApi.create(body),
+    onSuccess: () => {
+      toast.success('SLA policy created')
+      void queryClient.invalidateQueries({ queryKey: key })
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not create SLA policy')),
+  })
+}
+
+export function useUpdateSlaPolicy() {
+  const queryClient = useQueryClient()
+  const key = useKey('slas')
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: SlaPolicyUpdate }) => slasApi.update(id, body),
+    onSuccess: () => {
+      toast.success('SLA policy saved')
+      void queryClient.invalidateQueries({ queryKey: key })
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not save SLA policy')),
+  })
+}
+
+export function useDeleteSlaPolicy() {
+  const queryClient = useQueryClient()
+  const key = useKey('slas')
+  return useMutation({
+    mutationFn: (id: string) => slasApi.remove(id),
+    onSuccess: () => {
+      toast.success('SLA policy deleted')
+      void queryClient.invalidateQueries({ queryKey: key })
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not delete SLA policy')),
   })
 }
 

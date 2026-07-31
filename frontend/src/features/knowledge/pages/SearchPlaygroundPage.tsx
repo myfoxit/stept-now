@@ -6,8 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 
 import { KnowledgeNav, PageHeader, PageShell, ScrollBody } from '../components/shell'
@@ -17,13 +19,19 @@ export function Component() {
   const [query, setQuery] = useState('')
   const [k, setK] = useState(8)
   const [scoped, setScoped] = useState<string[]>([])
+  const [rerank, setRerank] = useState(false)
   const sources = useSources()
   const search = useSearch()
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!query.trim()) return
-    search.mutate({ query: query.trim(), k, source_ids: scoped.length ? scoped : null })
+    search.mutate({
+      query: query.trim(),
+      k,
+      source_ids: scoped.length ? scoped : null,
+      ...(rerank ? { rerank: true } : {}),
+    })
   }
 
   function toggleSource(id: string) {
@@ -69,6 +77,18 @@ export function Component() {
               {search.isPending ? <Spinner className="size-4" /> : <Search className="size-4" />}
               Search
             </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex items-center gap-2">
+              <Switch id="rerank-toggle" checked={rerank} onCheckedChange={setRerank} />
+              <Label htmlFor="rerank-toggle" className="text-sm font-medium">
+                Rerank with AI
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              One extra LLM pass reorders results — falls back to fused order on failure.
+            </p>
           </div>
 
           {sources.data && sources.data.length > 0 ? (

@@ -19,14 +19,17 @@ import { ApiError } from '@/api/client'
 import { useRealtime } from '@/api/ws'
 import { useAuthStore } from '@/stores/auth'
 import type { CursorPage } from '@/features/contacts/api'
+import { macrosApi, type MacroRunOut } from '@/features/automation/api'
 import {
   approvalsApi,
   copilotSuggest,
+  feedbackApi,
   inboxApi,
   listCanned,
   listInboxes,
   listMembers,
   listTeams,
+  slaApi,
   type AttachmentRef,
   type Conversation,
   type ConversationFilters,
@@ -108,6 +111,99 @@ export function usePendingApprovals() {
     queryKey: [AREA, workspaceId, 'approvals'],
     enabled: !!workspaceId,
     queryFn: approvalsApi.listPending,
+  })
+}
+
+// --- sla --------------------------------------------------------------------
+
+export function useConversationSla(conversationId: string | undefined) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: ['sla', workspaceId, conversationId],
+    enabled: !!workspaceId && !!conversationId,
+    queryFn: () => slaApi.get(conversationId!),
+  })
+}
+
+/** SLA policies available to apply (small list; shared 'sla' area cache). */
+export function useSlaPolicyOptions(enabled = true) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: ['sla', workspaceId, 'policies'],
+    enabled: !!workspaceId && enabled,
+    queryFn: slaApi.listPolicies,
+  })
+}
+
+export function useApplySla(conversationId: string) {
+  const qc = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: (slaPolicyId: string | null) => slaApi.apply(conversationId, slaPolicyId),
+    onSuccess: (_out, slaPolicyId) => {
+      toast.success(slaPolicyId ? 'SLA applied' : 'SLA removed')
+      qc.invalidateQueries({ queryKey: ['sla', workspaceId, conversationId] })
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not update SLA'),
+  })
+}
+
+// --- macros (run from the inbox) --------------------------------------------
+
+/** Macros available to run; keyed with the automation area so both share cache. */
+export function useRunnableMacros(enabled = true) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: ['automation', workspaceId, 'macros'],
+    enabled: !!workspaceId && enabled,
+    queryFn: macrosApi.list,
+  })
+}
+
+export function useRunMacro(conversationId: string) {
+  const qc = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: (macroId: string) => macrosApi.run(macroId, conversationId),
+    onSuccess: (out: MacroRunOut) => {
+      const failed = out.results.filter((r) => !r.ok)
+      if (failed.length === 0) {
+        toast.success('Macro applied')
+      } else {
+        toast.error('Macro partially applied', {
+          description: `Failed: ${failed
+            .map((f) => `${f.action}${f.error ? ` (${f.error})` : ''}`)
+            .join(', ')}`,
+        })
+      }
+      qc.invalidateQueries({ queryKey: [AREA, workspaceId, 'conversation', conversationId] })
+      qc.invalidateQueries({ queryKey: [AREA, workspaceId, 'messages', conversationId] })
+      qc.invalidateQueries({ queryKey: [AREA, workspaceId, 'conversations'] })
+      qc.invalidateQueries({ queryKey: ['sla', workspaceId, conversationId] })
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not run macro'),
+  })
+}
+
+// --- message feedback -------------------------------------------------------
+
+export function useMessageFeedback(message: Pick<Message, 'id' | 'conversation_id'>, enabled: boolean) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'feedback', message.id],
+    enabled: !!workspaceId && enabled,
+    queryFn: () => feedbackApi.list(message.conversation_id, message.id),
+  })
+}
+
+export function useSubmitMessageFeedback(message: Pick<Message, 'id' | 'conversation_id'>) {
+  return useMutation({
+    mutationFn: (rating: 'up' | 'down') =>
+      feedbackApi.submit(message.conversation_id, message.id, rating),
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not record feedback'),
   })
 }
 

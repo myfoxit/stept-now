@@ -43,4 +43,46 @@ describe('SearchPlaygroundPage', () => {
     expect(screen.getByText('0.4200')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText(/1 result in 12 ms/i)).toBeInTheDocument())
   })
+
+  it('sends rerank: true when the "Rerank with AI" switch is on', async () => {
+    const fetchFn = mockFetch({
+      'GET /api/v1/w/w1/knowledge/sources': () => ({ body: [] }),
+      'POST /api/v1/w/w1/knowledge/search': () => ({ body: { results: [], latency_ms: 5 } }),
+    })
+    renderPage(<SearchPlaygroundPage />)
+
+    await userEvent.click(screen.getByRole('switch', { name: /rerank with ai/i }))
+    await userEvent.type(screen.getByLabelText(/search query/i), 'refund policy')
+    await userEvent.click(screen.getByRole('button', { name: /^search$/i }))
+
+    await waitFor(() => {
+      const call = fetchFn.mock.calls.find(
+        ([url, init]) => init?.method === 'POST' && String(url).endsWith('/knowledge/search')
+      )
+      expect(call).toBeDefined()
+      expect(JSON.parse(String(call![1]?.body))).toMatchObject({
+        query: 'refund policy',
+        rerank: true,
+      })
+    })
+  })
+
+  it('omits rerank from the body when the switch is off', async () => {
+    const fetchFn = mockFetch({
+      'GET /api/v1/w/w1/knowledge/sources': () => ({ body: [] }),
+      'POST /api/v1/w/w1/knowledge/search': () => ({ body: { results: [], latency_ms: 5 } }),
+    })
+    renderPage(<SearchPlaygroundPage />)
+
+    await userEvent.type(screen.getByLabelText(/search query/i), 'refund policy')
+    await userEvent.click(screen.getByRole('button', { name: /^search$/i }))
+
+    await waitFor(() => {
+      const call = fetchFn.mock.calls.find(
+        ([url, init]) => init?.method === 'POST' && String(url).endsWith('/knowledge/search')
+      )
+      expect(call).toBeDefined()
+      expect(JSON.parse(String(call![1]?.body))).not.toHaveProperty('rerank')
+    })
+  })
 })

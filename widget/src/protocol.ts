@@ -23,6 +23,12 @@ export const MSG = {
   TOUR_START: 'stept:tour:start',
   /** loader -> app: a tour lifecycle event happened (mirrors backend telemetry). */
   TOUR_EVENT: 'stept:tour:event',
+  /**
+   * loader -> app: an ongoing campaign's trigger rules matched on the host page
+   * (payload `{campaignId}`). The app holds the visitor token, so it performs
+   * the actual trigger POST.
+   */
+  CAMPAIGN_DUE: 'stept:campaign:due',
 } as const
 
 export type MessageType = (typeof MSG)[keyof typeof MSG]

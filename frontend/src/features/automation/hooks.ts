@@ -6,10 +6,13 @@ import { currentWorkspaceId } from '@/stores/auth'
 
 import {
   automationApi,
+  macrosApi,
   webhooksApi,
   type AutomationRule,
   type AutomationRuleCreate,
   type AutomationRuleUpdate,
+  type MacroCreate,
+  type MacroUpdate,
   type WebhookCreate,
   type WebhookUpdate,
 } from './api'
@@ -104,6 +107,58 @@ export function useReorderRules() {
     },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ['automation', workspaceId, 'rules'] }),
+  })
+}
+
+// --- macros -----------------------------------------------------------------
+
+export function useMacros() {
+  const workspaceId = currentWorkspaceId()
+  return useQuery({
+    queryKey: ['automation', workspaceId, 'macros'],
+    queryFn: macrosApi.list,
+  })
+}
+
+function useMacrosInvalidate() {
+  const queryClient = useQueryClient()
+  const workspaceId = currentWorkspaceId()
+  return () => queryClient.invalidateQueries({ queryKey: ['automation', workspaceId, 'macros'] })
+}
+
+export function useCreateMacro() {
+  const invalidate = useMacrosInvalidate()
+  return useMutation({
+    mutationFn: (body: MacroCreate) => macrosApi.create(body),
+    onSuccess: () => {
+      toast.success('Macro created')
+      void invalidate()
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not create macro')),
+  })
+}
+
+export function useUpdateMacro() {
+  const invalidate = useMacrosInvalidate()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: MacroUpdate }) => macrosApi.update(id, body),
+    onSuccess: () => {
+      toast.success('Macro saved')
+      void invalidate()
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not save macro')),
+  })
+}
+
+export function useDeleteMacro() {
+  const invalidate = useMacrosInvalidate()
+  return useMutation({
+    mutationFn: (id: string) => macrosApi.remove(id),
+    onSuccess: () => {
+      toast.success('Macro deleted')
+      void invalidate()
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not delete macro')),
   })
 }
 

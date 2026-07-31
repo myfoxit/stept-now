@@ -25,11 +25,17 @@ self-hostable and MIT-licensed:
 
 - 🗂️ **Shared team inbox** — conversations across every channel in one place, with
   assignment, teams, private notes, tags, canned responses, priorities, snooze, and CSAT.
-- 💬 **Multi-channel** — embeddable web chat widget, email, Slack, Telegram, and a public
-  API channel. All conversation logic is channel-agnostic; adding a channel is one adapter.
-- 📚 **World-class RAG** — upload docs or crawl URLs → parse → chunk → embed → **hybrid
-  retrieval** (dense vectors + full-text, fused with Reciprocal Rank Fusion, neighbor-
-  expanded) with inline citations. Your help-center articles are first-class RAG sources.
+- 💬 **Multi-channel** — embeddable web chat widget, email, Slack, Telegram, **WhatsApp
+  (Cloud API)**, **Facebook Messenger**, **Instagram DM**, **SMS (Twilio)**, **LINE**, and
+  a public API channel — with signature-verified webhooks, delivery receipts, and
+  WhatsApp's 24h-session-window rules handled for you. All conversation logic is
+  channel-agnostic; adding a channel is one adapter.
+- 📚 **World-class RAG** — upload docs, crawl sites (recursive or sitemap), or connect
+  **GitHub** and **Notion** → parse → chunk → embed → **hybrid retrieval** (dense vectors +
+  full-text, fused with Reciprocal Rank Fusion, neighbor-expanded, optional **LLM rerank**)
+  with inline citations. Sources re-sync on a schedule, prune deleted pages, and your
+  help-center articles are first-class RAG sources. **Search analytics** show what people
+  ask, what got zero results, and how often the AI deflects a conversation.
 - 🤖 **AI agents ("Fin", but yours)** — configurable AI support agents with tools,
   guardrails, and **human approval gates**: an agent can search your knowledge base, tag
   or resolve a conversation, collect details, call your own HTTP actions, or hand off to a
@@ -40,6 +46,10 @@ self-hostable and MIT-licensed:
   ships in the box so every AI feature runs offline with zero API keys.
 - 🧭 **Product tours (DAP)** — build step-by-step in-app guides with a Chrome recorder
   extension; the widget plays them in your app. Onboarding without shipping code.
+- 📣 **Campaigns & SLAs** — proactive in-app messages (URL + time-on-page triggered) and
+  one-off scheduled sends to a segment; SLA policies with first-response / next-response /
+  resolution targets, breach events, and inbox badges. Plus **macros** (one-click
+  multi-action shortcuts) and 👍/👎 feedback on AI answers.
 - 🔐 **Enterprise-ready** — multi-workspace tenancy, RBAC with builtin + custom roles,
   team management, invitations, API keys with scopes, audit log, outbound webhooks.
 - 🧪 **Built to iterate** — backend (pytest), frontend (vitest), and end-to-end
