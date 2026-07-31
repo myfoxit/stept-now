@@ -11,10 +11,12 @@ built-in product tours.
 
 ---
 
-> ⚠️ **Status: under active construction.** Stept is being built wave by wave.
-> The backend core, tenancy/RBAC, conversations, multi-provider AI, and RAG are in;
-> channels, the agent engine, the dashboard UI, the embeddable widget, and the tour
-> recorder are landing next. See `docs/PLAN.md` for the live build status.
+> **Status: feature-complete v0.1.** The backend (multi-tenancy, RBAC, conversations,
+> channels, multi-provider AI, RAG, the agent engine with approval gates, automation,
+> reports, tours), the React dashboard, the embeddable widget, and the Chrome tour
+> recorder are all built and tested — **550+ automated tests** across pytest, vitest, and
+> Playwright, all green with zero external services required. See `docs/PLAN.md` for the
+> build history.
 
 ## Why Stept
 
