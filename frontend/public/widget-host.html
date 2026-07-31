@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Widget host (e2e)</title>
+  </head>
+  <body>
+    <h1 data-tour="inbox">Stept widget host</h1>
+    <p>This page exists so end-to-end tests (and manual QA) can embed the widget on a
+      real host origin. Pass <code>?key=wk_…&amp;api=http://host:port</code>.</p>
+    <section data-tour="knowledge">Knowledge section anchor.</section>
+    <section data-tour="ai">AI section anchor.</section>
+    <script>
+      const q = new URLSearchParams(location.search)
+      const key = q.get('key') || 'wk_REPLACE_ME'
+      const api = (q.get('api') || 'http://localhost:8600').replace(/\/+$/, '')
+      window.SteptSettings = { workspaceKey: key, apiBase: api }
+      const s = document.createElement('script')
+      s.src = api + '/widget-assets/loader.js'
+      s.async = true
+      document.head.appendChild(s)
+    </script>
+  </body>
+</html>
