@@ -53,14 +53,19 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
 
 ## Waves & status
 
-- [x] **R** Research agents: chatwoot / onyx / vercel-ai / claude-agent-sdk → `docs/research/*.md` (4 background agents launched)
-- [ ] **W0** Foundation (IN PROGRESS — done by orchestrator, not agents): root configs, backend core (config/db/security/permissions/errors/events/pubsub/queue/storage/ws/ratelimit/pagination), tenancy+auth+RBAC models/APIs/tests, stub tree for all domains (models/schemas/services/api pre-registered), frontend shell (auth, app shell, api client, shadcn), e2e config, Makefile verify green
-- [ ] **W1** Backend domains (4 parallel agents, disjoint file ownership): A contacts+directory, B conversations+inbox+realtime, C AI providers, D knowledge/RAG
-- [ ] **W2** E channels (email/slack/telegram), F automation+webhooks+reports, G agent engine (approval gates), H tours backend
-- [ ] **W3** Frontend (3 parallel agents): FE1 inbox, FE2 knowledge+AI+agents, FE3 contacts+automation+tours+reports+settings
-- [ ] **W4** Widget + extension (2 parallel agents)
-- [ ] **W5** e2e journeys, seed polish, alembic initial migration, README/docs, CI, final verify, merge worktree → master
-- [ ] Final: report to user (note: no git origin; user decides about GitHub repo creation; old stept containers on 8000/5173 left untouched)
+- [x] **R** Research agents → `docs/research/*.md` (chatwoot, onyx, vercel-ai, claude-agent-sdk)
+- [x] **W0** Foundation — backend core, tenancy+auth+RBAC, stub tree, frontend shell, e2e harness. 29 tests. commit 78264e7
+- [x] **W1** Backend domains: A directory, B conversations+realtime, C AI providers, D knowledge/RAG. 233 tests. commit 6511b23
+- [x] **W2** E widget-API+channels, F automation+webhooks+reports+search, G agent engine (approval gates), H tours. 418 tests, deterministic. commit c810c2a
+- [~] **W3** Frontend (3 agents IN FLIGHT): FE1 inbox+contacts, FE2 knowledge+ai/agents/approvals, FE3 automation+tours+reports+settings. schema.d.ts regenerated (120 paths/184 schemas) commit f69c3fd
+- [~] **W4** Widget + extension (2 agents IN FLIGHT, parallel with W3): W1 widget/ (loader+iframe app+host-DOM tour player), W2 extension/ (MV3 recorder)
+- [~] **W5** (partially done early): alembic 0001 initial migration DONE + validated on Postgres (commit 28a0f92); full schema verified on PG (42 tables, vector+pg_trgm, expr indexes). REMAINING: e2e journeys (need W3 UI), seed polish, docs polish, final verify, merge → master
+- [ ] Final: report to user. Notes: no git origin configured (user decides re GitHub); old stept containers on 8000/80/5173 are a PRIOR build — untouched; a Postgres container (build-postgres-1) is up on 54329 for PG validation; use `docker compose` (v2) not `docker-compose` (v1 broken by pyenv SSL).
+
+### Agent-orchestration lessons (for future waves / resets)
+- Agent completion notifications are reliable; a mid-task **silent stall** (~600s watchdog) sometimes doesn't self-report — when suspicious, check transcript freshness with `stat -L -f %m` on `<tasks>/<id>.output` (it's a SYMLINK; without -L you read the stale symlink mtime). Resume a stalled agent with SendMessage (its context is intact) or, if its work is already on disk, stop it and integrate yourself.
+- Monitor tool's shell can't reliably `stat` the symlinked task files — don't build mtime monitors on them; rely on completion notifications + direct `stat -L` checks.
+- Integration verify per wave: `ruff check app tests && mypy app && pytest -q` (+ run pytest ≥2× to catch flakes; fixed one queue-teardown isolation flake in W2).
 
 ## The build loop (per wave)
 
