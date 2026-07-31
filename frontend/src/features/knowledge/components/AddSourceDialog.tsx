@@ -7,22 +7,13 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import {
-  FileText,
-  Github,
-  Globe,
-  Link2,
-  Loader2,
-  Map,
-  NotebookText,
-  Type,
-  Upload,
-  X,
-} from 'lucide-react'
+import { Github, Globe, Link2, Loader2, Map, NotebookText, Type, Upload, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError } from '@/api/client'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -35,13 +26,24 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { currentWorkspaceId } from '@/stores/auth'
-import { formatBytes } from '@/lib/format'
 
-import { knowledgeApi, knowledgeKeys, type Source, type SourceType } from '../api'
+import {
+  knowledgeApi,
+  knowledgeKeys,
+  DEFAULT_CRAWL_DELAY_MS,
+  MAX_BATCH_FILES,
+  MAX_CRAWL_DELAY_MS,
+  MAX_CRAWL_PATTERNS,
+  MAX_CRAWL_PATTERN_LENGTH,
+  type Source,
+  type SourceType,
+} from '../api'
 import { refreshMinutes as configuredRefresh } from '../lib'
+import { FileDrop } from './FileDrop'
 
 const TYPE_TABS: { value: SourceType; label: string; icon: LucideIcon }[] = [
   { value: 'files', label: 'Files', icon: Upload },
@@ -76,6 +78,10 @@ interface FormState {
   baseUrl: string
   maxPages: string
   maxDepth: string
+  includePatterns: string[]
+  excludePatterns: string[]
+  respectRobots: boolean
+  delayMs: string
   repoOwner: string
   repo: string
   branch: string
@@ -97,6 +103,10 @@ const EMPTY_FORM: FormState = {
   baseUrl: '',
   maxPages: '',
   maxDepth: '',
+  includePatterns: [],
+  excludePatterns: [],
+  respectRobots: true,
+  delayMs: String(DEFAULT_CRAWL_DELAY_MS),
   repoOwner: '',
   repo: '',
   branch: '',
@@ -114,6 +124,10 @@ function formFromSource(source: Source): FormState {
     const value = config[key]
     return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : ''
   }
+  const patterns = (key: string) =>
+    Array.isArray(config[key])
+      ? (config[key] as unknown[]).filter((p): p is string => typeof p === 'string')
+      : []
   return {
     ...EMPTY_FORM,
     name: source.name,
@@ -122,6 +136,10 @@ function formFromSource(source: Source): FormState {
     baseUrl: str('base_url'),
     maxPages: str('max_pages'),
     maxDepth: str('max_depth'),
+    includePatterns: patterns('include_patterns'),
+    excludePatterns: patterns('exclude_patterns'),
+    respectRobots: config.respect_robots !== false,
+    delayMs: str('delay_ms') || String(DEFAULT_CRAWL_DELAY_MS),
     repoOwner: str('repo_owner'),
     repo: str('repo'),
     branch: str('branch'),
@@ -158,6 +176,14 @@ function buildConfig(mode: SourceType, form: FormState): Record<string, unknown>
     if (maxPages !== null) config.max_pages = maxPages
     const maxDepth = positiveInt(form.maxDepth)
     if (maxDepth !== null) config.max_depth = maxDepth
+    config.include_patterns = form.includePatterns
+    config.exclude_patterns = form.excludePatterns
+    config.respect_robots = form.respectRobots
+    const delay = Number(form.delayMs.trim())
+    config.delay_ms =
+      form.delayMs.trim() && Number.isFinite(delay)
+        ? Math.min(Math.max(Math.round(delay), 0), MAX_CRAWL_DELAY_MS)
+        : DEFAULT_CRAWL_DELAY_MS
   }
   if (mode === 'github') {
     config.repo_owner = form.repoOwner.trim()
@@ -180,11 +206,24 @@ function buildConfig(mode: SourceType, form: FormState): Record<string, unknown>
 
 function validate(mode: SourceType, form: FormState, editing: boolean): string | null {
   if (mode === 'files' && !editing && form.files.length === 0) return 'Choose at least one file.'
+  if (mode === 'files' && form.files.length > MAX_BATCH_FILES)
+    return `Upload at most ${MAX_BATCH_FILES} files at a time.`
   if (mode === 'urls' && !form.urls.trim()) return 'Add at least one URL.'
   if (mode === 'text' && !editing && (!form.title.trim() || !form.content.trim()))
     return 'Title and content are required.'
   if (mode === 'sitemap' && !form.sitemapUrl.trim()) return 'Sitemap URL is required.'
-  if (mode === 'crawl' && !form.baseUrl.trim()) return 'Base URL is required.'
+  if (mode === 'crawl') {
+    if (!form.baseUrl.trim()) return 'Base URL is required.'
+    if (
+      form.includePatterns.length > MAX_CRAWL_PATTERNS ||
+      form.excludePatterns.length > MAX_CRAWL_PATTERNS
+    ) {
+      return `At most ${MAX_CRAWL_PATTERNS} patterns each.`
+    }
+    const delay = Number(form.delayMs.trim())
+    if (form.delayMs.trim() && (!Number.isFinite(delay) || delay < 0 || delay > MAX_CRAWL_DELAY_MS))
+      return `Delay must be between 0 and ${MAX_CRAWL_DELAY_MS} ms.`
+  }
   if (mode === 'github' && (!form.repoOwner.trim() || !form.repo.trim()))
     return 'Repository owner and name are required.'
   if (mode === 'notion' && !editing && !form.token.trim())
@@ -245,9 +284,7 @@ export function AddSourceDialog({
       const name = trimmed || DEFAULT_NAMES[mode]
       if (mode === 'files') {
         const created = await knowledgeApi.createSource({ type: 'files', name })
-        for (const file of form.files) {
-          await knowledgeApi.uploadDocument(created.id, file)
-        }
+        if (form.files.length > 0) await knowledgeApi.uploadDocuments(created.id, form.files)
         return created
       }
       if (mode === 'text') {
@@ -340,7 +377,11 @@ export function AddSourceDialog({
                   Add or remove documents from the source page.
                 </p>
               ) : (
-                <FileDrop files={form.files} onChange={(files) => set('files', files)} />
+                <FileDrop
+                  files={form.files}
+                  onChange={(files) => set('files', files)}
+                  max={MAX_BATCH_FILES}
+                />
               )}
             </TabsContent>
 
@@ -379,14 +420,17 @@ export function AddSourceDialog({
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="source-content">Content (markdown)</Label>
-                    <Textarea
-                      id="source-content"
+                    <Label>Content</Label>
+                    <RichTextEditor
                       value={form.content}
-                      onChange={(e) => set('content', e.target.value)}
-                      rows={8}
+                      onChange={(markdown) => set('content', markdown)}
+                      variant="full"
+                      ariaLabel="Document content"
                       placeholder="Paste or write the content you want indexed…"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Stored as markdown so search and the help center stay in sync.
+                    </p>
                   </div>
                 </>
               )}
@@ -440,6 +484,48 @@ export function AddSourceDialog({
                   value={form.maxDepth}
                   onChange={(v) => set('maxDepth', v)}
                 />
+              </div>
+              <PatternField
+                id="crawl-include"
+                label="Include patterns"
+                hint="Glob against the URL path, e.g. /docs/*. Empty means everything."
+                values={form.includePatterns}
+                onChange={(v) => set('includePatterns', v)}
+              />
+              <PatternField
+                id="crawl-exclude"
+                label="Exclude patterns"
+                hint="Exclusions win over includes, e.g. /blog/*."
+                values={form.excludePatterns}
+                onChange={(v) => set('excludePatterns', v)}
+              />
+              <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+                <div className="grid gap-0.5">
+                  <Label htmlFor="crawl-robots">Respect robots.txt</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Skip paths disallowed for user-agent <code>*</code>.
+                  </p>
+                </div>
+                <Switch
+                  id="crawl-robots"
+                  checked={form.respectRobots}
+                  onCheckedChange={(v) => set('respectRobots', v)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="crawl-delay">Delay between requests (ms)</Label>
+                <Input
+                  id="crawl-delay"
+                  type="number"
+                  min={0}
+                  max={MAX_CRAWL_DELAY_MS}
+                  step={50}
+                  value={form.delayMs}
+                  onChange={(e) => set('delayMs', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  0–{MAX_CRAWL_DELAY_MS} ms of politeness between page fetches.
+                </p>
               </div>
               <RefreshField value={form.refreshMinutes} onChange={(v) => set('refreshMinutes', v)} />
             </TabsContent>
@@ -664,59 +750,64 @@ function CheckField({
   )
 }
 
-function FileDrop({ files, onChange }: { files: File[]; onChange: (files: File[]) => void }) {
-  const [dragging, setDragging] = useState(false)
+/** Enter-to-add glob chips, capped at the limits the backend enforces. */
+function PatternField({
+  id,
+  label,
+  hint,
+  values,
+  onChange,
+}: {
+  id: string
+  label: string
+  hint: string
+  values: string[]
+  onChange: (values: string[]) => void
+}) {
+  const [draft, setDraft] = useState('')
+  const full = values.length >= MAX_CRAWL_PATTERNS
+
+  const add = () => {
+    const pattern = draft.trim().slice(0, MAX_CRAWL_PATTERN_LENGTH)
+    if (!pattern || full || values.includes(pattern)) return
+    onChange([...values, pattern])
+    setDraft('')
+  }
+
   return (
-    <div className="grid gap-2">
-      <label
-        onDragOver={(e) => {
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        value={draft}
+        maxLength={MAX_CRAWL_PATTERN_LENGTH}
+        disabled={full}
+        placeholder={full ? `Limit of ${MAX_CRAWL_PATTERNS} reached` : 'Type a glob, press Enter'}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
           e.preventDefault()
-          setDragging(true)
+          add()
         }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragging(false)
-          onChange([...files, ...Array.from(e.dataTransfer.files)])
-        }}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center text-sm transition-colors hover:bg-accent/50 ${
-          dragging ? 'border-primary bg-accent/50' : ''
-        }`}
-      >
-        <FileText className="size-6 text-muted-foreground" />
-        <span className="font-medium">Drop files or click to browse</span>
-        <span className="text-xs text-muted-foreground">PDF, DOCX, HTML, Markdown, CSV or TXT</span>
-        <input
-          type="file"
-          multiple
-          className="sr-only"
-          aria-label="Upload files"
-          onChange={(e) => onChange([...files, ...Array.from(e.target.files ?? [])])}
-        />
-      </label>
-      {files.length > 0 ? (
-        <ul className="grid gap-1">
-          {files.map((file, i) => (
-            <li
-              key={`${file.name}-${i}`}
-              className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm"
-            >
-              <span className="truncate">{file.name}</span>
-              <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                {formatBytes(file.size)}
-                <button
-                  type="button"
-                  aria-label={`Remove ${file.name}`}
-                  onClick={() => onChange(files.filter((_, idx) => idx !== i))}
-                  className="rounded p-0.5 hover:bg-muted"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </span>
-            </li>
+      />
+      {values.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {values.map((pattern) => (
+            <Badge key={pattern} variant="secondary" className="gap-1 font-mono">
+              {pattern}
+              <button
+                type="button"
+                aria-label={`Remove ${pattern}`}
+                onClick={() => onChange(values.filter((p) => p !== pattern))}
+                className="rounded hover:text-destructive"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
           ))}
-        </ul>
+        </div>
       ) : null}
+      <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
   )
 }

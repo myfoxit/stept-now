@@ -3,8 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
   fetchCampaigns,
+  fetchExperiences,
+  fetchPreviewTour,
+  fetchTour,
   fetchTours,
   normalizeBase,
+  postChecklistProgress,
+  postSurveyResponse,
+  postTourEvent,
   sendMessageFeedback,
   triggerCampaign,
   WidgetApi,
@@ -86,6 +92,81 @@ describe('tour helpers', () => {
     expect(url.searchParams.get('widget_key')).toBe('wk_x')
     expect(url.searchParams.get('url')).toBe('https://site.test/pricing')
     expect(calls[0]!.init.headers!['X-Widget-Token']).toBe('tok')
+  })
+})
+
+describe('DAP helpers', () => {
+  it('fetchExperiences hits the one-call bootstrap with widget_key + url', async () => {
+    const calls = mockFetch({ body: { tours: [], checklists: [], surveys: [] } })
+    const data = await fetchExperiences('http://api:8600', 'wk_x', 'https://site.test/app', 'tok')
+    const url = new URL(calls[0]!.url)
+    expect(url.pathname).toBe('/api/widget/experiences')
+    expect(url.searchParams.get('widget_key')).toBe('wk_x')
+    expect(url.searchParams.get('url')).toBe('https://site.test/app')
+    expect(calls[0]!.init.headers!['X-Widget-Token']).toBe('tok')
+    expect(data).toEqual({ tours: [], checklists: [], surveys: [] })
+  })
+
+  it('fetchTour resolves ONE tour by id — the manual-trigger start path', async () => {
+    const calls = mockFetch({ body: { id: 't1', name: 'T', steps: [] } })
+    await fetchTour('http://api:8600', 'wk_x', 't1', null)
+    const url = new URL(calls[0]!.url)
+    expect(url.pathname).toBe('/api/widget/tours/t1')
+    expect(url.searchParams.get('widget_key')).toBe('wk_x')
+    expect(url.searchParams.has('url')).toBe(false)
+    expect(calls[0]!.init.headers ?? {}).not.toHaveProperty('X-Widget-Token')
+  })
+
+  it('fetchPreviewTour authenticates with the preview token only', async () => {
+    const calls = mockFetch({ body: { id: 't1', name: 'T', steps: [] } })
+    await fetchPreviewTour('http://api:8600', 't1', 'pv-token')
+    const url = new URL(calls[0]!.url)
+    expect(url.pathname).toBe('/api/widget/tours/t1')
+    expect(url.searchParams.get('preview_token')).toBe('pv-token')
+    expect(url.searchParams.has('widget_key')).toBe(false)
+  })
+
+  it('postTourEvent carries the step index and telemetry meta', async () => {
+    const calls = mockFetch({ body: { message: 'recorded' } })
+    await postTourEvent('http://api:8600', 'wk_x', 't1', 'step_error', 2, 'tok', {
+      url: 'https://site.test/app',
+      viewport_w: 1280,
+      reason: 'not_found',
+    })
+    expect(new URL(calls[0]!.url).pathname).toBe('/api/widget/tours/t1/events')
+    expect(JSON.parse(calls[0]!.init.body!)).toEqual({
+      event: 'step_error',
+      step_index: 2,
+      meta: { url: 'https://site.test/app', viewport_w: 1280, reason: 'not_found' },
+    })
+  })
+
+  it('postChecklistProgress posts {item_id, done} for one item', async () => {
+    const calls = mockFetch({ body: { stored: false } })
+    const ack = await postChecklistProgress('http://api:8600', 'wk_x', 'cl1', 'i2', true, null)
+    expect(new URL(calls[0]!.url).pathname).toBe('/api/widget/checklists/cl1/progress')
+    expect(JSON.parse(calls[0]!.init.body!)).toEqual({ item_id: 'i2', done: true })
+    expect(ack.stored).toBe(false)
+  })
+
+  it('postSurveyResponse posts the answers, the completed flag and the page url', async () => {
+    const calls = mockFetch({ body: { ok: true, thanks_message: 'Thanks!' } })
+    await postSurveyResponse(
+      'http://api:8600',
+      'wk_x',
+      'sv1',
+      [{ question_id: 'q1', value: 9 }],
+      false,
+      'tok',
+      'https://site.test/app',
+    )
+    const url = new URL(calls[0]!.url)
+    expect(url.pathname).toBe('/api/widget/surveys/sv1/responses')
+    expect(url.searchParams.get('url')).toBe('https://site.test/app')
+    expect(JSON.parse(calls[0]!.init.body!)).toEqual({
+      answers: [{ question_id: 'q1', value: 9 }],
+      completed: false,
+    })
   })
 })
 

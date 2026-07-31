@@ -92,18 +92,121 @@ export function installStept(
 // --- proactive campaigns: pure decision logic --------------------------------
 
 /**
- * fnmatch-style glob match, mirroring the backend's tour URL matching
- * (`*` = any run of characters, `?` = any single character; whole-string
- * match, case-sensitive). Everything else is treated literally.
+ * fnmatch-style glob match, mirroring the backend's URL matching for tours,
+ * checklists and surveys (`*` = any run of characters, `?` = any single
+ * character; whole-string match). Everything else is treated literally.
+ *
+ * CASE-INSENSITIVE on purpose: the backend matches with Python's `fnmatch`,
+ * which normalizes case on macOS/Windows, so a case-sensitive client would
+ * disagree with the server about which experiences are eligible. `[seq]`
+ * classes stay backend-only (documented in docs/DAP2-CONTRACTS.md #9).
  */
 export function globMatch(pattern: string, value: string): boolean {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
   const source = `^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`
   try {
-    return new RegExp(source).test(value)
+    return new RegExp(source, 'i').test(value)
   } catch {
     return false
   }
+}
+
+// --- preview links -----------------------------------------------------------
+
+export interface PreviewRequest {
+  token: string
+  /** Tour id, from an explicit hash param or the token's `tour` claim. */
+  tourId: string
+}
+
+/** Read a claim out of a JWT payload WITHOUT verifying it — the server is the
+ * only authority; the widget just needs the tour id to build the request URL. */
+export function decodeTokenClaim(token: string, claim: string): string | null {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))) as Record<
+      string,
+      unknown
+    >
+    const value = decoded[claim]
+    return typeof value === 'string' ? value : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Parse `#stept-preview=<token>` (optionally `&stept-preview-tour=<id>`) out of
+ * a location hash. The dashboard appends it to any page URL to preview a tour
+ * regardless of status/trigger/frequency.
+ */
+export function parsePreviewHash(hash: string): PreviewRequest | null {
+  const token = /[#&?]stept-preview=([^&\s]+)/.exec(hash || '')?.[1]
+  if (!token) return null
+  const decodedToken = safeDecode(token)
+  const explicit = /[#&?]stept-preview-tour=([^&\s]+)/.exec(hash)?.[1]
+  const tourId = explicit ? safeDecode(explicit) : decodeTokenClaim(decodedToken, 'tour')
+  return tourId ? { token: decodedToken, tourId } : null
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+// --- SPA navigation hook ------------------------------------------------------
+
+/** Where the untouched history methods are parked, so a re-boot can never stack
+ * wrappers (each stacked layer re-dispatched the event, N× per navigation). */
+const HISTORY_ORIGINALS = Symbol.for('stept.history.originals')
+
+interface HistoryOriginals {
+  pushState: History['pushState']
+  replaceState: History['replaceState']
+}
+
+type PatchHost = Record<symbol, HistoryOriginals | undefined>
+
+/**
+ * Patch `history.pushState`/`replaceState` to emit `stept:locationchange`.
+ * Idempotent: the originals are parked on a window symbol, so calling this
+ * again (a re-`boot`) is a no-op. Returns true when it actually patched.
+ */
+export function patchHistory(win: Window): boolean {
+  const host = win as unknown as PatchHost
+  if (host[HISTORY_ORIGINALS]) return false
+  const history = win.history
+  if (!history) return false
+  const originals: HistoryOriginals = {
+    pushState: history.pushState,
+    replaceState: history.replaceState,
+  }
+  host[HISTORY_ORIGINALS] = originals
+  for (const method of ['pushState', 'replaceState'] as const) {
+    const original = originals[method]
+    history[method] = function (this: History, ...args: Parameters<History['pushState']>) {
+      const result = original.apply(this, args)
+      win.dispatchEvent(new Event('stept:locationchange'))
+      return result
+    }
+  }
+  return true
+}
+
+/** Undo {@link patchHistory}. Returns true when a patch was removed. */
+export function restoreHistory(win: Window): boolean {
+  const host = win as unknown as PatchHost
+  const originals = host[HISTORY_ORIGINALS]
+  if (!originals) return false
+  win.history.pushState = originals.pushState
+  win.history.replaceState = originals.replaceState
+  host[HISTORY_ORIGINALS] = undefined
+  return true
 }
 
 /** localStorage key holding the triggered/skipped campaign ids for one widget. */

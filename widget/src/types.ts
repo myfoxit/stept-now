@@ -4,6 +4,10 @@
  * minimal — only the fields the widget actually reads.
  */
 
+import type { Target as DomCaptureTarget } from '@stept/dom-capture'
+
+export type { DomCaptureTarget }
+
 /** Identity handshake the host page may inject (Intercom-style HMAC). */
 export interface Identity {
   external_id: string
@@ -129,24 +133,183 @@ export interface CsatOut {
   feedback: string | null
 }
 
-/** Tour step + tour, mirrored from schemas/tours.py (WidgetTourOut). */
+/** Tour step + tour, mirrored from schemas/tours.py (WidgetTourOut).
+ *
+ * v2 fields are optional on the wire type so a pre-v2 payload (and the tests
+ * that build minimal fixtures) still typechecks; the player fills defaults. */
+export type TourStepType = 'tooltip' | 'modal' | 'banner' | 'hotspot' | 'action' | 'wait'
+export type StepPlacement = 'auto' | 'top' | 'bottom' | 'left' | 'right' | 'center'
+
+export interface StepMedia {
+  type: 'image' | 'video'
+  url: string
+}
+
+export interface StepAdvance {
+  on: 'button' | 'element_click' | 'input' | 'delay'
+  delay_ms?: number | null
+}
+
+export interface StepAction {
+  kind: 'click' | 'fill' | 'navigate'
+  value?: string | null
+  url?: string | null
+}
+
+export interface StepWait {
+  /** The persisted key is `for` (a Python keyword server-side, aliased there). */
+  for: 'element' | 'url'
+  selector?: string | null
+  url_pattern?: string | null
+  timeout_ms: number
+}
+
 export interface TourStep {
   id: string
+  type?: TourStepType
   selector: string
+  fallback_selectors?: string[]
+  /** Normalized visible text captured at record time (≤80 chars). */
+  text_hint?: string
+  /** Full @stept/dom-capture Target descriptor (opaque to the backend). */
+  target?: DomCaptureTarget | null
   title: string
   body: string
-  placement: 'auto' | 'top' | 'bottom' | 'left' | 'right'
+  media?: StepMedia | null
+  screenshot_key?: string | null
+  placement: StepPlacement
+  advance?: StepAdvance
+  action?: StepAction | null
+  wait?: StepWait | null
 }
+
+export interface TourSettings {
+  mode: 'guided' | 'driven'
+  backdrop: boolean
+  show_progress: boolean
+  dismissable: boolean
+}
+
+export type TourKind = 'flow' | 'banner' | 'announcement'
 
 export interface Tour {
   id: string
   name: string
+  kind?: TourKind
   steps: TourStep[]
-  theme: { accent: string }
+  theme: { accent: string; position?: 'top' | 'bottom' | null }
   version: number
+  settings?: TourSettings
+  /** `every_time` bypasses the widget's local seen-set. */
+  frequency_type?: string
 }
 
-export type TourEventName = 'started' | 'step_viewed' | 'completed' | 'dismissed'
+export type TourEventName =
+  | 'started'
+  | 'step_viewed'
+  | 'completed'
+  | 'dismissed'
+  | 'step_error'
+
+/** Telemetry context sent with every tour event (`WidgetTourEventIn.meta`). */
+export interface TourEventMeta {
+  url?: string
+  viewport_w?: number
+  /** true when the step resolved via anything but its primary selector. */
+  healed?: boolean
+  /** step_error only: `not_found` | `in_iframe` | `timeout`. */
+  reason?: string
+  [key: string]: unknown
+}
+
+// --- checklists (schemas/checklists.py → WidgetChecklistOut) -----------------
+
+export interface ChecklistItemAction {
+  type: 'start_tour' | 'open_url' | 'open_messenger' | 'none'
+  tour_id?: string | null
+  url?: string | null
+}
+
+export interface ChecklistItemCompletion {
+  type: 'manual' | 'tour_completed' | 'url_visited'
+  tour_id?: string | null
+  url_pattern?: string | null
+}
+
+export interface ChecklistItem {
+  id: string
+  title: string
+  body: string
+  action: ChecklistItemAction
+  completion: ChecklistItemCompletion
+}
+
+/** `{item_id: iso_completed_at}` plus the two lifecycle flags. */
+export interface ChecklistProgress {
+  item_state: Record<string, string>
+  dismissed: boolean
+  completed: boolean
+}
+
+export interface Checklist {
+  id: string
+  name: string
+  description: string
+  items: ChecklistItem[]
+  theme: { accent: string; position: 'bottom-right' | 'bottom-left' }
+  launcher: { label: string; auto_open_once: boolean }
+  version: number
+  /** Server-side progress; empty for anonymous visitors (kept locally instead). */
+  progress?: ChecklistProgress
+}
+
+/** POST /checklists/{id}/progress — `stored:false` ⇒ keep local state. */
+export interface ChecklistProgressAck {
+  stored: boolean
+  item_state?: Record<string, string>
+  dismissed?: boolean
+  completed?: boolean
+}
+
+// --- surveys (schemas/surveys.py → WidgetSurveyOut) -------------------------
+
+export type SurveyQuestionType = 'nps' | 'rating' | 'text' | 'select'
+
+export interface SurveyQuestion {
+  id: string
+  type: SurveyQuestionType
+  question: string
+  required: boolean
+  options?: string[] | null
+}
+
+export interface Survey {
+  id: string
+  name: string
+  questions: SurveyQuestion[]
+  presentation: 'modal' | 'slideout'
+  theme: { accent: string }
+  thanks_message: string
+  version: number
+  frequency_type?: string
+}
+
+export interface SurveyAnswer {
+  question_id: string
+  value: number | string
+}
+
+export interface SurveyAck {
+  ok: boolean
+  thanks_message: string
+}
+
+/** GET /api/widget/experiences — the one-call DAP bootstrap. */
+export interface ExperiencesResponse {
+  tours: Tour[]
+  checklists: Checklist[]
+  surveys: Survey[]
+}
 
 /**
  * Ongoing proactive campaign, mirrored from schemas/campaigns.py

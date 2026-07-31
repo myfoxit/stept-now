@@ -1,8 +1,13 @@
 import type { ReactElement } from 'react'
 
+import { installEditorDomShims } from '@/components/editor/test-dom'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { renderApp } from '@/test/helpers'
 import { useAuthStore } from '@/stores/auth'
+
+// Several knowledge screens embed the TipTap editor, which needs a couple of
+// DOM measurement APIs jsdom does not implement.
+installEditorDomShims()
 
 /** Seed the auth store with a workspace + permissions for feature tests. */
 export function seedAuth(
@@ -96,6 +101,16 @@ export function makeDocument(overrides: Record<string, unknown> = {}) {
     meta: {},
     created_at: NOW,
     updated_at: NOW,
+    ...overrides,
+  }
+}
+
+/** `GET /knowledge/documents/{id}` — chunks plus the raw text for authored docs. */
+export function makeDocumentDetail(overrides: Record<string, unknown> = {}) {
+  return {
+    ...makeDocument(),
+    chunks: [{ id: 'c1', ord: 0, content: 'Getting started', token_count: 12, meta: {} }],
+    content: null,
     ...overrides,
   }
 }

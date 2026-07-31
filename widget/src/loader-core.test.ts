@@ -4,11 +4,15 @@ import {
   campaignDelayMs,
   campaignSeenKey,
   createDispatcher,
+  decodeTokenClaim,
   firstDueCampaign,
   globMatch,
   installStept,
+  parsePreviewHash,
+  patchHistory,
   pruneSeenCampaigns,
   readSeenSet,
+  restoreHistory,
   selectEligibleCampaigns,
   writeSeenSet,
   type SteptCommandHandlers,
@@ -118,6 +122,75 @@ describe('globMatch', () => {
     expect(globMatch('*/a.b', 'https://x.test/aXb')).toBe(false)
     expect(globMatch('*/v?', 'https://x.test/v1')).toBe(true)
     expect(globMatch('*/v?', 'https://x.test/v12')).toBe(false)
+  })
+
+  it('matches case-insensitively, like the backend fnmatch', () => {
+    expect(globMatch('*/Settings*', 'https://app.test/settings/inboxes')).toBe(true)
+    expect(globMatch('*/settings*', 'https://app.test/SETTINGS')).toBe(true)
+    expect(globMatch('HTTPS://APP.TEST/*', 'https://app.test/pricing')).toBe(true)
+  })
+})
+
+// --- preview links -----------------------------------------------------------
+
+/** A JWT-shaped token whose payload carries the given claims (unsigned — the
+ * widget only reads it; the server verifies). */
+function fakeToken(claims: Record<string, string>): string {
+  const payload = btoa(JSON.stringify(claims)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+  return `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`
+}
+
+describe('parsePreviewHash', () => {
+  it('reads the token and takes the tour id from its claims', () => {
+    const token = fakeToken({ ws: 'w1', tour: 'tour-42' })
+    expect(parsePreviewHash(`#stept-preview=${token}`)).toEqual({ token, tourId: 'tour-42' })
+    expect(parsePreviewHash(`#/app/dashboard&stept-preview=${token}`)?.tourId).toBe('tour-42')
+  })
+
+  it('prefers an explicit tour id and tolerates url-encoding', () => {
+    const token = fakeToken({ ws: 'w1', tour: 'tour-42' })
+    const parsed = parsePreviewHash(`#stept-preview=${token}&stept-preview-tour=tour-99`)
+    expect(parsed).toEqual({ token, tourId: 'tour-99' })
+    expect(parsePreviewHash(`#stept-preview=${encodeURIComponent(token)}`)?.token).toBe(token)
+  })
+
+  it('returns null without a token or a resolvable tour id', () => {
+    expect(parsePreviewHash('')).toBeNull()
+    expect(parsePreviewHash('#section-2')).toBeNull()
+    expect(parsePreviewHash(`#stept-preview=${fakeToken({ ws: 'w1' })}`)).toBeNull()
+    expect(parsePreviewHash('#stept-preview=garbage')).toBeNull()
+    expect(decodeTokenClaim('not-a-jwt', 'tour')).toBeNull()
+  })
+})
+
+// --- SPA navigation hook ------------------------------------------------------
+
+describe('patchHistory', () => {
+  it('patches once (never stacks) and restores the originals on shutdown', () => {
+    const original = window.history.pushState
+    expect(patchHistory(window)).toBe(true)
+    const patched = window.history.pushState
+    expect(patched).not.toBe(original)
+
+    // A re-boot must be a no-op: stacked wrappers fired N events per navigation.
+    expect(patchHistory(window)).toBe(false)
+    expect(window.history.pushState).toBe(patched)
+
+    let fired = 0
+    const listener = (): void => void (fired += 1)
+    window.addEventListener('stept:locationchange', listener)
+    window.history.pushState({}, '', '/one')
+    window.history.replaceState({}, '', '/two')
+    expect(fired).toBe(2)
+
+    expect(restoreHistory(window)).toBe(true)
+    expect(window.history.pushState).toBe(original)
+    window.history.pushState({}, '', '/three')
+    expect(fired).toBe(2)
+    expect(restoreHistory(window)).toBe(false)
+
+    window.removeEventListener('stept:locationchange', listener)
+    window.history.replaceState({}, '', '/')
   })
 })
 

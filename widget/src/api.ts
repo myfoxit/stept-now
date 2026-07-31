@@ -11,14 +11,19 @@ import type {
   BootResult,
   Campaign,
   CampaignTriggerResult,
+  ChecklistProgressAck,
   ConversationSummary,
   CsatOut,
   CursorPage,
   ArticleDetail,
+  ExperiencesResponse,
   FeedbackRating,
   Identity,
   MessageFeedbackAck,
+  SurveyAck,
+  SurveyAnswer,
   Tour,
+  TourEventMeta,
   TourEventName,
   WidgetArticlesResponse,
   WidgetMessage,
@@ -167,9 +172,31 @@ export function widgetWsUrl(base: string, token: string): string {
   return url.toString()
 }
 
-// --- loader-side tour helpers (public widget_key auth) ----------------------
+// --- loader-side DAP helpers (public widget_key auth) -----------------------
 
-/** GET eligible live tours for the current page. */
+/** `X-Widget-Token` header when the visitor is identified, else nothing. */
+function widgetHeaders(token?: string | null): Record<string, string> {
+  return token ? { 'X-Widget-Token': token } : {}
+}
+
+/**
+ * GET every deliverable experience for this page + visitor in one round trip
+ * (tours, checklists, surveys). This is the widget's DAP bootstrap — it
+ * replaces the per-kind polling `fetchTours` did on its own.
+ */
+export function fetchExperiences(
+  base: string,
+  widgetKey: string,
+  pageUrl: string,
+  token?: string | null,
+): Promise<ExperiencesResponse> {
+  const q = `?widget_key=${encodeURIComponent(widgetKey)}&url=${encodeURIComponent(pageUrl)}`
+  return request<ExperiencesResponse>(base, `/api/widget/experiences${q}`, {
+    headers: widgetHeaders(token),
+  })
+}
+
+/** GET eligible live tours for the current page (legacy single-kind bootstrap). */
 export function fetchTours(
   base: string,
   widgetKey: string,
@@ -177,12 +204,37 @@ export function fetchTours(
   token?: string | null,
 ): Promise<Tour[]> {
   const q = `?widget_key=${encodeURIComponent(widgetKey)}&url=${encodeURIComponent(pageUrl)}`
-  const headers: Record<string, string> = {}
-  if (token) headers['X-Widget-Token'] = token
-  return request<Tour[]>(base, `/api/widget/tours${q}`, { headers })
+  return request<Tour[]>(base, `/api/widget/tours${q}`, { headers: widgetHeaders(token) })
 }
 
-/** POST a tour lifecycle event (started / step_viewed / completed / dismissed). */
+/**
+ * GET ONE live tour by id, whatever its trigger type. This is what backs
+ * `Stept('startTour', id)`: manual-trigger tours are excluded from the
+ * eligible list by design, so resolving them from that list could never work.
+ */
+export function fetchTour(
+  base: string,
+  widgetKey: string,
+  tourId: string,
+  token?: string | null,
+): Promise<Tour> {
+  const q = `?widget_key=${encodeURIComponent(widgetKey)}`
+  return request<Tour>(base, `/api/widget/tours/${encodeURIComponent(tourId)}${q}`, {
+    headers: widgetHeaders(token),
+  })
+}
+
+/** GET a tour for the dashboard preview link (any status/trigger/frequency). */
+export function fetchPreviewTour(
+  base: string,
+  tourId: string,
+  previewToken: string,
+): Promise<Tour> {
+  const q = `?preview_token=${encodeURIComponent(previewToken)}`
+  return request<Tour>(base, `/api/widget/tours/${encodeURIComponent(tourId)}${q}`)
+}
+
+/** POST a tour lifecycle event (started / step_viewed / completed / dismissed / step_error). */
 export async function postTourEvent(
   base: string,
   widgetKey: string,
@@ -190,15 +242,70 @@ export async function postTourEvent(
   event: TourEventName,
   stepIndex: number | null,
   token?: string | null,
+  meta?: TourEventMeta | null,
 ): Promise<void> {
   const q = `?widget_key=${encodeURIComponent(widgetKey)}`
-  const headers: Record<string, string> = {}
-  if (token) headers['X-Widget-Token'] = token
   await request(base, `/api/widget/tours/${tourId}/events${q}`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ event, step_index: stepIndex }),
+    headers: widgetHeaders(token),
+    body: JSON.stringify({ event, step_index: stepIndex, meta: meta ?? null }),
   })
+}
+
+/**
+ * POST one checklist item's progress. The server answers `{stored:false}` for
+ * anonymous visitors (it keeps nothing for them) — the widget then persists the
+ * state locally instead.
+ */
+export function postChecklistProgress(
+  base: string,
+  widgetKey: string,
+  checklistId: string,
+  itemId: string,
+  done: boolean,
+  token?: string | null,
+): Promise<ChecklistProgressAck> {
+  const q = `?widget_key=${encodeURIComponent(widgetKey)}`
+  return request<ChecklistProgressAck>(
+    base,
+    `/api/widget/checklists/${encodeURIComponent(checklistId)}/progress${q}`,
+    { method: 'POST', headers: widgetHeaders(token), body: JSON.stringify({ item_id: itemId, done }) },
+  )
+}
+
+/** POST the checklist dismissal (identified visitors only; anonymous is local). */
+export function postChecklistDismiss(
+  base: string,
+  widgetKey: string,
+  checklistId: string,
+  token?: string | null,
+): Promise<{ ok: boolean; stored: boolean }> {
+  const q = `?widget_key=${encodeURIComponent(widgetKey)}`
+  return request<{ ok: boolean; stored: boolean }>(
+    base,
+    `/api/widget/checklists/${encodeURIComponent(checklistId)}/dismiss${q}`,
+    { method: 'POST', headers: widgetHeaders(token) },
+  )
+}
+
+/** POST survey answers. `completed:false` is a partial (dismissed) submission. */
+export function postSurveyResponse(
+  base: string,
+  widgetKey: string,
+  surveyId: string,
+  answers: SurveyAnswer[],
+  completed: boolean,
+  token?: string | null,
+  pageUrl?: string,
+): Promise<SurveyAck> {
+  const q =
+    `?widget_key=${encodeURIComponent(widgetKey)}` +
+    (pageUrl ? `&url=${encodeURIComponent(pageUrl)}` : '')
+  return request<SurveyAck>(
+    base,
+    `/api/widget/surveys/${encodeURIComponent(surveyId)}/responses${q}`,
+    { method: 'POST', headers: widgetHeaders(token), body: JSON.stringify({ answers, completed }) },
+  )
 }
 
 // --- campaigns + answer feedback --------------------------------------------

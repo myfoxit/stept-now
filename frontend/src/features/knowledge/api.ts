@@ -9,7 +9,16 @@ import type { components } from '@/api/schema'
 
 export type Source = components['schemas']['SourceOut']
 export type Document = components['schemas']['DocumentOut']
-export type DocumentDetail = components['schemas']['DocumentDetailOut']
+
+/**
+ * `content` (the raw stored text of an authored, storage-backed document —
+ * `null` for connector/url-backed docs and anything over 200 KB) already ships
+ * from the backend but postdates the last `make types` run. The intersection
+ * becomes a no-op once `schema.d.ts` is regenerated.
+ */
+export type DocumentDetail = components['schemas']['DocumentDetailOut'] & {
+  content?: string | null
+}
 export type ChunkPreview = components['schemas']['ChunkPreviewOut']
 export type SearchResult = components['schemas']['SearchResponse']
 export type RetrievedChunk = components['schemas']['RetrievedChunkOut']
@@ -41,6 +50,16 @@ export const REMOTE_SOURCE_TYPES: readonly string[] = [
   'notion',
   'articles',
 ]
+
+/** Backend limits mirrored client-side so we fail before the round trip. */
+export const MAX_BATCH_FILES = 20
+export const MAX_CRAWL_PATTERNS = 20
+export const MAX_CRAWL_PATTERN_LENGTH = 200
+export const MAX_CRAWL_DELAY_MS = 2000
+export const DEFAULT_CRAWL_DELAY_MS = 250
+
+/** File types the ingestion parsers understand. */
+export const DOCUMENT_ACCEPT = '.pdf,.docx,.html,.htm,.md,.markdown,.txt,.csv'
 
 export const knowledgeKeys = {
   sources: (workspaceId: string) => ['knowledge', workspaceId, 'sources'] as const,
@@ -96,6 +115,20 @@ export const knowledgeApi = {
     api.post<Document>(ws(`/knowledge/sources/${sourceId}/documents`), body),
   uploadDocument: (sourceId: string, file: File) =>
     api.upload<Document>(ws(`/knowledge/sources/${sourceId}/documents`), file),
+  /**
+   * Up to 20 files in one multipart request. A file the parsers choke on comes
+   * back as a `failed` document carrying the error — the batch never aborts.
+   */
+  uploadDocuments: (sourceId: string, files: File[]) => {
+    const formData = new FormData()
+    for (const file of files) formData.append('file', file)
+    return api.post<Document[]>(ws(`/knowledge/sources/${sourceId}/documents/batch`), undefined, {
+      formData,
+    })
+  },
+  /** Re-edit an authored (storage-backed text/markdown) document. */
+  updateDocument: (id: string, body: { title?: string; content?: string }) =>
+    api.patch<Document>(ws(`/knowledge/documents/${id}`), body),
 
   // --- search --------------------------------------------------------------
   search: (body: { query: string; k?: number; source_ids?: string[] | null; rerank?: boolean }) =>

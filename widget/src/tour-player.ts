@@ -1,16 +1,35 @@
 /**
- * Host-DOM product-tour player.
+ * Host-DOM product-tour player (v2).
  *
- * Renders a spotlight + tooltip over real page elements (resolved via
- * `document.querySelector(step.selector)`), drives Back/Next/Done, and reports
- * lifecycle events through a callback. The positioning + eligibility math is
- * exported as pure functions so it can be unit-tested without a full browser.
+ * Renders every DAP step type over the real page — tooltip, modal, banner,
+ * hotspot, action (guided or "do it for me" driven) and hidden wait steps —
+ * resolving each anchored step through the shared `@stept/dom-capture` cascade
+ * (see dom-target.ts) so a drifted selector self-heals instead of dead-ending.
+ *
+ * Everything the player learns is reported back through `onEvent`, including
+ * `step_error` with a reason and `meta.healed` for self-heals. Progress is
+ * persisted in sessionStorage so a reload (or a `navigate` action step) resumes
+ * mid-tour WITHOUT re-emitting `started` — a duplicated start would silently
+ * inflate every completion-rate denominator.
+ *
+ * The positioning + eligibility math and the storage codec are exported as pure
+ * functions so they can be unit-tested without a browser.
  */
 
-import type { Tour, TourEventName } from './types'
+import { renderMarkdown } from './app/md'
+import { resolveStepTarget, stepNeedsTarget, waitForTarget, type StepErrorReason } from './dom-target'
+import { globMatch } from './loader-core'
+import type {
+  StepAction,
+  Tour,
+  TourEventMeta,
+  TourEventName,
+  TourSettings,
+  TourStep,
+} from './types'
 
 export type Side = 'top' | 'bottom' | 'left' | 'right'
-export type Placement = 'auto' | Side
+export type Placement = 'auto' | Side | 'center'
 
 export interface Rect {
   top: number
@@ -59,7 +78,8 @@ export function computeTooltipPosition(
   vp: Viewport,
   gap = 12,
 ): { top: number; left: number; side: Side } {
-  const side = placement === 'auto' ? resolveAutoPlacement(target, tip, vp, gap) : placement
+  const requested: Placement = placement === 'center' ? 'auto' : placement
+  const side = requested === 'auto' ? resolveAutoPlacement(target, tip, vp, gap) : requested
   let top = 0
   let left = 0
   const cx = target.left + target.width / 2
@@ -88,52 +108,267 @@ export function computeTooltipPosition(
   return { top, left, side }
 }
 
-/** First tour not already seen locally (client-side dedup for anon visitors). */
+/**
+ * First tour not already seen locally (client-side dedup for anon visitors).
+ * A tour whose server-side frequency is `every_time` bypasses the seen-set —
+ * the backend has already decided it should run again.
+ */
 export function selectFirstEligibleTour(
-  tours: Tour[],
+  tours: readonly Tour[],
   seen: Iterable<string> = [],
 ): Tour | null {
   const seenSet = seen instanceof Set ? seen : new Set(seen)
   for (const tour of tours) {
-    if (!seenSet.has(tour.id) && tour.steps.length > 0) return tour
+    if (!tour.steps.length) continue
+    if (tour.frequency_type === 'every_time' || !seenSet.has(tour.id)) return tour
   }
   return null
+}
+
+// --- progress persistence (pure, unit-tested) -------------------------------
+
+export interface TourProgress {
+  tourId: string
+  stepIndex: number
+  startedAt: number
+}
+
+/** sessionStorage key holding the in-flight tour position for one widget. */
+export function tourProgressKey(widgetKey: string): string {
+  return `stept:tour-progress:${widgetKey}`
+}
+
+/** Read the persisted position; tolerant of junk, private mode and old shapes. */
+export function readTourProgress(
+  storage: Pick<Storage, 'getItem'> | null,
+  key: string,
+): TourProgress | null {
+  try {
+    const raw = storage?.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<TourProgress>
+    if (!parsed || typeof parsed.tourId !== 'string' || typeof parsed.stepIndex !== 'number') {
+      return null
+    }
+    return {
+      tourId: parsed.tourId,
+      stepIndex: Math.max(0, Math.floor(parsed.stepIndex)),
+      startedAt: typeof parsed.startedAt === 'number' ? parsed.startedAt : Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function writeTourProgress(
+  storage: Pick<Storage, 'setItem'> | null,
+  key: string,
+  progress: TourProgress,
+): void {
+  try {
+    storage?.setItem(key, JSON.stringify(progress))
+  } catch {
+    /* private mode — the tour simply restarts after a reload */
+  }
+}
+
+export function clearTourProgress(
+  storage: Pick<Storage, 'removeItem'> | null,
+  key: string,
+): void {
+  try {
+    storage?.removeItem(key)
+  } catch {
+    /* ignore */
+  }
+}
+
+// --- media URLs (pure, unit-tested) -----------------------------------------
+
+/**
+ * Resolve a step media / screenshot URL against the widget's API origin.
+ *
+ * The backend returns public media as the ROOT-RELATIVE path
+ * `/api/widget/media/{workspace_id}/{key}`. That resolves correctly in the
+ * dashboard (same origin as the API) but the player runs on the CUSTOMER's
+ * domain, where it would 404 — so relative URLs are prefixed with `apiBase`.
+ * Anything carrying a scheme (an external CDN, `data:`) is passed through
+ * untouched.
+ */
+export function resolveMediaUrl(url: string, apiBase = ''): string {
+  const trimmed = (url ?? '').trim()
+  if (!trimmed) return ''
+  // scheme-qualified (http:, https:, data:, blob:) or protocol-relative
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('//')) return trimmed
+  const base = apiBase.replace(/\/+$/, '')
+  if (!base) return trimmed
+  return trimmed.startsWith('/') ? `${base}${trimmed}` : `${base}/${trimmed}`
+}
+
+/** Same fix for images the editor embedded in a markdown body. */
+export function absolutizeMedia(root: ParentNode, apiBase: string): void {
+  if (!apiBase) return
+  for (const img of root.querySelectorAll('img[src]')) {
+    const src = img.getAttribute('src') ?? ''
+    const resolved = resolveMediaUrl(src, apiBase)
+    if (resolved !== src) img.setAttribute('src', resolved)
+  }
+}
+
+// --- driven-mode actuation (pure, unit-tested) ------------------------------
+
+/**
+ * Set a form control's value the way a user would: through the NATIVE value
+ * setter (React & friends patch the instance property and would otherwise miss
+ * the change) followed by the `input` + `change` events they listen for.
+ */
+export function fillElement(el: HTMLElement, value: string): void {
+  const view = el.ownerDocument?.defaultView as (Window & typeof globalThis) | null
+  const tag = el.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    const ctor =
+      tag === 'TEXTAREA'
+        ? view?.HTMLTextAreaElement
+        : tag === 'SELECT'
+          ? view?.HTMLSelectElement
+          : view?.HTMLInputElement
+    const descriptor = ctor ? Object.getOwnPropertyDescriptor(ctor.prototype, 'value') : undefined
+    if (descriptor?.set) descriptor.set.call(el, value)
+    else (el as HTMLInputElement).value = value
+  } else {
+    el.textContent = value
+  }
+  const EventCtor = view?.Event ?? Event
+  el.dispatchEvent(new EventCtor('input', { bubbles: true }))
+  el.dispatchEvent(new EventCtor('change', { bubbles: true }))
+}
+
+/** Perform one driven action step. Returns false when it could not be done. */
+export function performAction(
+  action: StepAction,
+  el: HTMLElement | null,
+  win: Pick<Window, 'location'>,
+): boolean {
+  switch (action.kind) {
+    case 'click':
+      if (!el) return false
+      el.click()
+      return true
+    case 'fill':
+      if (!el) return false
+      fillElement(el, action.value ?? '')
+      return true
+    case 'navigate':
+      if (!action.url) return false
+      win.location.assign(action.url)
+      return true
+    default:
+      return false
+  }
 }
 
 // --- the DOM player ---------------------------------------------------------
 
 export interface TourPlayerOptions {
   accent?: string
-  /** Reports started / step_viewed / completed / dismissed to the caller. */
-  onEvent?: (event: TourEventName, stepIndex: number | null) => void
-  /** Injected for tests; defaults to the real global. */
+  /** Reports started / step_viewed / completed / dismissed / step_error. */
+  onEvent?: (event: TourEventName, stepIndex: number | null, meta?: TourEventMeta) => void
+  /** Injected for tests; defaults to the real globals. */
   doc?: Document
   win?: Window & typeof globalThis
+  /** Widget API origin — root-relative step media resolves against it. */
+  apiBase?: string
+  /** sessionStorage key for resume-after-reload (see {@link tourProgressKey}). */
+  progressKey?: string
+  storage?: Storage | null
+  /** Render a "Preview" badge and never persist progress. */
+  preview?: boolean
+  /** How long an anchored step waits for its element before it is skipped. */
+  resolveTimeoutMs?: number
+  /** Driven mode: highlight dwell before the action is performed. */
+  actionDelayMs?: number
+}
+
+const DEFAULT_SETTINGS: TourSettings = {
+  mode: 'guided',
+  backdrop: true,
+  show_progress: true,
+  dismissable: true,
 }
 
 const STYLE_ID = 'stept-tour-style'
 const CSS = `
-.stept-tour-backdrop{position:fixed;inset:0;z-index:2147483000;pointer-events:none}
+.stept-tour-root{position:fixed;inset:0;z-index:2147483000;pointer-events:none}
+.stept-tour-root.stept-veil{pointer-events:auto;background:rgba(15,23,42,.55)}
 .stept-tour-hole{position:fixed;z-index:2147483000;border-radius:8px;
   box-shadow:0 0 0 9999px rgba(15,23,42,.55);transition:all .18s ease;pointer-events:none;
   outline:2px solid var(--stept-accent,#6366f1);outline-offset:2px}
-.stept-tour-tip{position:fixed;z-index:2147483001;max-width:320px;width:calc(100vw - 32px);
+.stept-tour-hole.stept-nodim{box-shadow:none}
+.stept-tour-hole[hidden]{display:none}
+.stept-tour-tip{position:fixed;z-index:2147483001;max-width:340px;width:calc(100vw - 32px);
   background:#fff;color:#0f172a;border-radius:12px;box-shadow:0 12px 40px rgba(15,23,42,.28);
   padding:16px 16px 12px;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   box-sizing:border-box}
+.stept-tour-tip[hidden]{display:none}
+.stept-tour-tip:focus{outline:2px solid var(--stept-accent,#6366f1);outline-offset:2px}
+.stept-tour-tip.stept-centered{top:50%;left:50%;transform:translate(-50%,-50%);max-width:420px}
 .stept-tour-tip h4{margin:0 0 6px;font-size:15px;font-weight:600}
-.stept-tour-tip p{margin:0 0 12px;color:#334155}
-.stept-tour-tip .stept-tour-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.stept-tour-tip .stept-tour-count{font-size:12px;color:#64748b}
-.stept-tour-tip .stept-tour-actions{display:flex;gap:8px}
-.stept-tour-btn{border:0;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.stept-tour-tip p{margin:0 0 8px;color:#334155}
+.stept-tour-body{margin:0 0 10px;color:#334155}
+.stept-tour-body :first-child{margin-top:0}
+.stept-tour-body :last-child{margin-bottom:0}
+.stept-tour-body p{margin:0 0 8px}
+.stept-tour-body ul,.stept-tour-body ol{margin:0 0 8px;padding-left:20px}
+.stept-tour-body code{background:rgba(100,116,139,.16);border-radius:4px;padding:1px 4px;font-size:12px}
+.stept-tour-body img{max-width:100%;height:auto;border-radius:8px}
+.stept-tour-body table{border-collapse:collapse;width:100%;font-size:13px}
+.stept-tour-body th,.stept-tour-body td{border:1px solid rgba(100,116,139,.3);padding:4px 6px;text-align:left}
+.stept-tour-media{display:block;width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin:0 0 10px}
+.stept-tour-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stept-tour-count{font-size:12px;color:#64748b}
+.stept-tour-hint{font-size:12px;color:#64748b;margin:0}
+.stept-tour-actions{display:flex;gap:8px}
+.stept-tour-bar{height:3px;border-radius:2px;background:rgba(100,116,139,.22);margin:0 0 10px;overflow:hidden}
+.stept-tour-bar i{display:block;height:100%;background:var(--stept-accent,#6366f1);transition:width .2s ease}
+.stept-tour-btn{border:0;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:inherit}
 .stept-tour-btn.primary{background:var(--stept-accent,#6366f1);color:#fff}
 .stept-tour-btn.ghost{background:transparent;color:#475569}
 .stept-tour-close{position:absolute;top:8px;right:8px;border:0;background:transparent;
   font-size:16px;line-height:1;cursor:pointer;color:#94a3b8;padding:4px}
+.stept-tour-badge{display:inline-block;margin:0 0 6px;padding:1px 7px;border-radius:99px;font-size:10px;
+  font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--stept-accent,#6366f1);color:#fff}
+.stept-tour-banner{position:fixed;left:0;right:0;z-index:2147483001;pointer-events:auto;
+  display:flex;align-items:center;gap:12px;padding:12px 16px;box-sizing:border-box;
+  background:var(--stept-accent,#6366f1);color:#fff;
+  font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  box-shadow:0 6px 24px rgba(15,23,42,.22)}
+.stept-tour-banner[hidden]{display:none}
+.stept-tour-banner.stept-top{top:0}
+.stept-tour-banner.stept-bottom{bottom:0}
+.stept-tour-banner .stept-tour-banner-text{flex:1;min-width:0}
+.stept-tour-banner strong{display:block;font-size:14px}
+.stept-tour-banner .stept-tour-body{color:rgba(255,255,255,.92);margin:0}
+.stept-tour-banner .stept-tour-btn.primary{background:#fff;color:#0f172a}
+.stept-tour-banner .stept-tour-close{position:static;color:rgba(255,255,255,.85)}
+.stept-tour-beacon{position:fixed;z-index:2147483001;width:18px;height:18px;border-radius:50%;
+  background:var(--stept-accent,#6366f1);border:0;padding:0;cursor:pointer;pointer-events:auto;
+  box-shadow:0 0 0 4px rgba(99,102,241,.35);animation:stept-tour-pulse 1.8s ease-out infinite}
+.stept-tour-beacon[hidden]{display:none}
+@keyframes stept-tour-pulse{
+  0%{box-shadow:0 0 0 0 rgba(99,102,241,.55)}
+  70%{box-shadow:0 0 0 14px rgba(99,102,241,0)}
+  100%{box-shadow:0 0 0 0 rgba(99,102,241,0)}
+}
+.stept-tour-acting{outline:3px solid var(--stept-accent,#6366f1) !important;outline-offset:2px;
+  animation:stept-tour-pulse .6s ease-out 1}
 @media (prefers-color-scheme:dark){
   .stept-tour-tip{background:#1e293b;color:#f1f5f9}
-  .stept-tour-tip p{color:#cbd5e1}
+  .stept-tour-tip p,.stept-tour-body{color:#cbd5e1}
+  .stept-tour-btn.ghost{color:#cbd5e1}
+}
+@media (prefers-reduced-motion:reduce){
+  .stept-tour-beacon,.stept-tour-acting{animation:none}
 }
 `
 
@@ -141,98 +376,607 @@ export class TourPlayer {
   private doc: Document
   private win: Window & typeof globalThis
   private accent: string
-  private onEvent: (event: TourEventName, stepIndex: number | null) => void
+  private onEvent: (event: TourEventName, stepIndex: number | null, meta?: TourEventMeta) => void
+  private storage: Storage | null
+  private progressKey: string
+  private apiBase: string
+  private preview: boolean
+  private resolveTimeoutMs: number
+  private actionDelayMs: number
 
   private tour: Tour | null = null
+  private settings: TourSettings = DEFAULT_SETTINGS
   private index = 0
+  private startedAt = 0
+  private runToken = 0
+
   private root: HTMLElement | null = null
   private hole: HTMLElement | null = null
   private tip: HTMLElement | null = null
-  private reflow = () => this.position()
+  private banner: HTMLElement | null = null
+  private beacon: HTMLElement | null = null
+
+  private target: HTMLElement | null = null
+  private acting: HTMLElement | null = null
+  private stepCleanups: Array<() => void> = []
+  private resizeObserver: ResizeObserver | null = null
+  private previousFocus: Element | null = null
+  private rafPending = false
+
+  private reflow = (): void => this.schedulePosition()
+  private onKeyDown = (event: KeyboardEvent): void => this.handleKey(event)
 
   constructor(opts: TourPlayerOptions = {}) {
     this.doc = opts.doc ?? document
-    this.win = opts.win ?? (window as Window & typeof globalThis)
+    this.win = opts.win ?? (this.doc.defaultView as Window & typeof globalThis) ?? window
     this.accent = opts.accent ?? '#6366f1'
     this.onEvent = opts.onEvent ?? (() => {})
+    this.progressKey = opts.progressKey ?? 'stept:tour-progress'
+    this.apiBase = opts.apiBase ?? ''
+    this.storage = opts.storage !== undefined ? opts.storage : safeSessionStorage(this.win)
+    this.preview = opts.preview ?? false
+    this.resolveTimeoutMs = opts.resolveTimeoutMs ?? 4000
+    this.actionDelayMs = opts.actionDelayMs ?? 600
   }
 
   get active(): boolean {
     return this.tour !== null
   }
 
-  start(tour: Tour): void {
+  get activeTourId(): string | null {
+    return this.tour?.id ?? null
+  }
+
+  get stepIndex(): number {
+    return this.index
+  }
+
+  /** Start (or resume) a tour. Resuming never re-emits `started`. */
+  start(tour: Tour, opts: { preview?: boolean } = {}): void {
     if (this.tour) this.teardown()
     if (!tour.steps.length) return
     this.tour = tour
-    this.index = 0
+    this.preview = opts.preview ?? this.preview
+    this.settings = { ...DEFAULT_SETTINGS, ...(tour.settings ?? {}) }
     this.accent = tour.theme?.accent || this.accent
+    this.previousFocus = this.doc.activeElement
+
+    // Any stored position for THIS tour means it already started in this
+    // session (progress is cleared on completed/dismissed), so resuming must
+    // not re-emit `started` — that is what inflated completion-rate
+    // denominators on every reload.
+    const saved = this.preview ? null : readTourProgress(this.storage, this.progressKey)
+    const resume =
+      saved && saved.tourId === tour.id && saved.stepIndex < tour.steps.length ? saved : null
+    this.startedAt = resume ? resume.startedAt : Date.now()
+
     this.ensureStyle()
     this.build()
-    this.onEvent('started', null)
-    this.showStep(0)
     this.win.addEventListener('resize', this.reflow)
     this.win.addEventListener('scroll', this.reflow, true)
+    this.doc.addEventListener('keydown', this.onKeyDown, true)
+
+    if (!resume) this.emit('started', null)
+    this.showStep(resume ? resume.stepIndex : 0)
   }
 
   next(): void {
     if (!this.tour) return
-    const nextExisting = this.nextExistingIndex(this.index + 1)
-    if (nextExisting === -1) {
-      this.finish('completed')
-    } else {
-      this.showStep(nextExisting)
-    }
+    this.goto(this.index + 1)
   }
 
   back(): void {
     if (!this.tour) return
-    const prev = this.prevExistingIndex(this.index - 1)
-    if (prev !== -1) this.showStep(prev)
+    if (this.index > 0) this.showStep(this.index - 1)
   }
 
   dismiss(): void {
     this.finish('dismissed')
   }
 
-  private finish(event: TourEventName): void {
-    if (!this.tour) return
-    this.onEvent(event, event === 'dismissed' ? this.index : null)
+  /** Tear the player down without reporting anything (e.g. loader shutdown). */
+  stop(): void {
     this.teardown()
   }
 
-  private nextExistingIndex(from: number): number {
-    if (!this.tour) return -1
-    for (let i = from; i < this.tour.steps.length; i++) {
-      if (this.doc.querySelector(this.tour.steps[i]!.selector)) return i
-    }
-    return -1
+  // --- flow ----------------------------------------------------------------
+
+  private goto(index: number): void {
+    if (!this.tour) return
+    if (index >= this.tour.steps.length) this.finish('completed')
+    else this.showStep(index)
   }
 
-  private prevExistingIndex(from: number): number {
-    if (!this.tour) return -1
-    for (let i = from; i >= 0; i--) {
-      if (this.doc.querySelector(this.tour.steps[i]!.selector)) return i
-    }
-    return -1
+  private finish(event: 'completed' | 'dismissed'): void {
+    if (!this.tour) return
+    this.emit(event, event === 'dismissed' ? this.index : null)
+    this.clearProgress()
+    this.teardown()
   }
 
   private showStep(i: number): void {
     if (!this.tour) return
+    const step = this.tour.steps[i]
+    if (!step) {
+      this.finish('completed')
+      return
+    }
+    const token = ++this.runToken
+    this.resetStep()
     this.index = i
-    const step = this.tour.steps[i]!
-    const target = this.doc.querySelector(step.selector) as HTMLElement | null
-    if (!target) {
-      // Target vanished — advance rather than dead-ending the tour.
+    this.persist(i)
+
+    if ((step.type ?? 'tooltip') === 'wait') {
+      this.emit('step_viewed', i)
+      void this.runWaitStep(step, i, token)
+      return
+    }
+
+    if (!stepNeedsTarget(step)) {
+      this.present(step, i, null, false)
+      return
+    }
+
+    const immediate = resolveStepTarget(step, this.doc)
+    if (immediate.el) {
+      this.present(step, i, immediate.el, immediate.healed)
+      return
+    }
+    if (immediate.reason === 'in_iframe' || this.resolveTimeoutMs <= 0) {
+      this.failStep(i, immediate.reason === 'in_iframe' ? 'in_iframe' : 'not_found')
+      return
+    }
+    void this.awaitTarget(step, i, token)
+  }
+
+  /** SPA render race: give the element a moment to appear before skipping. */
+  private async awaitTarget(step: TourStep, i: number, token: number): Promise<void> {
+    const result = await waitForTarget(step, this.resolveTimeoutMs, {
+      doc: this.doc,
+      win: this.win,
+    })
+    if (token !== this.runToken || !this.tour) return
+    if (!result.el) {
+      this.failStep(i, result.reason === 'in_iframe' ? 'in_iframe' : 'not_found')
+      return
+    }
+    this.present(step, i, result.el, result.healed)
+  }
+
+  private failStep(i: number, reason: StepErrorReason): void {
+    this.emit('step_error', i, { reason })
+    this.goto(i + 1)
+  }
+
+  private present(step: TourStep, i: number, el: HTMLElement | null, healed: boolean): void {
+    this.target = el
+    const type = step.type ?? 'tooltip'
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+    }
+    if (type === 'banner') this.renderBanner(step, i)
+    else if (type === 'hotspot') this.renderHotspot(step, i, el)
+    else this.renderTip(step, i, el, type === 'modal')
+
+    this.position()
+    this.observeTarget(el)
+    this.emit('step_viewed', i, healed ? { healed: true } : undefined)
+
+    if (type === 'action' && this.settings.mode === 'driven' && step.action) {
+      this.runDrivenAction(step.action, el, i)
+      return
+    }
+    if (type === 'hotspot') return // advance binds when the beacon opens the tip
+    this.bindAdvance(step, el)
+    this.focusTip()
+  }
+
+  // --- step kinds ----------------------------------------------------------
+
+  private renderTip(step: TourStep, i: number, el: HTMLElement | null, centered: boolean): void {
+    const tip = this.tip
+    if (!tip || !this.tour) return
+    const type = step.type ?? 'tooltip'
+    const guidedAction = type === 'action' && this.settings.mode !== 'driven'
+    tip.innerHTML = ''
+    tip.hidden = false
+    tip.classList.toggle('stept-centered', centered)
+    tip.setAttribute('aria-modal', this.settings.backdrop && centered ? 'true' : 'false')
+    if (this.banner) this.banner.hidden = true
+    if (this.beacon) this.beacon.hidden = true
+
+    if (this.hole) {
+      this.hole.hidden = !el
+      this.hole.classList.toggle('stept-nodim', !this.settings.backdrop)
+    }
+    this.root?.classList.toggle('stept-veil', centered && this.settings.backdrop)
+
+    if (this.preview) {
+      const badge = el2(this.doc, 'span', 'stept-tour-badge')
+      badge.textContent = 'Preview'
+      tip.appendChild(badge)
+    }
+    if (this.settings.dismissable) tip.appendChild(this.closeButton())
+    if (step.media) tip.appendChild(this.mediaNode(step.media))
+
+    const titleId = `stept-tour-title-${i}`
+    const heading = el2(this.doc, 'h4')
+    heading.id = titleId
+    heading.textContent = step.title || defaultTitle(step, i)
+    tip.appendChild(heading)
+    tip.setAttribute('aria-labelledby', titleId)
+
+    const body = step.body || (guidedAction ? actionInstruction(step) : '')
+    if (body) {
+      const node = el2(this.doc, 'div', 'stept-tour-body')
+      node.innerHTML = renderMarkdown(body)
+      absolutizeMedia(node, this.apiBase)
+      tip.appendChild(node)
+    }
+    if (this.settings.show_progress) tip.appendChild(this.progressBar(i))
+    tip.appendChild(this.footer(step, i, guidedAction))
+  }
+
+  private renderHotspot(step: TourStep, i: number, el: HTMLElement | null): void {
+    if (this.tip) this.tip.hidden = true
+    if (this.banner) this.banner.hidden = true
+    if (this.hole) this.hole.hidden = true
+    this.root?.classList.remove('stept-veil')
+    const beacon = this.beacon
+    if (!beacon) return
+    beacon.hidden = false
+    beacon.setAttribute('aria-label', step.title || 'Show tip')
+    const open = (): void => {
+      this.renderTip(step, i, el, false)
+      this.position()
+      this.bindAdvance(step, el)
+      this.focusTip()
+    }
+    beacon.onclick = open
+  }
+
+  private renderBanner(step: TourStep, i: number): void {
+    const banner = this.banner
+    if (!banner || !this.tour) return
+    if (this.tip) this.tip.hidden = true
+    if (this.beacon) this.beacon.hidden = true
+    if (this.hole) this.hole.hidden = true
+    // A banner is an announcement, never a modal: the page stays fully usable.
+    this.root?.classList.remove('stept-veil')
+
+    const position = this.tour.theme?.position === 'top' ? 'top' : 'bottom'
+    banner.className = `stept-tour-banner stept-${position}`
+    banner.hidden = false
+    banner.innerHTML = ''
+    const text = el2(this.doc, 'div', 'stept-tour-banner-text')
+    if (step.title) {
+      const strong = el2(this.doc, 'strong')
+      strong.id = `stept-tour-title-${i}`
+      strong.textContent = step.title
+      text.appendChild(strong)
+      banner.setAttribute('aria-labelledby', strong.id)
+    }
+    if (step.body) {
+      const body = el2(this.doc, 'div', 'stept-tour-body')
+      body.innerHTML = renderMarkdown(step.body)
+      absolutizeMedia(body, this.apiBase)
+      text.appendChild(body)
+    }
+    banner.appendChild(text)
+
+    const isLast = i === this.tour.steps.length - 1
+    const cta = el2(this.doc, 'button', 'stept-tour-btn primary')
+    cta.textContent = isLast ? 'Got it' : 'Next'
+    cta.onclick = () => this.next()
+    banner.appendChild(cta)
+    if (this.settings.dismissable) banner.appendChild(this.closeButton())
+  }
+
+  private runDrivenAction(action: StepAction, el: HTMLElement | null, i: number): void {
+    if (el) {
+      el.classList.add('stept-tour-acting')
+      this.acting = el
+    }
+    const token = this.runToken
+    const timer = this.win.setTimeout(() => {
+      if (token !== this.runToken || !this.tour) return
+      this.clearActing()
+      // A navigate action unloads the page: persist the NEXT step first so the
+      // reload resumes the tour instead of restarting (or dropping) it.
+      if (action.kind === 'navigate') this.persist(i + 1)
+      let ok = false
+      try {
+        ok = performAction(action, el, this.win)
+      } catch {
+        ok = false
+      }
+      if (!ok) {
+        this.emit('step_error', i, { reason: 'action_failed' })
+      }
+      this.goto(i + 1)
+    }, this.actionDelayMs)
+    this.stepCleanups.push(() => this.win.clearTimeout(timer))
+  }
+
+  private async runWaitStep(step: TourStep, i: number, token: number): Promise<void> {
+    this.hideChrome()
+    const config = step.wait ?? { for: 'element' as const, timeout_ms: 10_000 }
+    const timeout = config.timeout_ms ?? 10_000
+    let ok: boolean
+    let reason: StepErrorReason = 'timeout'
+    if ((config.for ?? 'element') === 'url') {
+      ok = await this.waitForUrl(config.url_pattern ?? '', timeout)
+    } else {
+      const result = await waitForTarget(step, timeout, { doc: this.doc, win: this.win })
+      ok = result.el !== null
+      if (result.reason === 'in_iframe') reason = 'in_iframe'
+    }
+    if (token !== this.runToken || !this.tour) return
+    if (!ok) this.emit('step_error', i, { reason })
+    this.goto(i + 1)
+  }
+
+  /** Resolve true once `location.href` matches, false when the budget expires. */
+  private waitForUrl(pattern: string, timeoutMs: number): Promise<boolean> {
+    const matches = (): boolean => !pattern || globMatch(pattern, this.win.location.href)
+    if (matches()) return Promise.resolve(true)
+    return new Promise<boolean>((resolve) => {
+      let done = false
+      const finish = (ok: boolean): void => {
+        if (done) return
+        done = true
+        this.win.clearInterval(poll)
+        this.win.clearTimeout(timer)
+        this.win.removeEventListener('popstate', check)
+        this.win.removeEventListener('stept:locationchange', check)
+        resolve(ok)
+      }
+      const check = (): void => {
+        if (matches()) finish(true)
+      }
+      const poll = this.win.setInterval(check, 200)
+      const timer = this.win.setTimeout(() => finish(false), timeoutMs)
+      this.win.addEventListener('popstate', check)
+      this.win.addEventListener('stept:locationchange', check)
+      this.stepCleanups.push(() => finish(false))
+    })
+  }
+
+  // --- chrome --------------------------------------------------------------
+
+  private closeButton(): HTMLElement {
+    const close = el2(this.doc, 'button', 'stept-tour-close')
+    close.textContent = '×'
+    close.setAttribute('aria-label', 'Dismiss tour')
+    close.onclick = () => this.dismiss()
+    return close
+  }
+
+  private mediaNode(media: { type: 'image' | 'video'; url: string }): HTMLElement {
+    // Backend media is root-relative; the player runs on the customer's origin.
+    const src = resolveMediaUrl(media.url, this.apiBase)
+    if (media.type === 'video') {
+      const video = this.doc.createElement('video')
+      video.className = 'stept-tour-media'
+      video.src = src
+      video.controls = true
+      video.playsInline = true
+      return video
+    }
+    const img = this.doc.createElement('img')
+    img.className = 'stept-tour-media'
+    img.src = src
+    img.alt = ''
+    return img
+  }
+
+  private progressBar(i: number): HTMLElement {
+    const total = this.tour?.steps.length ?? 1
+    const bar = el2(this.doc, 'div', 'stept-tour-bar')
+    const fill = el2(this.doc, 'i')
+    fill.style.width = `${Math.round(((i + 1) / total) * 100)}%`
+    bar.appendChild(fill)
+    return bar
+  }
+
+  private footer(step: TourStep, i: number, guidedAction: boolean): HTMLElement {
+    const total = this.tour?.steps.length ?? 1
+    const isLast = i === total - 1
+    const advance = step.advance?.on ?? 'button'
+    const foot = el2(this.doc, 'div', 'stept-tour-foot')
+
+    const left = el2(this.doc, 'span', 'stept-tour-count')
+    if (this.settings.show_progress) left.textContent = `${i + 1} of ${total}`
+    foot.appendChild(left)
+
+    const actions = el2(this.doc, 'div', 'stept-tour-actions')
+    if (i > 0) {
+      const back = el2(this.doc, 'button', 'stept-tour-btn ghost')
+      back.textContent = 'Back'
+      back.onclick = () => this.back()
+      actions.appendChild(back)
+    }
+    // element_click / input / delay steps advance from the page itself; showing
+    // a Next button there would let the user skip the thing being taught.
+    const selfAdvancing = (guidedAction || advance !== 'button') && !isLast
+    if (selfAdvancing) {
+      const hint = el2(this.doc, 'p', 'stept-tour-hint')
+      hint.textContent = guidedAction
+        ? actionHint(step)
+        : advance === 'input'
+          ? 'Fill in the field to continue'
+          : advance === 'delay'
+            ? 'Continuing…'
+            : 'Click the highlighted element to continue'
+      actions.appendChild(hint)
+    } else {
+      const nextBtn = el2(this.doc, 'button', 'stept-tour-btn primary')
+      nextBtn.textContent = isLast ? 'Done' : 'Next'
+      nextBtn.onclick = () => this.next()
+      actions.appendChild(nextBtn)
+    }
+    foot.appendChild(actions)
+    return foot
+  }
+
+  private bindAdvance(step: TourStep, el: HTMLElement | null): void {
+    const advance = step.advance ?? { on: 'button' as const }
+    const guidedAction = (step.type ?? 'tooltip') === 'action' && this.settings.mode !== 'driven'
+    const mode = guidedAction ? 'element_click' : advance.on
+
+    if (mode === 'element_click' && el) {
+      const handler = (): void => this.next()
+      el.addEventListener('click', handler, true)
+      this.stepCleanups.push(() => el.removeEventListener('click', handler, true))
+      return
+    }
+    if (mode === 'input' && el) {
+      const handler = (event: Event): void => {
+        if (event.type === 'keydown' && (event as KeyboardEvent).key !== 'Enter') return
+        const value = (el as HTMLInputElement).value
+        if (typeof value === 'string' && !value.trim()) return
+        this.next()
+      }
+      for (const type of ['change', 'blur', 'keydown']) {
+        el.addEventListener(type, handler, true)
+        this.stepCleanups.push(() => el.removeEventListener(type, handler, true))
+      }
+      return
+    }
+    if (mode === 'delay') {
+      const delay = Math.max(100, advance.delay_ms ?? 3000)
+      const timer = this.win.setTimeout(() => this.next(), delay)
+      this.stepCleanups.push(() => this.win.clearTimeout(timer))
+    }
+  }
+
+  private handleKey(event: KeyboardEvent): void {
+    if (!this.tour) return
+    if (event.key === 'Escape' && this.settings.dismissable) {
+      event.preventDefault()
+      this.dismiss()
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
       this.next()
       return
     }
-    if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      this.back()
     }
-    this.renderTip(step, i)
-    this.position()
-    this.onEvent('step_viewed', i)
+  }
+
+  private focusTip(): void {
+    const tip = this.tip
+    if (!tip || tip.hidden || typeof tip.focus !== 'function') return
+    try {
+      tip.focus({ preventScroll: true })
+    } catch {
+      tip.focus()
+    }
+  }
+
+  private hideChrome(): void {
+    if (this.tip) this.tip.hidden = true
+    if (this.banner) this.banner.hidden = true
+    if (this.beacon) this.beacon.hidden = true
+    if (this.hole) this.hole.hidden = true
+    this.root?.classList.remove('stept-veil')
+  }
+
+  // --- geometry ------------------------------------------------------------
+
+  private observeTarget(el: HTMLElement | null): void {
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
+    const Observer = (this.win as unknown as { ResizeObserver?: typeof ResizeObserver })
+      .ResizeObserver
+    if (!el || typeof Observer !== 'function') return
+    const observer = new Observer(this.reflow)
+    observer.observe(el)
+    this.resizeObserver = observer
+  }
+
+  private schedulePosition(): void {
+    if (this.rafPending) return
+    const raf = this.win.requestAnimationFrame?.bind(this.win)
+    if (!raf) {
+      this.position()
+      return
+    }
+    this.rafPending = true
+    raf(() => {
+      this.rafPending = false
+      this.position()
+    })
+  }
+
+  private position(): void {
+    if (!this.tour) return
+    const step = this.tour.steps[this.index]
+    if (!step) return
+    const el = this.target
+    const tip = this.tip
+    if (el && this.hole && !this.hole.hidden) {
+      const r = el.getBoundingClientRect()
+      const pad = 6
+      Object.assign(this.hole.style, {
+        top: `${r.top - pad}px`,
+        left: `${r.left - pad}px`,
+        width: `${r.width + pad * 2}px`,
+        height: `${r.height + pad * 2}px`,
+      })
+    }
+    if (el && this.beacon && !this.beacon.hidden) {
+      const r = el.getBoundingClientRect()
+      this.beacon.style.top = `${r.top - 9}px`
+      this.beacon.style.left = `${r.left + r.width - 9}px`
+    }
+    if (!tip || tip.hidden || tip.classList.contains('stept-centered')) return
+    if (!el) {
+      // Anchorless tip (a targetless tooltip): park it bottom-centre.
+      tip.style.top = ''
+      tip.style.left = ''
+      tip.classList.add('stept-centered')
+      return
+    }
+    const r = el.getBoundingClientRect()
+    const tipRect = tip.getBoundingClientRect()
+    const vp = { width: this.win.innerWidth, height: this.win.innerHeight }
+    const pos = computeTooltipPosition(
+      (step.placement as Placement) ?? 'auto',
+      { top: r.top, left: r.left, width: r.width, height: r.height },
+      { width: tipRect.width || 320, height: tipRect.height || 150 },
+      vp,
+    )
+    tip.style.top = `${pos.top}px`
+    tip.style.left = `${pos.left}px`
+  }
+
+  // --- plumbing ------------------------------------------------------------
+
+  private emit(event: TourEventName, stepIndex: number | null, extra?: TourEventMeta): void {
+    const meta: TourEventMeta = {
+      url: this.win.location?.href ?? '',
+      viewport_w: this.win.innerWidth,
+      ...(extra ?? {}),
+    }
+    this.onEvent(event, stepIndex, meta)
+  }
+
+  private persist(index: number): void {
+    if (this.preview || !this.tour) return
+    writeTourProgress(this.storage, this.progressKey, {
+      tourId: this.tour.id,
+      stepIndex: index,
+      startedAt: this.startedAt,
+    })
+  }
+
+  private clearProgress(): void {
+    clearTourProgress(this.storage, this.progressKey)
   }
 
   private ensureStyle(): void {
@@ -244,98 +988,114 @@ export class TourPlayer {
   }
 
   private build(): void {
-    const root = this.doc.createElement('div')
-    root.className = 'stept-tour-backdrop'
+    const root = el2(this.doc, 'div', 'stept-tour-root')
     root.style.setProperty('--stept-accent', this.accent)
-    const hole = this.doc.createElement('div')
-    hole.className = 'stept-tour-hole'
-    const tip = this.doc.createElement('div')
-    tip.className = 'stept-tour-tip'
-    tip.setAttribute('role', 'dialog')
+    const hole = el2(this.doc, 'div', 'stept-tour-hole')
+    hole.hidden = true
     root.appendChild(hole)
-    // Tip is a sibling on <body> so it can receive pointer events.
+
+    const tip = el2(this.doc, 'div', 'stept-tour-tip')
+    tip.setAttribute('role', 'dialog')
+    tip.setAttribute('tabindex', '-1')
+    tip.hidden = true
+    tip.style.setProperty('--stept-accent', this.accent)
+
+    const banner = el2(this.doc, 'div', 'stept-tour-banner')
+    banner.setAttribute('role', 'region')
+    banner.hidden = true
+    banner.style.setProperty('--stept-accent', this.accent)
+
+    const beacon = el2(this.doc, 'button', 'stept-tour-beacon')
+    beacon.hidden = true
+    beacon.style.setProperty('--stept-accent', this.accent)
+
+    // Siblings on <body> (not children of the pointer-events:none root) so they
+    // stay clickable.
     this.doc.body.appendChild(root)
     this.doc.body.appendChild(tip)
-    tip.style.setProperty('--stept-accent', this.accent)
+    this.doc.body.appendChild(banner)
+    this.doc.body.appendChild(beacon)
     this.root = root
     this.hole = hole
     this.tip = tip
+    this.banner = banner
+    this.beacon = beacon
   }
 
-  private renderTip(step: { title: string; body: string }, i: number): void {
-    if (!this.tip || !this.tour) return
-    const total = this.tour.steps.length
-    const isLast = this.nextExistingIndex(i + 1) === -1
-    const hasPrev = this.prevExistingIndex(i - 1) !== -1
-    this.tip.innerHTML = ''
-    const close = el(this.doc, 'button', 'stept-tour-close')
-    close.textContent = '×'
-    close.setAttribute('aria-label', 'Dismiss tour')
-    close.onclick = () => this.dismiss()
-    const h = el(this.doc, 'h4')
-    h.textContent = step.title || `Step ${i + 1}`
-    const p = el(this.doc, 'p')
-    p.textContent = step.body || ''
-    const foot = el(this.doc, 'div', 'stept-tour-foot')
-    const count = el(this.doc, 'span', 'stept-tour-count')
-    count.textContent = `${i + 1} of ${total}`
-    const actions = el(this.doc, 'div', 'stept-tour-actions')
-    if (hasPrev) {
-      const back = el(this.doc, 'button', 'stept-tour-btn ghost')
-      back.textContent = 'Back'
-      back.onclick = () => this.back()
-      actions.appendChild(back)
+  private clearActing(): void {
+    this.acting?.classList.remove('stept-tour-acting')
+    this.acting = null
+  }
+
+  private resetStep(): void {
+    for (const cleanup of this.stepCleanups.splice(0)) {
+      try {
+        cleanup()
+      } catch {
+        /* ignore */
+      }
     }
-    const nextBtn = el(this.doc, 'button', 'stept-tour-btn primary')
-    nextBtn.textContent = isLast ? 'Done' : 'Next'
-    nextBtn.onclick = () => this.next()
-    actions.appendChild(nextBtn)
-    foot.appendChild(count)
-    foot.appendChild(actions)
-    this.tip.appendChild(close)
-    this.tip.appendChild(h)
-    if (step.body) this.tip.appendChild(p)
-    this.tip.appendChild(foot)
-  }
-
-  private position(): void {
-    if (!this.tour || !this.hole || !this.tip) return
-    const step = this.tour.steps[this.index]!
-    const target = this.doc.querySelector(step.selector) as HTMLElement | null
-    if (!target) return
-    const r = target.getBoundingClientRect()
-    const pad = 6
-    Object.assign(this.hole.style, {
-      top: `${r.top - pad}px`,
-      left: `${r.left - pad}px`,
-      width: `${r.width + pad * 2}px`,
-      height: `${r.height + pad * 2}px`,
-    })
-    const tipRect = this.tip.getBoundingClientRect()
-    const vp = { width: this.win.innerWidth, height: this.win.innerHeight }
-    const pos = computeTooltipPosition(
-      step.placement,
-      { top: r.top, left: r.left, width: r.width, height: r.height },
-      { width: tipRect.width || 300, height: tipRect.height || 140 },
-      vp,
-    )
-    this.tip.style.top = `${pos.top}px`
-    this.tip.style.left = `${pos.left}px`
+    this.clearActing()
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
+    this.target = null
   }
 
   private teardown(): void {
+    this.runToken++
+    this.resetStep()
     this.win.removeEventListener('resize', this.reflow)
     this.win.removeEventListener('scroll', this.reflow, true)
+    this.doc.removeEventListener('keydown', this.onKeyDown, true)
     this.root?.remove()
     this.tip?.remove()
-    this.root = this.hole = this.tip = null
+    this.banner?.remove()
+    this.beacon?.remove()
+    this.root = this.hole = this.tip = this.banner = this.beacon = null
     this.tour = null
     this.index = 0
+    const previous = this.previousFocus as HTMLElement | null
+    this.previousFocus = null
+    if (previous && typeof previous.focus === 'function' && previous.isConnected) {
+      try {
+        previous.focus({ preventScroll: true })
+      } catch {
+        previous.focus()
+      }
+    }
   }
 }
 
-function el(doc: Document, tag: string, className = ''): HTMLElement {
+function el2(doc: Document, tag: string, className = ''): HTMLElement {
   const node = doc.createElement(tag)
   if (className) node.className = className
   return node
+}
+
+function defaultTitle(step: TourStep, i: number): string {
+  if ((step.type ?? 'tooltip') === 'action' && step.action) return actionInstruction(step)
+  return `Step ${i + 1}`
+}
+
+/** Guided-mode copy for an action step the USER has to perform. */
+function actionInstruction(step: TourStep): string {
+  const action = step.action
+  if (!action) return ''
+  if (action.kind === 'fill') return `Type “${action.value ?? ''}” here`
+  if (action.kind === 'navigate') return `Go to ${action.url ?? 'the next page'}`
+  return 'Click the highlighted element'
+}
+
+function actionHint(step: TourStep): string {
+  return step.action?.kind === 'fill'
+    ? 'Fill in the field to continue'
+    : 'Click the highlighted element to continue'
+}
+
+function safeSessionStorage(win: Window): Storage | null {
+  try {
+    return win.sessionStorage ?? null
+  } catch {
+    return null
+  }
 }

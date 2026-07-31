@@ -76,12 +76,15 @@
         <code>demo.html?key=wk_your_key&amp;api=http://localhost:8600</code>.
       </p>
 
-      <!-- These data-tour anchors match the seeded "Welcome to Stept" tour selectors.
-           On a matching URL the loader auto-starts the first eligible tour. -->
+      <!-- These data-tour anchors match the seeded tour selectors. On a matching URL
+           the loader auto-starts the first eligible experience (tour > survey >
+           checklist auto-open). -->
       <nav>
         <a href="#" data-tour="inbox">Inbox</a>
         <a href="#" data-tour="knowledge">Knowledge</a>
         <a href="#" data-tour="ai">AI</a>
+        <a href="#/automations" data-tour="automations">Automations</a>
+        <a href="#/settings/inboxes">Settings</a>
       </nav>
 
       <section data-tour="inbox">
@@ -96,10 +99,25 @@
         <h2>AI agents</h2>
         <p>Automated first responders with approval gates.</p>
       </section>
+      <section data-tour="automations">
+        <h2>Automations</h2>
+        <p>Rules that route, tag and reply on their own.</p>
+        <button data-tour="new-rule" type="button">New rule</button>
+        <label>Rule name <input data-tour="rule-name" type="text" /></label>
+      </section>
 
       <p>
         Try the console: <code>Stept('open')</code>, <code>Stept('close')</code>,
-        <code>Stept('startTour', '&lt;tourId&gt;')</code>, <code>Stept('shutdown')</code>.
+        <code>Stept('startTour', '&lt;tourId&gt;')</code> (works for manual-trigger tours too),
+        <code>Stept('shutdown')</code>.
+      </p>
+      <p class="note">
+        <strong>DAP surfaces on this page:</strong> tours (tooltip / modal / banner / hotspot /
+        action / wait steps), the checklist launcher pill next to the messenger bubble, and NPS
+        or rating surveys. Navigating to <code>#/settings/inboxes</code> ticks the seeded
+        &ldquo;Connect an inbox&rdquo; checklist item (url_visited). To preview an unpublished
+        tour, mint a preview token in the dashboard and open this page with
+        <code>#stept-preview=&lt;token&gt;</code>.
       </p>
     </main>
 

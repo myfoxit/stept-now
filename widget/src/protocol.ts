@@ -29,6 +29,11 @@ export const MSG = {
    * the actual trigger POST.
    */
   CAMPAIGN_DUE: 'stept:campaign:due',
+  /**
+   * loader -> app: a checklist item's CTA opened the messenger
+   * (payload `{checklistId, itemId}`) so the app can react to the context.
+   */
+  CHECKLIST_ACTION: 'stept:checklist:action',
 } as const
 
 export type MessageType = (typeof MSG)[keyof typeof MSG]

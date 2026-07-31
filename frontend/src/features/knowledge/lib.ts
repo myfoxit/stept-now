@@ -55,6 +55,25 @@ export function sourceTypeLabel(type: string): string {
   return SOURCE_TYPE_LABELS[type] ?? type
 }
 
+/** Mime types the authored-document editor (PATCH /knowledge/documents/{id}) accepts. */
+const EDITABLE_MIMES = ['text/markdown', 'text/plain']
+
+/**
+ * Whether a document is worth offering an "Edit" action for — the same rule the
+ * backend enforces: authored (storage-backed) text living in a files/text
+ * source. Connector- and URL-backed documents answer 409 to a PATCH, so they
+ * get no affordance at all. The detail endpoint is still the authority: it
+ * returns `content: null` for anything it will not let you edit.
+ */
+export function isEditableDocument(
+  document: { mime?: string | null; uri?: string | null },
+  sourceType: string | undefined
+): boolean {
+  if (sourceType !== 'files' && sourceType !== 'text') return false
+  if (document.uri) return false
+  return EDITABLE_MIMES.includes(document.mime ?? '')
+}
+
 /** The configured auto-resync interval, if the source has one (int minutes ≥ 5). */
 export function refreshMinutes(config: Record<string, unknown> | null | undefined): number | null {
   const raw = config?.refresh_minutes

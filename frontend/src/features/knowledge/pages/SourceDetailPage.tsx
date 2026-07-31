@@ -1,5 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileText, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  FileText,
+  Pencil,
+  PencilLine,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -29,6 +38,7 @@ import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
 import { knowledgeApi, knowledgeKeys, REMOTE_SOURCE_TYPES } from '../api'
 import { AddDocumentDialog } from '../components/AddDocumentDialog'
 import { AddSourceDialog } from '../components/AddSourceDialog'
+import { EditDocumentDialog } from '../components/EditDocumentDialog'
 import { ErrorState, ListSkeleton, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import {
   AutoSyncBadge,
@@ -38,7 +48,7 @@ import {
   SourceTypeIcon,
 } from '../components/status'
 import { useDocument, useDocuments, useSource } from '../hooks'
-import { refreshMinutes, sourceTypeLabel } from '../lib'
+import { isEditableDocument, refreshMinutes, sourceTypeLabel } from '../lib'
 
 export function Component() {
   const { sourceId = '' } = useParams()
@@ -50,6 +60,7 @@ export function Component() {
   const [addOpen, setAddOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [previewId, setPreviewId] = useState<string | null>(null)
+  const [editDocumentId, setEditDocumentId] = useState<string | null>(null)
 
   const syncMutation = useMutation({
     mutationFn: () => knowledgeApi.syncSource(sourceId),
@@ -200,6 +211,17 @@ export function Component() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       {canWrite ? (
                         <div className="flex justify-end gap-1">
+                          {isEditableDocument(doc, src?.type) ? (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              aria-label={`Edit ${doc.title}`}
+                              onClick={() => setEditDocumentId(doc.id)}
+                            >
+                              <PencilLine className="size-4" />
+                            </Button>
+                          ) : null}
                           {doc.status === 'failed' ? (
                             <Button
                               size="icon"
@@ -236,6 +258,11 @@ export function Component() {
       ) : null}
       {src ? <AddSourceDialog source={src} open={editOpen} onOpenChange={setEditOpen} /> : null}
       <DocumentPreviewDialog id={previewId} onClose={() => setPreviewId(null)} />
+      <EditDocumentDialog
+        documentId={editDocumentId}
+        sourceId={sourceId}
+        onClose={() => setEditDocumentId(null)}
+      />
     </PageShell>
   )
 }

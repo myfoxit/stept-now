@@ -1,18 +1,37 @@
 /**
  * Minimal, dependency-free markdown renderer. Supports headings, bold/italic,
- * inline code, fenced code blocks, unordered/ordered lists, blockquotes and
- * links. Renders through React text nodes (never dangerouslySetInnerHTML), so
- * user content cannot inject markup.
+ * inline code, fenced code blocks, unordered/ordered lists, blockquotes,
+ * links, images and GFM pipe tables. Renders through React text nodes (never
+ * dangerouslySetInnerHTML), so user content cannot inject markup — image and
+ * link targets are additionally restricted to safe schemes.
  */
 
 import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
-/** Inline formatting: `code`, **bold**, *italic*, [text](url). */
+/** Links: http(s), mailto, anchors and same-origin paths. Nothing else. */
+function safeHref(url: string): string | null {
+  const trimmed = url.trim()
+  if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed
+  if (/^[#/]/.test(trimmed)) return trimmed
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null
+  return trimmed
+}
+
+/** Images are stricter: remote http(s) or a same-origin path. */
+function safeSrc(url: string): string | null {
+  const trimmed = url.trim()
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (/^\//.test(trimmed)) return trimmed
+  return null
+}
+
+/** Inline formatting: `code`, **bold**, *italic*, [text](url), ![alt](src). */
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = []
-  const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))/g
+  const pattern =
+    /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(!\[[^\]]*\]\([^)]+\))|(\[[^\]]+\]\([^)]+\))/g
   let last = 0
   let match: RegExpExecArray | null
   let i = 0
@@ -30,13 +49,25 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>)
     } else if (token.startsWith('*')) {
       nodes.push(<em key={key}>{token.slice(1, -1)}</em>)
+    } else if (token.startsWith('![')) {
+      const imageMatch = /!\[([^\]]*)\]\(([^)]+)\)/.exec(token)
+      const src = imageMatch ? safeSrc(imageMatch[2]) : null
+      if (imageMatch && src) {
+        nodes.push(
+          <img key={key} src={src} alt={imageMatch[1]} className="max-w-full rounded-md" />
+        )
+      } else if (imageMatch) {
+        // Unsafe scheme — keep the alt text, drop the image.
+        nodes.push(imageMatch[1])
+      }
     } else {
       const linkMatch = /\[([^\]]+)\]\(([^)]+)\)/.exec(token)
-      if (linkMatch) {
+      const href = linkMatch ? safeHref(linkMatch[2]) : null
+      if (linkMatch && href) {
         nodes.push(
           <a
             key={key}
-            href={linkMatch[2]}
+            href={href}
             target="_blank"
             rel="noreferrer"
             className="text-primary underline underline-offset-2"
@@ -44,6 +75,8 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
             {linkMatch[1]}
           </a>
         )
+      } else if (linkMatch) {
+        nodes.push(linkMatch[1])
       }
     }
     last = match.index + token.length
@@ -51,6 +84,19 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   if (last < text.length) nodes.push(text.slice(last))
   return nodes
 }
+
+/** A `| a | b |` row split into trimmed cells. */
+function tableCells(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+}
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/
+const TABLE_DIVIDER = /^\s*\|?[\s:-]*-[\s:|-]*\|?\s*$/
 
 export function Markdown({ content, className }: { content: string; className?: string }) {
   const lines = content.replace(/\r\n/g, '\n').split('\n')
@@ -76,8 +122,8 @@ export function Markdown({ content, className }: { content: string; className?: 
     list = null
   }
 
-  for (const raw of lines) {
-    const line = raw
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
 
     if (code !== null) {
       if (line.trim().startsWith('```')) {
@@ -95,6 +141,47 @@ export function Markdown({ content, className }: { content: string; className?: 
     if (line.trim().startsWith('```')) {
       flushList()
       code = []
+      continue
+    }
+
+    // GFM pipe table: header row, divider row, then body rows.
+    if (TABLE_ROW.test(line) && index + 1 < lines.length && TABLE_DIVIDER.test(lines[index + 1])) {
+      flushList()
+      const header = tableCells(line)
+      const rows: string[][] = []
+      index += 2
+      while (index < lines.length && TABLE_ROW.test(lines[index])) {
+        rows.push(tableCells(lines[index]))
+        index += 1
+      }
+      index -= 1
+      const tableKey = key++
+      blocks.push(
+        <div key={tableKey} className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b">
+                {header.map((cell, i) => (
+                  <th key={i} className="px-2 py-1.5 font-medium">
+                    {renderInline(cell, `th-${tableKey}-${i}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, r) => (
+                <tr key={r} className="border-b last:border-0">
+                  {row.map((cell, c) => (
+                    <td key={c} className="px-2 py-1.5 align-top text-muted-foreground">
+                      {renderInline(cell, `td-${tableKey}-${r}-${c}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
       continue
     }
 

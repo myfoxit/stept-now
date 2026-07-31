@@ -36,35 +36,40 @@ function mockCreateRoutes(id: string) {
 describe('AddSourceDialog', () => {
   beforeEach(() => seedAuth())
 
-  it('uploads files by creating a source then posting each document', async () => {
+  it('uploads files by creating a source then posting one batch', async () => {
     const fetchFn = mockFetch({
       'POST /api/v1/w/w1/knowledge/sources': () => ({
         status: 201,
         body: makeSource({ id: 'src1', type: 'files' }),
       }),
-      'POST /api/v1/w/w1/knowledge/sources/src1/documents': () => ({
+      'POST /api/v1/w/w1/knowledge/sources/src1/documents/batch': () => ({
         status: 201,
-        body: makeDocument({ id: 'd1' }),
+        body: [makeDocument({ id: 'd1' }), makeDocument({ id: 'd2' })],
       }),
     })
     renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
 
     const input = screen.getByLabelText(/upload files/i)
-    await userEvent.upload(input, new File(['hello'], 'guide.txt', { type: 'text/plain' }))
+    await userEvent.upload(input, [
+      new File(['hello'], 'guide.txt', { type: 'text/plain' }),
+      new File(['more'], 'faq.md', { type: 'text/markdown' }),
+    ])
     expect(await screen.findByText('guide.txt')).toBeInTheDocument()
+    expect(screen.getByText('faq.md')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /create source/i }))
 
     await waitFor(() => {
       const calls = fetchFn.mock.calls.map(([url, init]) => `${init?.method} ${url}`)
-      expect(calls.some((c) => c === 'POST /api/v1/w/w1/knowledge/sources')).toBe(true)
-      expect(
-        calls.some((c) => c === 'POST /api/v1/w/w1/knowledge/sources/src1/documents')
-      ).toBe(true)
+      expect(calls).toContain('POST /api/v1/w/w1/knowledge/sources')
+      expect(calls).toContain('POST /api/v1/w/w1/knowledge/sources/src1/documents/batch')
     })
+    const batch = fetchFn.mock.calls.find(([url]) => String(url).endsWith('/documents/batch'))!
+    const form = batch[1]?.body as FormData
+    expect(form.getAll('file')).toHaveLength(2)
   })
 
-  it('creates a text source with a pasted document', async () => {
+  it('creates a text source authored in the rich text editor', async () => {
     const fetchFn = mockFetch({
       'POST /api/v1/w/w1/knowledge/sources': () => ({
         status: 201,
@@ -79,7 +84,15 @@ describe('AddSourceDialog', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: /text/i }))
     await userEvent.type(screen.getByLabelText(/document title/i), 'Refund policy')
-    await userEvent.type(screen.getByLabelText(/content/i), 'We offer refunds within 30 days.')
+
+    const editor = screen.getByRole('textbox', { name: /document content/i })
+    await userEvent.click(editor)
+    await userEvent.click(screen.getByRole('button', { name: 'Heading 2' }))
+    await userEvent.keyboard('Refunds')
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /create source/i })).toBeEnabled()
+    )
     await userEvent.click(screen.getByRole('button', { name: /create source/i }))
 
     await waitFor(() => {
@@ -88,7 +101,11 @@ describe('AddSourceDialog', () => {
           init?.method === 'POST' && String(url).endsWith('/sources/src2/documents')
       )
       expect(textCall).toBeDefined()
-      expect(JSON.parse(String(textCall![1]?.body))).toMatchObject({ title: 'Refund policy' })
+      // The editor serialises back to markdown — never HTML.
+      expect(JSON.parse(String(textCall![1]?.body))).toEqual({
+        title: 'Refund policy',
+        content: '## Refunds',
+      })
     })
   })
 
@@ -132,9 +149,69 @@ describe('AddSourceDialog', () => {
     await waitFor(() => {
       expect(bodyOf(fetchFn, 'POST', '/knowledge/sources')).toMatchObject({
         type: 'crawl',
-        config: { base_url: 'https://docs.example.com', max_pages: 50, max_depth: 3 },
+        config: {
+          base_url: 'https://docs.example.com',
+          max_pages: 50,
+          max_depth: 3,
+          // Politeness defaults ship even when the user touches nothing.
+          respect_robots: true,
+          delay_ms: 250,
+          include_patterns: [],
+          exclude_patterns: [],
+        },
       })
     })
+  })
+
+  it('serializes crawl include/exclude chips, robots switch and delay into config', async () => {
+    const fetchFn = mockCreateRoutes('src4b')
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /crawl/i }))
+    await userEvent.type(screen.getByLabelText(/base url/i), 'https://docs.example.com')
+
+    const include = screen.getByLabelText(/include patterns/i)
+    await userEvent.type(include, '/docs/*{Enter}')
+    await userEvent.type(include, '/guides/*{Enter}')
+    // Duplicates are ignored rather than added twice.
+    await userEvent.type(include, '/docs/*{Enter}')
+    await userEvent.type(screen.getByLabelText(/exclude patterns/i), '/blog/*{Enter}')
+
+    await userEvent.click(screen.getByLabelText(/respect robots/i))
+    const delay = screen.getByLabelText(/delay between requests/i)
+    await userEvent.clear(delay)
+    await userEvent.type(delay, '1000')
+
+    await userEvent.click(screen.getByRole('button', { name: /create source/i }))
+
+    await waitFor(() => {
+      expect(bodyOf(fetchFn, 'POST', '/knowledge/sources')).toMatchObject({
+        type: 'crawl',
+        config: {
+          include_patterns: ['/docs/*', '/guides/*'],
+          exclude_patterns: ['/blog/*'],
+          respect_robots: false,
+          delay_ms: 1000,
+        },
+      })
+    })
+  })
+
+  it('removes a crawl pattern chip and rejects an out-of-range delay', async () => {
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /crawl/i }))
+    await userEvent.type(screen.getByLabelText(/base url/i), 'https://docs.example.com')
+    await userEvent.type(screen.getByLabelText(/include patterns/i), '/docs/*{Enter}')
+    expect(screen.getByText('/docs/*')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove /docs/*' }))
+    expect(screen.queryByText('/docs/*')).not.toBeInTheDocument()
+
+    const delay = screen.getByLabelText(/delay between requests/i)
+    await userEvent.clear(delay)
+    await userEvent.type(delay, '5000')
+    expect(screen.getByRole('button', { name: /create source/i })).toBeDisabled()
   })
 
   it('creates a github source and sends the token as a secret only when typed', async () => {

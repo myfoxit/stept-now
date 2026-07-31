@@ -7,32 +7,63 @@
  *    (served from `{apiBase}/widget-assets/app.html`);
  *  - bridge the host page and the iframe over postMessage;
  *  - expose the `window.Stept(cmd, …)` queue API;
- *  - run the host-DOM product-tour player: on boot and on SPA URL changes it
- *    fetches eligible tours and auto-starts the first one, reporting telemetry;
+ *  - run the DAP engine: one `GET /api/widget/experiences` bootstrap per page
+ *    view (re-evaluated on SPA URL changes) delivering tours, checklists and
+ *    surveys, played in the host DOM with telemetry reported back;
  *  - run the proactive-campaign engine: evaluate ongoing campaigns against the
  *    current URL + time-on-page and nudge the iframe (which holds the visitor
  *    token) to trigger at most one per page view — badge only, never auto-open.
  *
+ * Experience priority per page view: an active tour wins, then a survey, then
+ * the checklist auto-open. Never two overlays at once; the checklist launcher
+ * pill coexists with the messenger launcher.
+ *
  * No framework, no external deps. Kept small; the testable pieces live in
- * loader-core.ts, tour-player.ts and api.ts.
+ * loader-core.ts, dom-target.ts, tour-player.ts, checklist-widget.ts,
+ * survey-widget.ts and api.ts.
  */
 
-import { fetchCampaigns, fetchTours, postTourEvent } from './api'
+import {
+  fetchCampaigns,
+  fetchExperiences,
+  fetchPreviewTour,
+  fetchTour,
+  postChecklistDismiss,
+  postChecklistProgress,
+  postSurveyResponse,
+  postTourEvent,
+} from './api'
+import { ChecklistWidget } from './checklist-widget'
 import {
   campaignDelayMs,
   campaignSeenKey,
   firstDueCampaign,
   installStept,
+  parsePreviewHash,
+  patchHistory,
   pruneSeenCampaigns,
   readSeenSet,
+  restoreHistory,
   selectEligibleCampaigns,
   writeSeenSet,
   type SteptCommandHandlers,
   type SteptFn,
 } from './loader-core'
 import { envelope, MSG, type MessageType, parseEnvelope } from './protocol'
-import { selectFirstEligibleTour, TourPlayer } from './tour-player'
-import type { Campaign, SteptSettings, Tour, TourEventName } from './types'
+import { selectFirstEligibleSurvey, SurveyWidget, surveySeenKey } from './survey-widget'
+import { selectFirstEligibleTour, TourPlayer, tourProgressKey } from './tour-player'
+import type {
+  Campaign,
+  Checklist,
+  ChecklistItem,
+  ExperiencesResponse,
+  SteptSettings,
+  Survey,
+  SurveyAnswer,
+  Tour,
+  TourEventMeta,
+  TourEventName,
+} from './types'
 
 const currentScript = document.currentScript as HTMLScriptElement | null
 
@@ -94,8 +125,11 @@ class WidgetHost {
   private open = false
   private token: string | null = null
 
-  private tourPlayer: TourPlayer
-  private lastTourUrl = ''
+  private tourPlayer: TourPlayer | null = null
+  private checklist: ChecklistWidget | null = null
+  private survey: SurveyWidget | null = null
+  private lastExperienceUrl = ''
+  private previewing = false
 
   /** Ongoing campaigns, fetched once per page session (reset on re-boot). */
   private campaigns: Campaign[] | null = null
@@ -106,10 +140,6 @@ class WidgetHost {
     this.settings = settings
     this.apiBase = (settings.apiBase || scriptOrigin()).replace(/\/+$/, '')
     this.widgetKey = settings.workspaceKey || settings.widgetKey || ''
-    this.tourPlayer = new TourPlayer({
-      accent: this.accent,
-      onEvent: (event, stepIndex) => this.onTourEvent(event, stepIndex),
-    })
   }
 
   init(): void {
@@ -117,11 +147,53 @@ class WidgetHost {
       console.error('[stept] missing workspaceKey in window.SteptSettings')
       return
     }
+    this.buildEngines()
     this.injectStyle()
     this.renderLauncher()
     this.renderFrame()
     window.addEventListener('message', this.onMessage)
     this.watchUrlChanges()
+    void this.checkPreview()
+  }
+
+  // --- DAP engines ---------------------------------------------------------
+
+  private buildEngines(): void {
+    this.tourPlayer = new TourPlayer({
+      accent: this.accent,
+      apiBase: this.apiBase,
+      progressKey: tourProgressKey(this.widgetKey),
+      onEvent: (event, stepIndex, meta) => this.onTourEvent(event, stepIndex, meta),
+    })
+    this.checklist = new ChecklistWidget({
+      widgetKey: this.widgetKey,
+      apiBase: this.apiBase,
+      onAction: (item, checklist) => this.runChecklistAction(item, checklist),
+      onProgress: (checklistId, itemId, done) => {
+        postChecklistProgress(
+          this.apiBase,
+          this.widgetKey,
+          checklistId,
+          itemId,
+          done,
+          this.token,
+        ).catch(() => {
+          /* anonymous / offline — the widget keeps the state locally */
+        })
+      },
+      onDismiss: (checklistId) => {
+        postChecklistDismiss(this.apiBase, this.widgetKey, checklistId, this.token).catch(() => {})
+      },
+    })
+    this.survey = new SurveyWidget({
+      widgetKey: this.widgetKey,
+      onSubmit: (surveyId, answers, completed) => this.submitSurvey(surveyId, answers, completed),
+    })
+  }
+
+  /** True while a tour, survey or the checklist panel owns the screen. */
+  private hasOverlay(): boolean {
+    return Boolean(this.tourPlayer?.active || this.survey?.active || this.checklist?.isOpen)
   }
 
   // --- DOM -----------------------------------------------------------------
@@ -207,9 +279,19 @@ class WidgetHost {
 
   shutdown(): void {
     window.removeEventListener('message', this.onMessage)
+    window.removeEventListener('popstate', this.onLocationChange)
+    window.removeEventListener('stept:locationchange', this.onLocationChange)
+    restoreHistory(window)
     this.clearCampaignTimer()
     this.campaigns = null
     this.lastCampaignUrl = ''
+    this.lastExperienceUrl = ''
+    this.previewing = false
+    this.tourPlayer?.stop()
+    this.checklist?.unmount()
+    this.survey?.close(false)
+    this.tourPlayer = this.checklist = this.survey = null
+    this.activeTourId = null
     this.launcher?.remove()
     this.frame?.remove()
     this.launcher = this.frame = this.badge = null
@@ -257,7 +339,7 @@ class WidgetHost {
           this.applyPosition(payload.position)
         }
         this.setUnread(Number(payload.unread ?? 0))
-        void this.checkTours(true)
+        void this.checkExperiences(true)
         void this.checkCampaigns(true)
         break
       case MSG.UNREAD:
@@ -275,7 +357,7 @@ class WidgetHost {
         }
         break
       case MSG.TOUR_START:
-        this.startTour(String(payload.tourId ?? ''))
+        void this.startTour(String(payload.tourId ?? ''))
         break
     }
   }
@@ -297,100 +379,198 @@ class WidgetHost {
     }
   }
 
-  // --- tours ---------------------------------------------------------------
+  // --- experiences ---------------------------------------------------------
 
   private activeTourId: string | null = null
 
+  private onLocationChange = (): void => {
+    void this.checkExperiences(false)
+    void this.checkCampaigns(false)
+  }
+
   private watchUrlChanges(): void {
-    const fire = () => {
-      void this.checkTours(false)
-      void this.checkCampaigns(false)
+    // Idempotent: a re-boot must not stack another wrapper on history.
+    patchHistory(window)
+    window.addEventListener('popstate', this.onLocationChange)
+    window.addEventListener('stept:locationchange', this.onLocationChange)
+  }
+
+  /** One bootstrap per page view: tours + checklists + surveys in one call. */
+  private async checkExperiences(force: boolean): Promise<void> {
+    const url = window.location.href
+    if (!force && url === this.lastExperienceUrl) return
+    this.lastExperienceUrl = url
+    // `url_visited` checklist items tick on every navigation, even while an
+    // overlay is up and even before the next bootstrap lands.
+    this.checklist?.checkUrl(url)
+    if (this.previewing) return
+    try {
+      const data = await fetchExperiences(this.apiBase, this.widgetKey, url, this.token)
+      this.applyExperiences(data, url)
+    } catch (err) {
+      console.warn('[stept] experiences check failed', err)
     }
-    for (const method of ['pushState', 'replaceState'] as const) {
-      const original = history[method]
-      history[method] = function (this: History, ...args: Parameters<History['pushState']>) {
-        const result = original.apply(this, args)
-        window.dispatchEvent(new Event('stept:locationchange'))
-        return result
+  }
+
+  private applyExperiences(data: ExperiencesResponse, url: string): void {
+    let claimed = this.hasOverlay()
+    if (!claimed) {
+      const tour = selectFirstEligibleTour(data.tours ?? [], this.seenIds(this.toursSeenKey()))
+      if (tour) {
+        this.play(tour)
+        claimed = true
       }
     }
-    window.addEventListener('popstate', fire)
-    window.addEventListener('stept:locationchange', fire)
-  }
-
-  private async checkTours(force: boolean): Promise<void> {
-    const url = window.location.href
-    if (!force && url === this.lastTourUrl) return
-    this.lastTourUrl = url
-    if (this.tourPlayer.active) return
-    try {
-      const tours = await fetchTours(this.apiBase, this.widgetKey, url, this.token)
-      const tour = selectFirstEligibleTour(tours, this.seenTours())
-      if (tour) this.play(tour)
-    } catch (err) {
-      console.warn('[stept] tour check failed', err)
+    if (!claimed) {
+      const survey = selectFirstEligibleSurvey(
+        data.surveys ?? [],
+        this.seenIds(surveySeenKey(this.widgetKey)),
+      )
+      if (survey) {
+        this.mountSurvey(survey)
+        claimed = true
+      }
     }
+    const checklist = data.checklists?.[0] ?? null
+    if (!checklist) {
+      this.checklist?.unmount()
+      return
+    }
+    this.checklist?.mount(checklist, { autoOpen: !claimed })
+    this.checklist?.checkUrl(url)
   }
 
+  // --- tours ---------------------------------------------------------------
+
+  /** `Stept('startTour', id)`: fetch THAT tour (manual triggers included). */
   async startTour(tourId: string): Promise<void> {
     if (!tourId) return
     try {
-      const tours = await fetchTours(this.apiBase, this.widgetKey, window.location.href, this.token)
-      const tour = tours.find((t: Tour) => t.id === tourId)
-      if (tour) this.play(tour)
-      else console.warn(`[stept] tour ${tourId} not eligible on this page`)
+      const tour = await fetchTour(this.apiBase, this.widgetKey, tourId, this.token)
+      this.play(tour)
     } catch (err) {
-      console.warn('[stept] startTour failed', err)
+      console.warn(`[stept] startTour ${tourId} failed`, err)
+    }
+  }
+
+  /** Dashboard preview link: `…#stept-preview=<token>` plays it immediately. */
+  private async checkPreview(): Promise<void> {
+    const request = parsePreviewHash(window.location.hash)
+    if (!request) return
+    this.previewing = true
+    try {
+      const tour = await fetchPreviewTour(this.apiBase, request.tourId, request.token)
+      this.play(tour, true)
+    } catch (err) {
+      this.previewing = false
+      console.warn('[stept] tour preview failed', err)
     }
   }
 
   /** Begin a tour, tagging telemetry with its id (set before 'started' fires). */
-  private play(tour: Tour): void {
+  private play(tour: Tour, preview = false): void {
+    // One overlay at a time: a tour takes the screen from a survey/checklist.
+    this.survey?.close(false)
+    this.checklist?.closePanel()
     this.activeTourId = tour.id
-    this.tourPlayer.start(tour)
+    this.tourPlayer?.start(tour, { preview })
   }
 
-  private onTourEvent(event: TourEventName, stepIndex: number | null): void {
+  private onTourEvent(
+    event: TourEventName,
+    stepIndex: number | null,
+    meta?: TourEventMeta,
+  ): void {
     const tourId = this.activeTourId
     if (!tourId) return
-    postTourEvent(this.apiBase, this.widgetKey, tourId, event, stepIndex, this.token).catch(() => {})
-    this.post(MSG.TOUR_EVENT, { tourId, event, stepIndex })
+    postTourEvent(
+      this.apiBase,
+      this.widgetKey,
+      tourId,
+      event,
+      stepIndex,
+      this.token,
+      meta ?? null,
+    ).catch(() => {})
+    this.post(MSG.TOUR_EVENT, { tourId, event, stepIndex, meta })
+    if (event === 'completed') {
+      // Optimistic locally; the server does it authoritatively for contacts.
+      this.checklist?.onTourCompleted(tourId)
+    }
     if (event === 'completed' || event === 'dismissed') {
-      this.rememberSeen(tourId)
+      if (this.previewing) {
+        // Preview over: let the normal bootstrap run again on this same URL.
+        this.previewing = false
+        this.lastExperienceUrl = ''
+      } else {
+        this.rememberSeen(this.toursSeenKey(), tourId)
+      }
       this.activeTourId = null
     }
   }
 
-  private seenTours(): Set<string> {
-    try {
-      const raw = window.localStorage.getItem(this.seenKey())
-      return new Set(raw ? (JSON.parse(raw) as string[]) : [])
-    } catch {
-      return new Set()
+  // --- checklists + surveys ------------------------------------------------
+
+  private runChecklistAction(item: ChecklistItem, checklist: Checklist): void {
+    const action = item.action
+    if (!action) return
+    if (action.type === 'start_tour' && action.tour_id) {
+      this.checklist?.closePanel()
+      void this.startTour(action.tour_id)
+      return
+    }
+    if (action.type === 'open_url' && action.url) {
+      window.open(action.url, '_blank', 'noopener')
+      return
+    }
+    if (action.type === 'open_messenger') {
+      this.checklist?.closePanel()
+      this.openPanel()
+      this.post(MSG.CHECKLIST_ACTION, { checklistId: checklist.id, itemId: item.id })
     }
   }
 
-  private rememberSeen(id: string): void {
-    try {
-      const seen = this.seenTours()
-      seen.add(id)
-      window.localStorage.setItem(this.seenKey(), JSON.stringify([...seen]))
-    } catch {
-      /* ignore */
-    }
+  private mountSurvey(survey: Survey): void {
+    this.rememberSeen(surveySeenKey(this.widgetKey), survey.id)
+    this.survey?.mount(survey)
   }
 
-  private seenKey(): string {
+  private submitSurvey(surveyId: string, answers: SurveyAnswer[], completed: boolean): void {
+    postSurveyResponse(
+      this.apiBase,
+      this.widgetKey,
+      surveyId,
+      answers,
+      completed,
+      this.token,
+      window.location.href,
+    ).catch(() => {})
+  }
+
+  // --- local seen-sets -----------------------------------------------------
+
+  private toursSeenKey(): string {
     return `stept:tours-seen:${this.widgetKey}`
+  }
+
+  private seenIds(key: string): Set<string> {
+    return readSeenSet(this.storage(), key)
+  }
+
+  private rememberSeen(key: string, id: string): void {
+    const seen = this.seenIds(key)
+    seen.add(id)
+    writeSeenSet(this.storage(), key, seen)
   }
 
   // --- proactive campaigns -------------------------------------------------
 
   /**
-   * Mirror of the tour check: on READY and on SPA URL changes, evaluate the
-   * ongoing campaigns against the current URL and arm ONE timer for the first
-   * due campaign. Firing marks it seen (optimistically) and asks the iframe —
-   * which holds the visitor token — to POST the trigger. Never opens the panel.
+   * Mirror of the experiences check: on READY and on SPA URL changes, evaluate
+   * the ongoing campaigns against the current URL and arm ONE timer for the
+   * first due campaign. Firing marks it seen (optimistically) and asks the
+   * iframe — which holds the visitor token — to POST the trigger. Never opens
+   * the panel.
    */
   private async checkCampaigns(force: boolean): Promise<void> {
     const url = window.location.href

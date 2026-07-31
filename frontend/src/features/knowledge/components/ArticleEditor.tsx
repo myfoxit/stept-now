@@ -1,11 +1,17 @@
-/** Inline article editor: title, collection, markdown write/preview, publish. */
+/**
+ * Inline article editor: title, collection, publish and a three-tab body
+ * editor. "Write" is the rich text surface, "Markdown" is the raw source and
+ * "Preview" renders it the way the help center will. All three read and write
+ * the same markdown string, so switching tabs never loses content.
+ */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Eye, Globe, Loader2, PencilLine, Save, Trash2 } from 'lucide-react'
+import { Code2, Eye, Globe, Loader2, PencilLine, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError } from '@/api/client'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +43,7 @@ export function ArticleEditor({
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [collectionId, setCollectionId] = useState<string>('')
+  const [tab, setTab] = useState('write')
 
   useEffect(() => {
     if (article) {
@@ -175,18 +182,34 @@ export function ArticleEditor({
           </div>
         </div>
 
-        <Tabs defaultValue="write">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="write">
               <PencilLine className="size-4" /> Write
+            </TabsTrigger>
+            <TabsTrigger value="markdown">
+              <Code2 className="size-4" /> Markdown
             </TabsTrigger>
             <TabsTrigger value="preview">
               <Eye className="size-4" /> Preview
             </TabsTrigger>
           </TabsList>
+          {/* Both editors are mounted from the same `body` state, so switching
+              tabs is a pure view change — nothing to sync, nothing to lose. */}
           <TabsContent value="write" className="mt-3">
+            <RichTextEditor
+              value={body}
+              onChange={setBody}
+              variant="full"
+              disabled={!canWrite}
+              ariaLabel="Article body"
+              placeholder="Write your article…"
+              className="min-h-[24rem]"
+            />
+          </TabsContent>
+          <TabsContent value="markdown" className="mt-3">
             <Textarea
-              aria-label="Article body"
+              aria-label="Article markdown"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={!canWrite}
