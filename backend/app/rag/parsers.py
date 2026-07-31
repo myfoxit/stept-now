@@ -1,9 +1,12 @@
 """Content extraction: bytes → ParsedDoc(title, text, meta).
 
-Supported: pdf (pypdf), docx (python-docx), html (bs4 — headings preserved as
-"## " markdown lines), md/txt passthrough, csv → markdown table (capped 200
-rows). Unsupported or corrupt input raises `ParseError`; callers surface it as
-a 400 (uploads) or a failed document (background ingestion) — never a crash.
+Supported: pdf (pypdf — a page whose text extraction fails is skipped and
+recorded in meta["failed_pages"], never fatal), docx (python-docx — paragraphs
+and tables in document order; tables become GFM markdown capped at 100 data
+rows), html (bs4 — headings preserved as "## " markdown lines), md/txt
+passthrough, csv → markdown table (capped 200 rows). Unsupported or corrupt
+input raises `ParseError`; callers surface it as a 400 (uploads) or a failed
+document (background ingestion) — never a crash.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 CSV_MAX_ROWS = 200
+DOCX_TABLE_MAX_ROWS = 100  # data rows per table (mirrors the CSV cap style)
 
 _EXTENSION_MIME = {
     ".pdf": "application/pdf",
@@ -78,22 +82,62 @@ def _extract_pdf(filename: str, content: bytes) -> ParsedDoc:
 
     try:
         reader = PdfReader(io.BytesIO(content))
-        pages = [page.extract_text() or "" for page in reader.pages]
+        page_count = len(reader.pages)
     except Exception as exc:
         raise ParseError(f"Could not read PDF: {exc}") from exc
+    pages: list[str] = []
+    failed_pages: list[int] = []  # 1-based page numbers whose extraction blew up
+    for index in range(page_count):
+        try:
+            pages.append(reader.pages[index].extract_text() or "")
+        except Exception:  # one bad page never fails the whole document
+            pages.append("")
+            failed_pages.append(index + 1)
     title = None
-    if reader.metadata is not None and reader.metadata.title:
-        title = str(reader.metadata.title).strip() or None
+    try:
+        if reader.metadata is not None and reader.metadata.title:
+            title = str(reader.metadata.title).strip() or None
+    except Exception:  # corrupt metadata is not fatal either
+        title = None
     text = "\n\n".join(page.strip() for page in pages if page.strip())
-    return ParsedDoc(
-        title=title or _title_from_filename(filename),
-        text=text,
-        meta={"pages": len(reader.pages)},
-    )
+    meta: dict[str, Any] = {"pages": page_count}
+    if failed_pages:
+        meta["failed_pages"] = failed_pages
+    return ParsedDoc(title=title or _title_from_filename(filename), text=text, meta=meta)
+
+
+def _docx_table_markdown(table: Any) -> str:
+    """One docx table → a GFM markdown table (first row = header, data rows
+    capped at DOCX_TABLE_MAX_ROWS with a truncation note, pipes escaped)."""
+    rows = table.rows
+    if not rows:
+        return ""
+
+    def _cells(row: Any) -> list[str]:
+        return [" ".join(cell.text.split()).replace("|", "\\|") for cell in row.cells]
+
+    header = _cells(rows[0])
+    if not header:
+        return ""
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "| " + " | ".join("---" for _ in header) + " |",
+    ]
+    lines.extend("| " + " | ".join(_cells(row)) + " |" for row in rows[1 : DOCX_TABLE_MAX_ROWS + 1])
+    if len(rows) > DOCX_TABLE_MAX_ROWS + 1:
+        lines.append(f"… truncated to the first {DOCX_TABLE_MAX_ROWS} rows of {len(rows) - 1}.")
+    return "\n".join(lines)
 
 
 def _extract_docx(filename: str, content: bytes) -> ParsedDoc:
+    """Walk paragraphs AND tables in true document order via
+    `Document.iter_inner_content()` (python-docx ≥ 1.1, pinned here at 1.2):
+    it yields Paragraph/Table items straight from the body element, so a table
+    between two paragraphs lands between them in the extracted text. Each
+    table is emitted as one GFM markdown block (single-newline rows) so the
+    "\\n\\n" join below cannot split it."""
     import docx
+    from docx.table import Table
 
     try:
         document = docx.Document(io.BytesIO(content))
@@ -101,11 +145,16 @@ def _extract_docx(filename: str, content: bytes) -> ParsedDoc:
         raise ParseError(f"Could not read DOCX: {exc}") from exc
     lines: list[str] = []
     title: str | None = None
-    for paragraph in document.paragraphs:
-        text = paragraph.text.strip()
+    for item in document.iter_inner_content():
+        if isinstance(item, Table):
+            rendered = _docx_table_markdown(item)
+            if rendered:
+                lines.append(rendered)
+            continue
+        text = item.text.strip()
         if not text:
             continue
-        style = (paragraph.style.name if paragraph.style is not None else "") or ""
+        style = (item.style.name if item.style is not None else "") or ""
         match = re.match(r"^Heading (\d)$", style)
         if style == "Title" or match:
             level = 1 if style == "Title" else min(int(match.group(1)), 6)  # type: ignore[union-attr]

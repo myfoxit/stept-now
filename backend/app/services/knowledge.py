@@ -10,13 +10,21 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.errors import BadRequestError, NotFoundError, PayloadTooLargeError, ValidationFailure
+from app.core.errors import (
+    AppError,
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    PayloadTooLargeError,
+    ValidationFailure,
+)
 from app.core.events import Actor
 from app.core.queue import enqueue
 from app.core.security import decrypt_secret, encrypt_secret
 from app.core.storage import get_storage
 from app.models.knowledge import Chunk, Document, KnowledgeSource
 from app.rag import tasks as rag_tasks  # noqa: F401  (registers queue tasks on import)
+from app.rag.ingestion import ingest_document
 from app.rag.parsers import ParseError, extract, normalize_mime
 from app.rag.retrieval import search_chunks
 from app.schemas.knowledge import RetrievedChunkOut, SearchResponse, SourceOut
@@ -27,6 +35,18 @@ ARTICLES_SOURCE_NAME = "Help center articles"
 
 # Source types that support scheduled re-sync via config.refresh_minutes.
 REFRESHABLE_TYPES = frozenset({"urls", "sitemap", "crawl", "github", "notion"})
+
+# Files in one batch upload request.
+MAX_BATCH_FILES = 20
+
+# Crawl include_patterns/exclude_patterns limits.
+MAX_CRAWL_PATTERNS = 20
+
+# Authored documents (uploaded/pasted plain text) can be edited in place.
+EDITABLE_SOURCE_TYPES = frozenset({"files", "text"})
+EDITABLE_MIMES = frozenset({"text/markdown", "text/plain"})
+# Raw content returned on the document detail endpoint (TipTap editing).
+DOCUMENT_CONTENT_MAX_BYTES = 200 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +82,21 @@ def _clamp_int(config: dict[str, Any], key: str, *, cap: int, minimum: int = 1) 
     config[key] = min(value, cap)
 
 
+def _clean_patterns(config: dict[str, Any], key: str) -> None:
+    """Normalize a crawl glob list: ≤20 entries, each a ≤200 char string."""
+    value = config.get(key)
+    if value is None:
+        return
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValidationFailure(f"config.{key} must be a list of glob strings")
+    patterns = [item.strip() for item in value if item.strip()]
+    if any(len(pattern) > 200 for pattern in patterns):
+        raise ValidationFailure(f"config.{key} entries are limited to 200 characters")
+    if len(patterns) > MAX_CRAWL_PATTERNS:
+        raise ValidationFailure(f"config.{key} is limited to {MAX_CRAWL_PATTERNS} patterns")
+    config[key] = patterns
+
+
 def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]:
     config = dict(config)
     if source_type == "urls":
@@ -79,6 +114,11 @@ def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]
         config["base_url"] = _require_http_url(config, "base_url", source_type)
         _clamp_int(config, "max_pages", cap=200)
         _clamp_int(config, "max_depth", cap=5, minimum=0)
+        _clamp_int(config, "delay_ms", cap=2000, minimum=0)
+        _clean_patterns(config, "include_patterns")
+        _clean_patterns(config, "exclude_patterns")
+        if "respect_robots" in config and not isinstance(config["respect_robots"], bool):
+            raise ValidationFailure("config.respect_robots must be a boolean")
     elif source_type == "github":
         for key in ("repo_owner", "repo"):
             value = config.get(key)
@@ -318,6 +358,54 @@ async def add_document_from_file(
     return document
 
 
+async def add_documents_from_files(
+    session: AsyncSession,
+    workspace_id: str,
+    source: KnowledgeSource,
+    *,
+    actor: Actor,
+    files: list[tuple[str, bytes, str | None]],
+) -> list[Document]:
+    """Batch upload: [(filename, data, content_type), …] → one Document each.
+
+    Every file is validated/stored independently — an empty, oversized, or
+    unparseable file becomes a `failed` Document carrying the reason instead of
+    aborting the batch. Infrastructure failures still raise.
+    """
+    if source.type == "articles":
+        raise BadRequestError("The articles source is managed automatically")
+    if not files:
+        raise BadRequestError("Batch uploads need at least one 'file' field")
+    if len(files) > MAX_BATCH_FILES:
+        raise BadRequestError(f"Batch uploads are limited to {MAX_BATCH_FILES} files")
+    documents: list[Document] = []
+    for filename, data, content_type in files:
+        try:
+            document = await add_document_from_file(
+                session,
+                workspace_id,
+                source,
+                actor=actor,
+                filename=filename,
+                data=data,
+                content_type=content_type,
+            )
+        except AppError as exc:
+            document = Document(
+                workspace_id=workspace_id,
+                source_id=source.id,
+                title=filename[:400] or "Untitled",
+                mime=normalize_mime(filename, content_type),
+                status="failed",
+                error=exc.message[:1000],
+                meta={"filename": filename, "size": len(data)},
+            )
+            session.add(document)
+            await session.flush()
+        documents.append(document)
+    return documents
+
+
 async def add_document_from_text(
     session: AsyncSession,
     workspace_id: str,
@@ -387,6 +475,95 @@ async def get_document_chunks(
         select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.ord).limit(limit)
     )
     return list(rows.scalars())
+
+
+def is_editable_document(document: Document, source: KnowledgeSource) -> bool:
+    """True for authored documents: storage-key-backed text/markdown living in
+    a files/text source. URL-, portal- and connector-backed documents are
+    rendered from somewhere else and cannot be edited here."""
+    if source.type not in EDITABLE_SOURCE_TYPES:
+        return False
+    uri = document.uri or ""
+    if not uri or uri.startswith(("http://", "https://", "/")):
+        return False
+    return (document.mime or "") in EDITABLE_MIMES
+
+
+async def document_content(document: Document, source: KnowledgeSource) -> str | None:
+    """Raw stored text of an editable document (the TipTap editing surface).
+
+    None for anything non-editable, missing from storage, or bigger than
+    DOCUMENT_CONTENT_MAX_BYTES.
+    """
+    if not is_editable_document(document, source):
+        return None
+    try:
+        data = await get_storage().read(document.uri or "")
+    except (NotFoundError, OSError):
+        return None
+    if len(data) > DOCUMENT_CONTENT_MAX_BYTES:
+        return None
+    return data.decode("utf-8", errors="replace")
+
+
+async def update_document(
+    session: AsyncSession,
+    workspace_id: str,
+    document_id: str,
+    *,
+    actor: Actor,
+    title: str | None = None,
+    content: str | None = None,
+) -> Document:
+    """Re-edit an authored document: store the new text and re-index inline.
+
+    Re-ingestion is synchronous so the caller sees the indexed result straight
+    away; unchanged content short-circuits inside `ingest_document` (chunk ids
+    stay stable). A changed title forces a re-chunk because the title is
+    prefixed onto every chunk. Non-editable documents raise ConflictError.
+    """
+    document = await get_document(session, workspace_id, document_id)
+    source = await get_source(session, workspace_id, document.source_id)
+    if not is_editable_document(document, source):
+        raise ConflictError("Only authored text documents can be edited")
+    if title is not None:
+        new_title = title.strip()[:400]
+        if not new_title:
+            raise ValidationFailure("title must not be empty")
+        if new_title != document.title:
+            document.title = new_title
+            document.content_hash = None  # title is chunked into the content
+    if content is not None:
+        old_key = document.uri or ""
+        filename = _authored_filename(document)
+        stored = await get_storage().save(filename, content.encode("utf-8"))
+        document.uri = stored.key
+        document.meta = {**document.meta, "filename": filename, "size": stored.size}
+        if old_key and old_key != stored.key:
+            await get_storage().delete(old_key)
+    document.status = "processing"
+    document.error = None
+    await session.flush()
+    parsed = await rag_tasks.load_document_text(document)
+    await ingest_document(session, document, parsed.text)
+    await audit.record(
+        session,
+        workspace_id,
+        actor=actor,
+        action="knowledge.document.update",
+        target_type="document",
+        target_id=document.id,
+        meta={"title": document.title},
+    )
+    return document
+
+
+def _authored_filename(document: Document) -> str:
+    """Storage filename for a re-saved authored doc: current title + the
+    original extension (markdown by default)."""
+    previous = str(document.meta.get("filename") or "")
+    extension = f".{previous.rsplit('.', 1)[1]}" if "." in previous else ".md"
+    return f"{document.title.strip() or 'document'}{extension}"
 
 
 async def delete_document(

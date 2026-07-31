@@ -26,6 +26,15 @@ if config.config_file_name is not None:
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 target_metadata = Base.metadata
 
+# Expression indexes bootstrapped at startup by app.core.db.ensure_pg_indexes rather
+# than declared on the metadata. Autogenerate cannot see them, so without this filter
+# every new revision proposes dropping them.
+BOOTSTRAP_INDEXES = {"ix_chunks_fts", "ix_contacts_name_trgm"}
+
+
+def _include_object(obj, name, type_, reflected, compare_to) -> bool:
+    return not (type_ == "index" and name in BOOTSTRAP_INDEXES)
+
 
 def _run_migrations(connection) -> None:
     context.configure(
@@ -33,6 +42,7 @@ def _run_migrations(connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -44,6 +54,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

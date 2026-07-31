@@ -21,6 +21,7 @@ from app.api.v1 import (
     automations,
     campaigns,
     canned_responses,
+    checklists,
     contacts,
     conversations,
     files,
@@ -35,6 +36,7 @@ from app.api.v1 import (
     search_analytics,
     segments,
     slas,
+    surveys,
     tags,
     teams,
     tours,
@@ -78,3 +80,5 @@ api_router.include_router(search_analytics.router, prefix=WS, tags=["search-anal
 api_router.include_router(webhooks.router, prefix=WS, tags=["webhooks"])
 api_router.include_router(reports.router, prefix=WS, tags=["reports"])
 api_router.include_router(tours.router, prefix=WS, tags=["tours"])
+api_router.include_router(checklists.router, prefix=WS, tags=["checklists"])
+api_router.include_router(surveys.router, prefix=WS, tags=["surveys"])

@@ -41,12 +41,16 @@ THREE_STEPS = [
 # --- HTTP helpers -----------------------------------------------------------
 
 
-async def widget_key_for(client, ctx) -> str:
+async def widget_inbox(client, ctx) -> dict:
     resp = await client.get(f"{ctx.base}/inboxes", headers=ctx.owner_headers)
     assert resp.status_code == 200, resp.text
     widgets = [i for i in resp.json() if i["channel_type"] == "widget"]
     assert widgets, "no default widget inbox"
-    return widgets[0]["widget_key"]
+    return widgets[0]
+
+
+async def widget_key_for(client, ctx) -> str:
+    return (await widget_inbox(client, ctx))["widget_key"]
 
 
 async def create_tour(client, ctx, *, headers=None, **overrides) -> dict:
@@ -93,20 +97,43 @@ def expired_recorder_token(workspace_id: str, user_id: str) -> str:
     return jwt.encode(payload, get_settings().secret_key, algorithm="HS256")
 
 
+async def extension_token_for(client, ctx, headers=None) -> str:
+    resp = await client.post(
+        f"{ctx.base}/tours/extension-token", headers=headers or ctx.owner_headers
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["token"]
+
+
+async def extension_headers(client, ctx) -> dict[str, str]:
+    return {"Authorization": f"Bearer {await extension_token_for(client, ctx)}"}
+
+
+async def preview_token_for(client, ctx, tour_id: str) -> str:
+    resp = await client.post(f"{ctx.base}/tours/{tour_id}/preview-token", headers=ctx.owner_headers)
+    assert resp.status_code == 200, resp.text
+    return resp.json()["token"]
+
+
 async def insert_events(workspace_id: str, tour_id: str, plays: list[tuple]) -> None:
-    """Insert (contact_id, event, step_index) telemetry through a committed session
-    so a separate API request transaction can read it."""
+    """Insert (contact_id, event, step_index[, meta][, created_at]) telemetry
+    through a committed session so a separate API request transaction reads it."""
     async with get_session_factory()() as session:
-        for contact_id, event, step_index in plays:
-            session.add(
-                TourEvent(
-                    workspace_id=workspace_id,
-                    tour_id=tour_id,
-                    contact_id=contact_id,
-                    event=event,
-                    step_index=step_index,
-                )
+        for play in plays:
+            contact_id, event, step_index = play[0], play[1], play[2]
+            meta = play[3] if len(play) > 3 else {}
+            created_at = play[4] if len(play) > 4 else None
+            row = TourEvent(
+                workspace_id=workspace_id,
+                tour_id=tour_id,
+                contact_id=contact_id,
+                event=event,
+                step_index=step_index,
+                meta=meta or {},
             )
+            if created_at is not None:
+                row.created_at = created_at
+            session.add(row)
         await session.commit()
 
 

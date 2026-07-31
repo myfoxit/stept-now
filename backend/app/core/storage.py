@@ -1,7 +1,11 @@
 """File storage. Local disk by default; the protocol keeps S3/GCS pluggable.
 
-Keys are relative paths like "2026/07/{uuid7}-{safe-name}". Serving always goes
-through authenticated API routes — storage backends never expose public URLs.
+Keys are relative paths like "2026/07/{uuid7}-{safe-name}". Storage backends
+never mint public URLs themselves: serving goes through API routes, which are
+authenticated except for the one deliberately public namespace,
+`public/{workspace_id}/…` (DAP step media rendered on customer sites — see
+app/api/widget/media.py). Callers that need to control their own key layout —
+that namespace being the only one today — use `save_at` instead of `save`.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ class StoredFile:
 
 class Storage(Protocol):
     async def save(self, filename: str, data: bytes) -> StoredFile: ...
+    async def save_at(self, key: str, data: bytes) -> StoredFile: ...
     async def read(self, key: str) -> bytes: ...
     async def delete(self, key: str) -> None: ...
 
@@ -48,7 +53,9 @@ class LocalStorage:
 
     async def save(self, filename: str, data: bytes) -> StoredFile:
         now = utcnow()
-        key = f"{now:%Y/%m}/{uuid7()}-{safe_filename(filename)}"
+        return await self.save_at(f"{now:%Y/%m}/{uuid7()}-{safe_filename(filename)}", data)
+
+    async def save_at(self, key: str, data: bytes) -> StoredFile:
         path = self._resolve(key)
 
         def _write() -> None:

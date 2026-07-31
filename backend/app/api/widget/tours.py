@@ -1,9 +1,10 @@
 """Widget public tours API.
 
 Self-contained light auth (does NOT use app/api/widget/deps.py): the workspace is
-resolved from the `widget_key` query param (matching Inbox.widget_key) and the
-end-user contact, when known, from an optional `X-Widget-Token` (typ "widget").
-The recorder endpoint authenticates with a recorder token instead.
+resolved from the `widget_key` query param (matching an ENABLED widget Inbox) and
+the end-user contact, when known, from an optional `X-Widget-Token` (typ
+"widget"). The recorder endpoint authenticates with a recorder token instead;
+tour previews authenticate with a single-tour `preview_token`.
 """
 
 from __future__ import annotations
@@ -29,17 +30,20 @@ from app.services import tours as tours_service
 router = APIRouter()
 
 
-async def _resolve(session: Db, widget_key: str) -> tuple[str, Inbox]:
-    """Resolve (workspace_id, inbox) from a public widget key."""
+async def resolve_widget_key(session: Db, widget_key: str) -> tuple[str, Inbox]:
+    """Resolve (workspace_id, inbox) from a public widget key.
+
+    Only an ENABLED widget-channel inbox serves the widget — a disabled or
+    repurposed inbox is indistinguishable from an unknown key (404)."""
     inbox = (
         await session.execute(select(Inbox).where(Inbox.widget_key == widget_key))
     ).scalar_one_or_none()
-    if inbox is None:
+    if inbox is None or not inbox.enabled or inbox.channel_type != "widget":
         raise NotFoundError("Unknown widget key")
     return inbox.workspace_id, inbox
 
 
-async def _contact_from_token(request: Request, session: Db, workspace_id: str) -> Contact | None:
+async def contact_from_token(request: Request, session: Db, workspace_id: str) -> Contact | None:
     """Best-effort contact resolution from an optional X-Widget-Token; a missing,
     invalid, or cross-workspace token simply yields an anonymous visitor."""
     token = request.headers.get("X-Widget-Token")
@@ -62,16 +66,18 @@ async def _contact_from_token(request: Request, session: Db, workspace_id: str) 
 
 @router.get("/tours", response_model=list[WidgetTourOut])
 async def list_widget_tours(request: Request, session: Db, widget_key: str, url: str):
-    workspace_id, _inbox = await _resolve(session, widget_key)
-    contact = await _contact_from_token(request, session, workspace_id)
+    workspace_id, _inbox = await resolve_widget_key(session, widget_key)
+    contact = await contact_from_token(request, session, workspace_id)
     tours = await tours_service.deliverable_tours(session, workspace_id, url=url, contact=contact)
-    return [WidgetTourOut.model_validate(t) for t in tours]
+    return [tours_service.widget_tour_out(t) for t in tours]
 
 
 @router.post("/tours/recorder", response_model=RecorderTourOut, status_code=201)
 async def create_recorder_tour(body: RecorderTourIn, session: Db):
+    """Legacy recorder entry point — delegates to the same draft-creation service
+    the extension API uses."""
     workspace_id, user_id = await tours_service.authorize_recorder(session, body.token)
-    tour = await tours_service.create_tour_from_recorder(
+    tour = await tours_service.create_extension_draft(
         session,
         workspace_id,
         user_id=user_id,
@@ -83,12 +89,36 @@ async def create_recorder_tour(body: RecorderTourIn, session: Db):
     return RecorderTourOut(id=tour.id, name=tour.name, app_url=app_url)
 
 
+@router.get("/tours/{tour_id}", response_model=WidgetTourOut)
+async def get_widget_tour(
+    tour_id: str,
+    request: Request,
+    session: Db,
+    widget_key: str | None = None,
+    preview_token: str | None = None,
+):
+    """Single-tour fetch backing `stept('startTour', id)` (live tour of ANY
+    trigger type) and, with `preview_token`, the dashboard preview link (any
+    status/trigger/frequency, that one tour only)."""
+    if preview_token:
+        tour = await tours_service.preview_tour(session, preview_token, tour_id)
+        return tours_service.widget_tour_out(tour)
+    if not widget_key:
+        raise NotFoundError("Unknown widget key")
+    workspace_id, _inbox = await resolve_widget_key(session, widget_key)
+    contact = await contact_from_token(request, session, workspace_id)
+    tour = await tours_service.deliverable_tour_by_id(
+        session, workspace_id, tour_id, contact=contact
+    )
+    return tours_service.widget_tour_out(tour)
+
+
 @router.post("/tours/{tour_id}/events", response_model=Msg)
 async def record_widget_event(
     tour_id: str, body: WidgetTourEventIn, request: Request, session: Db, widget_key: str
 ):
-    workspace_id, _inbox = await _resolve(session, widget_key)
-    contact = await _contact_from_token(request, session, workspace_id)
+    workspace_id, _inbox = await resolve_widget_key(session, widget_key)
+    contact = await contact_from_token(request, session, workspace_id)
     await tours_service.record_event(
         session,
         workspace_id,
@@ -96,5 +126,6 @@ async def record_widget_event(
         event=body.event,
         step_index=body.step_index,
         contact_id=contact.id if contact is not None else None,
+        meta=body.meta,
     )
     return Msg(message="recorded")

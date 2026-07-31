@@ -63,6 +63,27 @@ export const router = createBrowserRouter([
           },
           { path: '/tours', lazy: () => import('@/features/tours/pages/ToursPage') },
           { path: '/tours/:tourId', lazy: () => import('@/features/tours/pages/TourEditorPage') },
+          {
+            path: '/tours/:tourId/analytics',
+            lazy: () => import('@/features/tours/pages/TourAnalyticsPage'),
+          },
+          {
+            path: '/checklists',
+            lazy: () => import('@/features/checklists/pages/ChecklistsPage'),
+          },
+          {
+            path: '/checklists/:checklistId',
+            lazy: () => import('@/features/checklists/pages/ChecklistEditorPage'),
+          },
+          { path: '/surveys', lazy: () => import('@/features/surveys/pages/SurveysPage') },
+          {
+            path: '/surveys/:surveyId',
+            lazy: () => import('@/features/surveys/pages/SurveyEditorPage'),
+          },
+          {
+            path: '/surveys/:surveyId/results',
+            lazy: () => import('@/features/surveys/pages/SurveyResultsPage'),
+          },
           { path: '/reports', lazy: () => import('@/features/reports/pages/ReportsPage') },
           { path: '/settings', lazy: () => import('@/features/settings/pages/SettingsLayout') },
           {

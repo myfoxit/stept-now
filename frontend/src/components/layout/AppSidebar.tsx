@@ -2,7 +2,9 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  ClipboardList,
   Inbox,
+  ListChecks,
   Map as MapIcon,
   Megaphone,
   Settings,
@@ -42,7 +44,14 @@ const SECTIONS = [
       { title: 'AI Agents', url: '/ai', icon: Bot },
       { title: 'Automation', url: '/automation', icon: Workflow },
       { title: 'Campaigns', url: '/campaigns', icon: Megaphone },
+    ],
+  },
+  {
+    label: 'Adoption',
+    items: [
       { title: 'Tours', url: '/tours', icon: MapIcon },
+      { title: 'Checklists', url: '/checklists', icon: ListChecks },
+      { title: 'Surveys', url: '/surveys', icon: ClipboardList },
     ],
   },
   {

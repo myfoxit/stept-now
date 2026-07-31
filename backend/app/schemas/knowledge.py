@@ -48,6 +48,13 @@ class TextDocumentCreate(BaseModel):
     content: str = Field(min_length=1)
 
 
+class DocumentUpdate(BaseModel):
+    """Re-edit an authored (storage-backed text/markdown) document."""
+
+    title: str | None = Field(None, min_length=1, max_length=400)
+    content: str | None = None
+
+
 class DocumentOut(ORMModel):
     id: str
     source_id: str
@@ -73,6 +80,9 @@ class ChunkPreviewOut(ORMModel):
 
 class DocumentDetailOut(DocumentOut):
     chunks: list[ChunkPreviewOut] = Field(default_factory=list)
+    # Raw stored text — editable (authored) documents only, ≤200KB; None for
+    # connector/url-backed documents and oversized files.
+    content: str | None = None
 
 
 class SearchRequest(BaseModel):

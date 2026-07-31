@@ -6,7 +6,9 @@
   (sitemap/crawl/github/notion) fetch their full listing via
   `app.rag.connectors`, upsert by (source_id, uri), and prune documents that
   vanished from a complete, error-free listing (Onyx-style deletion pruning);
-  other source types re-ingest their non-indexed documents. Failures mark the
+  other source types re-ingest their non-indexed documents. Sitemap syncs are
+  incremental: a URL whose <lastmod> matches the stored one is not refetched
+  (it still counts as present, so pruning leaves it alone). Failures mark the
   document/source as errored — the task itself never raises for content
   problems.
 - knowledge_refresh_scan (scheduled, 60s): enqueues sync_source for every
@@ -38,7 +40,7 @@ from app.rag.ingestion import ingest_document
 from app.rag.parsers import ParsedDoc, ParseError
 
 if TYPE_CHECKING:
-    from app.rag.connectors import FetchedDoc
+    from app.rag.connectors import FetchedDoc, SitemapEntry
 
 logger = log("rag")
 
@@ -216,6 +218,8 @@ async def upsert_and_ingest(
             document.mime = item.mime
             document.status = "processing"
             document.error = None
+        if item.meta:  # reassigned, not mutated — JSON columns don't track in place
+            document.meta = {**document.meta, **item.meta}
         try:
             await ingest_document(session, document, item.text)
         except Exception as exc:  # embedding/db trouble for one document
@@ -264,6 +268,34 @@ async def _sync_urls(session: AsyncSession, source: KnowledgeSource) -> list[str
     return errors + await upsert_and_ingest(session, source, fetched)
 
 
+async def _sync_sitemap(
+    session: AsyncSession, source: KnowledgeSource, entries: list[SitemapEntry]
+) -> tuple[list[FetchedDoc], list[str], set[str]]:
+    """Fetch the sitemap's pages, skipping URLs whose <lastmod> still matches
+    the stored one. Returns (fetched, errors, unchanged-uris) — the unchanged
+    set is still "present" for pruning, it just costs no HTTP request."""
+    unchanged: set[str] = set()
+    stale: list[SitemapEntry] = []
+    for entry in entries:
+        document = await _get_document_by_uri(session, source, entry.url)
+        if (
+            entry.lastmod  # no stamp → always refetch
+            and document is not None
+            and document.status == "indexed"
+            and document.meta.get("lastmod") == entry.lastmod
+        ):
+            unchanged.add(entry.url)
+        else:
+            stale.append(entry)
+    fetched, errors = await _fetch_url_list(session, source, [entry.url for entry in stale])
+    lastmods = {entry.url: entry.lastmod for entry in stale if entry.lastmod}
+    for item in fetched:
+        lastmod = lastmods.get(item.uri)
+        if lastmod:
+            item.meta["lastmod"] = lastmod
+    return fetched, errors, unchanged
+
+
 async def _sync_connector(session: AsyncSession, source: KnowledgeSource) -> list[str]:
     """sitemap/crawl/github/notion: fetch the full listing, upsert + ingest,
     then prune documents that disappeared — but only when the listing was
@@ -273,9 +305,10 @@ async def _sync_connector(session: AsyncSession, source: KnowledgeSource) -> lis
 
     config = source.config or {}
     fetch_errors: list[str] = []
+    unchanged: set[str] = set()
     if source.type == "sitemap":
-        urls = await connectors.fetch_sitemap(config)
-        fetched, fetch_errors = await _fetch_url_list(session, source, urls)
+        entries = await connectors.fetch_sitemap(config)
+        fetched, fetch_errors, unchanged = await _sync_sitemap(session, source, entries)
     elif source.type == "crawl":
         fetched, fetch_errors = await connectors.crawl_site(config)
     elif source.type == "github":
@@ -284,7 +317,8 @@ async def _sync_connector(session: AsyncSession, source: KnowledgeSource) -> lis
         fetched = await connectors.fetch_notion(config, get_source_secrets(source))
     errors = fetch_errors + await upsert_and_ingest(session, source, fetched)
     if not errors:
-        await _prune_missing_documents(session, source, keep_uris={item.uri for item in fetched})
+        keep_uris = {item.uri for item in fetched} | unchanged
+        await _prune_missing_documents(session, source, keep_uris=keep_uris)
     return errors
 
 

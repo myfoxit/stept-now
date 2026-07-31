@@ -34,8 +34,17 @@ async def test_widget_delivers_matching_live_tour(client, workspace_ctx):
     assert match.status_code == 200, match.text
     body = match.json()
     assert [t["id"] for t in body] == [tour["id"]]
-    # Public shape only exposes id/name/steps/theme/version.
-    assert set(body[0]) == {"id", "name", "steps", "theme", "version"}
+    # Public shape: playback fields only — never audience/schedule internals.
+    assert set(body[0]) == {
+        "id",
+        "name",
+        "kind",
+        "steps",
+        "theme",
+        "version",
+        "settings",
+        "frequency_type",
+    }
     assert len(body[0]["steps"]) == len(TWO_STEPS)
 
     no_match = await client.get(

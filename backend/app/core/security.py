@@ -20,9 +20,15 @@ from app.core.errors import UnauthorizedError
 
 _hasher = PasswordHasher()
 
-TokenType = Literal["access", "refresh", "widget", "password_reset", "recorder"]
+TokenType = Literal[
+    "access", "refresh", "widget", "password_reset", "recorder", "extension", "tour_preview"
+]
 
 API_KEY_PREFIX = "sk_stept_"
+
+# Single source of truth for tour-recorder/extension token lifetimes (imported by routers).
+RECORDER_TOKEN_TTL_DAYS = 7
+EXTENSION_TOKEN_TTL_DAYS = 30
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +99,21 @@ def create_widget_token(workspace_id: str, contact_id: str) -> str:
 
 def create_recorder_token(workspace_id: str, user_id: str) -> str:
     """Short-lived token pasted into the tour-recorder browser extension."""
-    return _encode({"ws": workspace_id, "sub": user_id}, timedelta(days=7), "recorder")
+    return _encode(
+        {"ws": workspace_id, "sub": user_id}, timedelta(days=RECORDER_TOKEN_TTL_DAYS), "recorder"
+    )
+
+
+def create_extension_token(workspace_id: str, user_id: str) -> str:
+    """Long-lived workspace-scoped token minted for the logged-in Chrome extension."""
+    return _encode(
+        {"ws": workspace_id, "sub": user_id}, timedelta(days=EXTENSION_TOKEN_TTL_DAYS), "extension"
+    )
+
+
+def create_tour_preview_token(workspace_id: str, tour_id: str) -> str:
+    """One-hour token that lets the widget fetch a single tour regardless of status."""
+    return _encode({"ws": workspace_id, "tour": tour_id}, timedelta(hours=1), "tour_preview")
 
 
 # ---------------------------------------------------------------------------

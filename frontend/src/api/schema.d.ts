@@ -1019,6 +1019,94 @@ export interface paths {
     patch: operations['update_canned_response_api_v1_w__workspace_id__canned_responses__response_id__patch']
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/checklists': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Checklists */
+    get: operations['list_checklists_api_v1_w__workspace_id__checklists_get']
+    put?: never
+    /** Create Checklist */
+    post: operations['create_checklist_api_v1_w__workspace_id__checklists_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/checklists/{checklist_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Checklist */
+    get: operations['get_checklist_api_v1_w__workspace_id__checklists__checklist_id__get']
+    put?: never
+    post?: never
+    /** Delete Checklist */
+    delete: operations['delete_checklist_api_v1_w__workspace_id__checklists__checklist_id__delete']
+    options?: never
+    head?: never
+    /** Update Checklist */
+    patch: operations['update_checklist_api_v1_w__workspace_id__checklists__checklist_id__patch']
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/checklists/{checklist_id}/pause': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Pause Checklist */
+    post: operations['pause_checklist_api_v1_w__workspace_id__checklists__checklist_id__pause_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/checklists/{checklist_id}/publish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Publish Checklist */
+    post: operations['publish_checklist_api_v1_w__workspace_id__checklists__checklist_id__publish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/checklists/{checklist_id}/stats': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Checklist Stats */
+    get: operations['checklist_stats_api_v1_w__workspace_id__checklists__checklist_id__stats_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/contacts': {
     parameters: {
       query?: never
@@ -1486,7 +1574,12 @@ export interface paths {
     delete: operations['delete_document_api_v1_w__workspace_id__knowledge_documents__document_id__delete']
     options?: never
     head?: never
-    patch?: never
+    /**
+     * Update Document
+     * @description Edit an authored document's title/content; re-indexes inline. Documents
+     *     backed by a URL, the portal, or a connector return 409.
+     */
+    patch: operations['update_document_api_v1_w__workspace_id__knowledge_documents__document_id__patch']
     trace?: never
   }
   '/api/v1/w/{workspace_id}/knowledge/documents/{document_id}/retry': {
@@ -1575,6 +1668,28 @@ export interface paths {
      *     `{title, content}` for pasted text. Parsing errors return 400.
      */
     post: operations['add_document_api_v1_w__workspace_id__knowledge_sources__source_id__documents_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/knowledge/sources/{source_id}/documents/batch': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Add Documents Batch
+     * @description Add up to 20 documents in one multipart request (repeat the `file`
+     *     field). A file that cannot be read yields a `failed` document carrying the
+     *     error — the rest of the batch still lands.
+     */
+    post: operations['add_documents_batch_api_v1_w__workspace_id__knowledge_sources__source_id__documents_batch_post']
     delete?: never
     options?: never
     head?: never
@@ -1916,6 +2031,111 @@ export interface paths {
     patch: operations['update_sla_policy_api_v1_w__workspace_id__slas__policy_id__patch']
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/surveys': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Surveys */
+    get: operations['list_surveys_api_v1_w__workspace_id__surveys_get']
+    put?: never
+    /** Create Survey */
+    post: operations['create_survey_api_v1_w__workspace_id__surveys_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/surveys/{survey_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Survey */
+    get: operations['get_survey_api_v1_w__workspace_id__surveys__survey_id__get']
+    put?: never
+    post?: never
+    /** Delete Survey */
+    delete: operations['delete_survey_api_v1_w__workspace_id__surveys__survey_id__delete']
+    options?: never
+    head?: never
+    /** Update Survey */
+    patch: operations['update_survey_api_v1_w__workspace_id__surveys__survey_id__patch']
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/surveys/{survey_id}/pause': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Pause Survey */
+    post: operations['pause_survey_api_v1_w__workspace_id__surveys__survey_id__pause_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/surveys/{survey_id}/publish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Publish Survey */
+    post: operations['publish_survey_api_v1_w__workspace_id__surveys__survey_id__publish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/surveys/{survey_id}/responses': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Survey Responses */
+    get: operations['list_survey_responses_api_v1_w__workspace_id__surveys__survey_id__responses_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/surveys/{survey_id}/results': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Survey Results */
+    get: operations['survey_results_api_v1_w__workspace_id__surveys__survey_id__results_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/tags': {
     parameters: {
       query?: never
@@ -2040,6 +2260,29 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/tours/extension-token': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Create Extension Token Route
+     * @description Mint the long-lived workspace-scoped token the logged-in extension stores.
+     *
+     *     Membership + tours:manage are re-validated on every extension API call, so a
+     *     revoked member's stored token stops working immediately.
+     */
+    post: operations['create_extension_token_route_api_v1_w__workspace_id__tours_extension_token_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/tours/recorder-token': {
     parameters: {
       query?: never
@@ -2079,6 +2322,26 @@ export interface paths {
     patch: operations['update_tour_api_v1_w__workspace_id__tours__tour_id__patch']
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/tours/{tour_id}/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Tour Events
+     * @description Newest-first telemetry feed backing the analytics page's event table.
+     */
+    get: operations['tour_events_api_v1_w__workspace_id__tours__tour_id__events_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/tours/{tour_id}/pause': {
     parameters: {
       query?: never
@@ -2090,6 +2353,27 @@ export interface paths {
     put?: never
     /** Pause Tour */
     post: operations['pause_tour_api_v1_w__workspace_id__tours__tour_id__pause_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/tours/{tour_id}/preview-token': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Create Preview Token
+     * @description One-hour token scoped to this single tour: the widget plays it via
+     *     `#stept-preview=<token>` regardless of status/trigger/frequency.
+     */
+    post: operations['create_preview_token_api_v1_w__workspace_id__tours__tour_id__preview_token_post']
     delete?: never
     options?: never
     head?: never
@@ -2303,6 +2587,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/widget/checklists/{checklist_id}/dismiss': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Dismiss */
+    post: operations['dismiss_api_widget_checklists__checklist_id__dismiss_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/checklists/{checklist_id}/progress': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Record Progress */
+    post: operations['record_progress_api_widget_checklists__checklist_id__progress_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/widget/conversations': {
     parameters: {
       query?: never
@@ -2410,6 +2728,164 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/widget/dap/auth/check': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Auth Check
+     * @description Extension settings screen: confirm the stored token still works.
+     */
+    post: operations['auth_check_api_widget_dap_auth_check_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/dap/screenshots': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Upload Screenshot
+     * @description Tour-independent upload: the recorder captures eagerly, long before a
+     *     draft exists, and references the returned key as `screenshot_key` on save.
+     *     Orphaned screenshots are acceptable (v1).
+     */
+    post: operations['upload_screenshot_api_widget_dap_screenshots_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/dap/tours': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Dap Tours */
+    get: operations['list_dap_tours_api_widget_dap_tours_get']
+    put?: never
+    /**
+     * Create Dap Tour
+     * @description Save a recording as a draft tour (rich superset of the legacy recorder).
+     */
+    post: operations['create_dap_tour_api_widget_dap_tours_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/dap/tours/{tour_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Dap Tour */
+    get: operations['get_dap_tour_api_widget_dap_tours__tour_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Patch Dap Tour */
+    patch: operations['patch_dap_tour_api_widget_dap_tours__tour_id__patch']
+    trace?: never
+  }
+  '/api/widget/dap/tours/{tour_id}/steps': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Put Dap Steps
+     * @description Replace the deck; 409 when the dashboard edited it since `base_version`.
+     */
+    put: operations['put_dap_steps_api_widget_dap_tours__tour_id__steps_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/experiences': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Experiences
+     * @description One call, every deliverable DAP experience for this page + visitor.
+     */
+    get: operations['list_experiences_api_widget_experiences_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/media/{workspace_id}/{key}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Serve Public Media
+     * @description Unauthenticated, long-cached, open-CORS delivery of public assets.
+     */
+    get: operations['serve_public_media_api_widget_media__workspace_id___key__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/surveys/{survey_id}/responses': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Submit Response */
+    post: operations['submit_response_api_widget_surveys__survey_id__responses_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/widget/tours': {
     parameters: {
       query?: never
@@ -2436,8 +2912,34 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** Create Recorder Tour */
+    /**
+     * Create Recorder Tour
+     * @description Legacy recorder entry point — delegates to the same draft-creation service
+     *     the extension API uses.
+     */
     post: operations['create_recorder_tour_api_widget_tours_recorder_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/tours/{tour_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Widget Tour
+     * @description Single-tour fetch backing `stept('startTour', id)` (live tour of ANY
+     *     trigger type) and, with `preview_token`, the dashboard preview link (any
+     *     status/trigger/frequency, that one tour only).
+     */
+    get: operations['get_widget_tour_api_widget_tours__tour_id__get']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -3211,6 +3713,11 @@ export interface components {
       /** File */
       file: string
     }
+    /** Body_upload_screenshot_api_widget_dap_screenshots_post */
+    Body_upload_screenshot_api_widget_dap_screenshots_post: {
+      /** File */
+      file: string
+    }
     /** BootIdentity */
     BootIdentity: {
       /** Email */
@@ -3381,6 +3888,209 @@ export interface components {
       current_password: string
       /** New Password */
       new_password: string
+    }
+    /** ChecklistAudience */
+    ChecklistAudience: {
+      /** Filters */
+      filters?: components['schemas']['SegmentFilter'][]
+      /**
+       * Type
+       * @default all
+       * @enum {string}
+       */
+      type: 'all' | 'filters'
+    }
+    /** ChecklistCreate */
+    ChecklistCreate: {
+      audience?: components['schemas']['ChecklistAudience']
+      /**
+       * Description
+       * @default
+       */
+      description: string
+      /** Items */
+      items?: components['schemas']['ChecklistItemIn'][]
+      launcher?: components['schemas']['ChecklistLauncher']
+      /** Name */
+      name: string
+      /**
+       * Priority
+       * @default 0
+       */
+      priority: number
+      theme?: components['schemas']['ChecklistTheme']
+      trigger?: components['schemas']['ChecklistTrigger']
+    }
+    /**
+     * ChecklistItemAction
+     * @description What the item's CTA does when clicked.
+     */
+    ChecklistItemAction: {
+      /** Tour Id */
+      tour_id?: string | null
+      /**
+       * Type
+       * @default none
+       * @enum {string}
+       */
+      type: 'start_tour' | 'open_url' | 'open_messenger' | 'none'
+      /** Url */
+      url?: string | null
+    }
+    /**
+     * ChecklistItemCompletion
+     * @description How the item gets checked off.
+     */
+    ChecklistItemCompletion: {
+      /** Tour Id */
+      tour_id?: string | null
+      /**
+       * Type
+       * @default manual
+       * @enum {string}
+       */
+      type: 'manual' | 'tour_completed' | 'url_visited'
+      /** Url Pattern */
+      url_pattern?: string | null
+    }
+    /** ChecklistItemIn */
+    ChecklistItemIn: {
+      action?: components['schemas']['ChecklistItemAction']
+      /**
+       * Body
+       * @default
+       */
+      body: string
+      completion?: components['schemas']['ChecklistItemCompletion']
+      /** Id */
+      id?: string | null
+      /** Title */
+      title: string
+    }
+    /** ChecklistItemOut */
+    ChecklistItemOut: {
+      action: components['schemas']['ChecklistItemAction']
+      /** Body */
+      body: string
+      completion: components['schemas']['ChecklistItemCompletion']
+      /** Id */
+      id: string
+      /** Title */
+      title: string
+    }
+    /** ChecklistItemStat */
+    ChecklistItemStat: {
+      /** Completed Count */
+      completed_count: number
+      /** Id */
+      id: string
+      /** Title */
+      title: string
+    }
+    /** ChecklistLauncher */
+    ChecklistLauncher: {
+      /**
+       * Auto Open Once
+       * @default true
+       */
+      auto_open_once: boolean
+      /**
+       * Label
+       * @default Getting started
+       */
+      label: string
+    }
+    /** ChecklistOut */
+    ChecklistOut: {
+      audience: components['schemas']['ChecklistAudience']
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Created By */
+      created_by?: string | null
+      /** Description */
+      description: string
+      /** Id */
+      id: string
+      /** Items */
+      items: components['schemas']['ChecklistItemOut'][]
+      launcher: components['schemas']['ChecklistLauncher']
+      /** Name */
+      name: string
+      /** Priority */
+      priority: number
+      /** Status */
+      status: string
+      theme: components['schemas']['ChecklistTheme']
+      trigger: components['schemas']['ChecklistTrigger']
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** Version */
+      version: number
+    }
+    /** ChecklistStats */
+    ChecklistStats: {
+      /** Completion Rate */
+      completion_rate: number
+      /** Completions */
+      completions: number
+      /** Items */
+      items: components['schemas']['ChecklistItemStat'][]
+      /** Starts */
+      starts: number
+      /** Views */
+      views?: number | null
+    }
+    /** ChecklistTheme */
+    ChecklistTheme: {
+      /**
+       * Accent
+       * @default #6366f1
+       */
+      accent: string
+      /**
+       * Position
+       * @default bottom-right
+       * @enum {string}
+       */
+      position: 'bottom-right' | 'bottom-left'
+    }
+    /**
+     * ChecklistTrigger
+     * @description Where the launcher shows. Defaults to every page (`*`).
+     */
+    ChecklistTrigger: {
+      /**
+       * Type
+       * @default url_match
+       * @enum {string}
+       */
+      type: 'manual' | 'url_match'
+      /**
+       * Url Pattern
+       * @default *
+       */
+      url_pattern: string | null
+    }
+    /** ChecklistUpdate */
+    ChecklistUpdate: {
+      audience?: components['schemas']['ChecklistAudience'] | null
+      /** Description */
+      description?: string | null
+      /** Items */
+      items?: components['schemas']['ChecklistItemIn'][] | null
+      launcher?: components['schemas']['ChecklistLauncher'] | null
+      /** Name */
+      name?: string | null
+      /** Priority */
+      priority?: number | null
+      theme?: components['schemas']['ChecklistTheme'] | null
+      trigger?: components['schemas']['ChecklistTrigger'] | null
     }
     /** ChunkPreviewOut */
     ChunkPreviewOut: {
@@ -3997,10 +4707,69 @@ export interface components {
       /** Url */
       url?: string | null
     }
+    /** DapAuthCheckOut */
+    DapAuthCheckOut: {
+      /**
+       * Perms Ok
+       * @default true
+       */
+      perms_ok: boolean
+      /** User Name */
+      user_name: string
+      /** Workspace Id */
+      workspace_id: string
+      /** Workspace Name */
+      workspace_name: string
+    }
+    /** DapStepsPut */
+    DapStepsPut: {
+      /** Base Version */
+      base_version: number
+      /** Steps */
+      steps: components['schemas']['TourStepIn'][]
+    }
+    /** DapTourCreate */
+    DapTourCreate: {
+      /** Name */
+      name: string
+      /** Steps */
+      steps?: components['schemas']['TourStepIn'][]
+      /** Url Pattern */
+      url_pattern?: string | null
+    }
+    /** DapTourPatch */
+    DapTourPatch: {
+      /** Name */
+      name?: string | null
+      /** Url Pattern */
+      url_pattern?: string | null
+    }
+    /** DapTourSummary */
+    DapTourSummary: {
+      /** Id */
+      id: string
+      /** Kind */
+      kind: string
+      /** Name */
+      name: string
+      /** Status */
+      status: string
+      /** Steps Count */
+      steps_count: number
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** Version */
+      version: number
+    }
     /** DocumentDetailOut */
     DocumentDetailOut: {
       /** Chunks */
       chunks?: components['schemas']['ChunkPreviewOut'][]
+      /** Content */
+      content?: string | null
       /** Content Hash */
       content_hash?: string | null
       /**
@@ -4068,6 +4837,42 @@ export interface components {
       updated_at: string
       /** Uri */
       uri?: string | null
+    }
+    /**
+     * DocumentUpdate
+     * @description Re-edit an authored (storage-backed text/markdown) document.
+     */
+    DocumentUpdate: {
+      /** Content */
+      content?: string | null
+      /** Title */
+      title?: string | null
+    }
+    /**
+     * ExperiencesOut
+     * @description One-call widget bootstrap for all DAP experience kinds.
+     */
+    ExperiencesOut: {
+      /** Checklists */
+      checklists?: {
+        [key: string]: unknown
+      }[]
+      /** Surveys */
+      surveys?: {
+        [key: string]: unknown
+      }[]
+      /** Tours */
+      tours?: components['schemas']['WidgetTourOut'][]
+    }
+    /** ExtensionTokenOut */
+    ExtensionTokenOut: {
+      /**
+       * Expires Days
+       * @default 30
+       */
+      expires_days: number
+      /** Token */
+      token: string
     }
     /** FeedbackCreate */
     FeedbackCreate: {
@@ -4580,6 +5385,28 @@ export interface components {
       /** Total */
       total: number
     }
+    /** OffsetPage[SurveyResponseOut] */
+    OffsetPage_SurveyResponseOut_: {
+      /** Items */
+      items: components['schemas']['SurveyResponseOut'][]
+      /** Limit */
+      limit: number
+      /** Offset */
+      offset: number
+      /** Total */
+      total: number
+    }
+    /** OffsetPage[TourEventOut] */
+    OffsetPage_TourEventOut_: {
+      /** Items */
+      items: components['schemas']['TourEventOut'][]
+      /** Limit */
+      limit: number
+      /** Offset */
+      offset: number
+      /** Total */
+      total: number
+    }
     /** OffsetPage[WebhookDeliveryOut] */
     OffsetPage_WebhookDeliveryOut_: {
       /** Items */
@@ -4664,6 +5491,16 @@ export interface components {
       logo_url?: string | null
       /** Name */
       name: string
+    }
+    /** PreviewTokenOut */
+    PreviewTokenOut: {
+      /**
+       * Expires Minutes
+       * @default 60
+       */
+      expires_minutes: number
+      /** Token */
+      token: string
     }
     /** ProviderTestRequest */
     ProviderTestRequest: {
@@ -4879,6 +5716,11 @@ export interface components {
       name?: string | null
       /** Permissions */
       permissions?: string[] | null
+    }
+    /** ScreenshotOut */
+    ScreenshotOut: {
+      /** Key */
+      key: string
     }
     /** SearchAnalyticsOverview */
     SearchAnalyticsOverview: {
@@ -5176,6 +6018,327 @@ export interface components {
         [key: string]: unknown
       } | null
     }
+    /** StepAction */
+    StepAction: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'click' | 'fill' | 'navigate'
+      /** Url */
+      url?: string | null
+      /** Value */
+      value?: string | null
+    }
+    /** StepAdvance */
+    StepAdvance: {
+      /** Delay Ms */
+      delay_ms?: number | null
+      /**
+       * On
+       * @default button
+       * @enum {string}
+       */
+      on: 'button' | 'element_click' | 'input' | 'delay'
+    }
+    /** StepMedia */
+    StepMedia: {
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: 'image' | 'video'
+      /** Url */
+      url: string
+    }
+    /** StepWait */
+    StepWait: {
+      /**
+       * For
+       * @default element
+       * @enum {string}
+       */
+      for: 'element' | 'url'
+      /** Selector */
+      selector?: string | null
+      /**
+       * Timeout Ms
+       * @default 10000
+       */
+      timeout_ms: number
+      /** Url Pattern */
+      url_pattern?: string | null
+    }
+    /** SurveyAnswer */
+    SurveyAnswer: {
+      /** Question Id */
+      question_id: string
+      /** Value */
+      value: number | string
+    }
+    /** SurveyAudience */
+    SurveyAudience: {
+      /** Filters */
+      filters?: components['schemas']['SegmentFilter'][]
+      /**
+       * Type
+       * @default all
+       * @enum {string}
+       */
+      type: 'all' | 'filters'
+    }
+    /** SurveyCreate */
+    SurveyCreate: {
+      audience?: components['schemas']['SurveyAudience']
+      frequency?: components['schemas']['SurveyFrequency']
+      /** Name */
+      name: string
+      /**
+       * Presentation
+       * @default slideout
+       * @enum {string}
+       */
+      presentation: 'modal' | 'slideout'
+      /**
+       * Priority
+       * @default 0
+       */
+      priority: number
+      /** Questions */
+      questions?: components['schemas']['SurveyQuestionIn'][]
+      schedule?: components['schemas']['SurveySchedule']
+      /**
+       * Thanks Message
+       * @default Thanks for the feedback!
+       */
+      thanks_message: string
+      theme?: components['schemas']['SurveyTheme']
+      trigger?: components['schemas']['SurveyTrigger']
+    }
+    /** SurveyDayPoint */
+    SurveyDayPoint: {
+      /** Date */
+      date: string
+      /** Responses */
+      responses: number
+    }
+    /** SurveyFrequency */
+    SurveyFrequency: {
+      /** Cooldown Hours */
+      cooldown_hours?: number | null
+      /**
+       * Type
+       * @default once
+       * @enum {string}
+       */
+      type: 'once' | 'until_completed' | 'until_dismissed' | 'every_time'
+    }
+    /** SurveyNpsResult */
+    SurveyNpsResult: {
+      /** Detractors */
+      detractors: number
+      /** Passives */
+      passives: number
+      /** Promoters */
+      promoters: number
+      /** Score */
+      score: number
+    }
+    /** SurveyOut */
+    SurveyOut: {
+      audience: components['schemas']['SurveyAudience']
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Created By */
+      created_by?: string | null
+      frequency: components['schemas']['SurveyFrequency']
+      /** Id */
+      id: string
+      /** Name */
+      name: string
+      /** Presentation */
+      presentation: string
+      /** Priority */
+      priority: number
+      /** Questions */
+      questions: components['schemas']['SurveyQuestionOut'][]
+      schedule: components['schemas']['SurveySchedule']
+      /** Status */
+      status: string
+      /** Thanks Message */
+      thanks_message: string
+      theme: components['schemas']['SurveyTheme']
+      trigger: components['schemas']['SurveyTrigger']
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** Version */
+      version: number
+    }
+    /** SurveyQuestionIn */
+    SurveyQuestionIn: {
+      /** Id */
+      id?: string | null
+      /** Options */
+      options?: string[] | null
+      /** Question */
+      question: string
+      /**
+       * Required
+       * @default true
+       */
+      required: boolean
+      /**
+       * Type
+       * @default text
+       * @enum {string}
+       */
+      type: 'nps' | 'rating' | 'text' | 'select'
+    }
+    /** SurveyQuestionOut */
+    SurveyQuestionOut: {
+      /** Id */
+      id: string
+      /** Options */
+      options?: string[] | null
+      /** Question */
+      question: string
+      /** Required */
+      required: boolean
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: 'nps' | 'rating' | 'text' | 'select'
+    }
+    /** SurveyRatingResult */
+    SurveyRatingResult: {
+      /** Avg */
+      avg: number
+      /** Distribution */
+      distribution: {
+        [key: string]: number
+      }
+    }
+    /** SurveyResponseOut */
+    SurveyResponseOut: {
+      /** Answers */
+      answers: components['schemas']['SurveyAnswer'][]
+      /** Completed */
+      completed: boolean
+      /** Contact Id */
+      contact_id?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Id */
+      id: string
+      /** Meta */
+      meta?: {
+        [key: string]: string
+      }
+      /** Survey Id */
+      survey_id: string
+    }
+    /** SurveyResults */
+    SurveyResults: {
+      /** By Day */
+      by_day: components['schemas']['SurveyDayPoint'][]
+      /** Completed */
+      completed: number
+      /** Completion Rate */
+      completion_rate: number
+      nps?: components['schemas']['SurveyNpsResult'] | null
+      ratings?: components['schemas']['SurveyRatingResult'] | null
+      /** Responses */
+      responses: number
+      /** Select */
+      select?: components['schemas']['SurveySelectResult'][]
+      /** Text Answers */
+      text_answers?: components['schemas']['SurveyTextAnswer'][]
+    }
+    /**
+     * SurveySchedule
+     * @description UTC window; both ends optional (empty schedule = always on).
+     */
+    SurveySchedule: {
+      /** End At */
+      end_at?: string | null
+      /** Start At */
+      start_at?: string | null
+    }
+    /** SurveySelectResult */
+    SurveySelectResult: {
+      /** Counts */
+      counts: {
+        [key: string]: number
+      }
+      /** Question */
+      question: string
+      /** Question Id */
+      question_id: string
+    }
+    /** SurveyTextAnswer */
+    SurveyTextAnswer: {
+      /** Contact Id */
+      contact_id?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Question Id */
+      question_id: string
+      /** Value */
+      value: string
+    }
+    /** SurveyTheme */
+    SurveyTheme: {
+      /**
+       * Accent
+       * @default #6366f1
+       */
+      accent: string
+    }
+    /** SurveyTrigger */
+    SurveyTrigger: {
+      /**
+       * Type
+       * @default url_match
+       * @enum {string}
+       */
+      type: 'manual' | 'url_match'
+      /**
+       * Url Pattern
+       * @default *
+       */
+      url_pattern: string | null
+    }
+    /** SurveyUpdate */
+    SurveyUpdate: {
+      audience?: components['schemas']['SurveyAudience'] | null
+      frequency?: components['schemas']['SurveyFrequency'] | null
+      /** Name */
+      name?: string | null
+      /** Presentation */
+      presentation?: ('modal' | 'slideout') | null
+      /** Priority */
+      priority?: number | null
+      /** Questions */
+      questions?: components['schemas']['SurveyQuestionIn'][] | null
+      schedule?: components['schemas']['SurveySchedule'] | null
+      /** Thanks Message */
+      thanks_message?: string | null
+      theme?: components['schemas']['SurveyTheme'] | null
+      trigger?: components['schemas']['SurveyTrigger'] | null
+    }
     /** TagCreate */
     TagCreate: {
       /**
@@ -5316,12 +6479,66 @@ export interface components {
        * @default
        */
       description: string
+      frequency?: components['schemas']['TourFrequency']
+      /**
+       * Kind
+       * @default flow
+       * @enum {string}
+       */
+      kind: 'flow' | 'banner' | 'announcement'
       /** Name */
       name: string
+      /**
+       * Priority
+       * @default 0
+       */
+      priority: number
+      schedule?: components['schemas']['TourSchedule']
+      settings?: components['schemas']['TourSettings']
       /** Steps */
       steps?: components['schemas']['TourStepIn'][]
       theme?: components['schemas']['TourTheme']
       trigger?: components['schemas']['TourTrigger']
+    }
+    /** TourDayStat */
+    TourDayStat: {
+      /** Completions */
+      completions: number
+      /** Date */
+      date: string
+      /** Starts */
+      starts: number
+    }
+    /** TourEventOut */
+    TourEventOut: {
+      /** Contact Id */
+      contact_id?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Event */
+      event: string
+      /** Id */
+      id: string
+      /** Meta */
+      meta?: {
+        [key: string]: unknown
+      }
+      /** Step Index */
+      step_index?: number | null
+    }
+    /** TourFrequency */
+    TourFrequency: {
+      /** Cooldown Hours */
+      cooldown_hours?: number | null
+      /**
+       * Type
+       * @default until_dismissed
+       * @enum {string}
+       */
+      type: 'once' | 'until_completed' | 'until_dismissed' | 'every_time'
     }
     /** TourOut */
     TourOut: {
@@ -5335,10 +6552,17 @@ export interface components {
       created_by?: string | null
       /** Description */
       description: string
+      frequency: components['schemas']['TourFrequency']
       /** Id */
       id: string
+      /** Kind */
+      kind: string
       /** Name */
       name: string
+      /** Priority */
+      priority: number
+      schedule: components['schemas']['TourSchedule']
+      settings: components['schemas']['TourSettings']
       /** Status */
       status: string
       /** Steps */
@@ -5353,8 +6577,44 @@ export interface components {
       /** Version */
       version: number
     }
+    /**
+     * TourSchedule
+     * @description Delivery window (UTC). Empty = always on.
+     */
+    TourSchedule: {
+      /** End At */
+      end_at?: string | null
+      /** Start At */
+      start_at?: string | null
+    }
+    /** TourSettings */
+    TourSettings: {
+      /**
+       * Backdrop
+       * @default true
+       */
+      backdrop: boolean
+      /**
+       * Dismissable
+       * @default true
+       */
+      dismissable: boolean
+      /**
+       * Mode
+       * @default guided
+       * @enum {string}
+       */
+      mode: 'guided' | 'driven'
+      /**
+       * Show Progress
+       * @default true
+       */
+      show_progress: boolean
+    }
     /** TourStats */
     TourStats: {
+      /** By Day */
+      by_day?: components['schemas']['TourDayStat'][]
       /** Completion Rate */
       completion_rate: number
       /** Completions */
@@ -5363,49 +6623,128 @@ export interface components {
       dismissals: number
       /** Starts */
       starts: number
+      /**
+       * Step Errors
+       * @default 0
+       */
+      step_errors: number
       /** Steps */
       steps: components['schemas']['TourStepStat'][]
+      /**
+       * Unique Starts
+       * @default 0
+       */
+      unique_starts: number
     }
     /** TourStepIn */
     TourStepIn: {
+      action?: components['schemas']['StepAction'] | null
+      advance?: components['schemas']['StepAdvance']
       /**
        * Body
        * @default
        */
       body: string
+      /** Fallback Selectors */
+      fallback_selectors?: string[]
       /** Id */
       id?: string | null
+      media?: components['schemas']['StepMedia'] | null
       /**
        * Placement
        * @default auto
        * @enum {string}
        */
-      placement: 'auto' | 'top' | 'bottom' | 'left' | 'right'
-      /** Selector */
+      placement: 'auto' | 'top' | 'bottom' | 'left' | 'right' | 'center'
+      /** Screenshot Key */
+      screenshot_key?: string | null
+      /**
+       * Selector
+       * @default
+       */
       selector: string
+      /** Target */
+      target?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Text Hint
+       * @default
+       */
+      text_hint: string
       /**
        * Title
        * @default
        */
       title: string
+      /**
+       * Type
+       * @default tooltip
+       * @enum {string}
+       */
+      type: 'tooltip' | 'modal' | 'banner' | 'hotspot' | 'action' | 'wait'
+      wait?: components['schemas']['StepWait'] | null
     }
-    /** TourStepOut */
+    /**
+     * TourStepOut
+     * @description Echo of a stored step. Defaults keep pre-v2 rows readable.
+     */
     TourStepOut: {
-      /** Body */
+      action?: components['schemas']['StepAction'] | null
+      advance?: components['schemas']['StepAdvance']
+      /**
+       * Body
+       * @default
+       */
       body: string
+      /** Fallback Selectors */
+      fallback_selectors?: string[]
       /** Id */
       id: string
-      /** Placement */
+      media?: components['schemas']['StepMedia'] | null
+      /**
+       * Placement
+       * @default auto
+       */
       placement: string
-      /** Selector */
+      /** Screenshot Key */
+      screenshot_key?: string | null
+      /**
+       * Selector
+       * @default
+       */
       selector: string
-      /** Title */
+      /** Target */
+      target?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Text Hint
+       * @default
+       */
+      text_hint: string
+      /**
+       * Title
+       * @default
+       */
       title: string
+      /**
+       * Type
+       * @default tooltip
+       * @enum {string}
+       */
+      type: 'tooltip' | 'modal' | 'banner' | 'hotspot' | 'action' | 'wait'
+      wait?: components['schemas']['StepWait'] | null
     }
     /** TourStepStat */
     TourStepStat: {
       /** Drop Off */
       drop_off: number
+      /**
+       * Healed
+       * @default 0
+       */
+      healed: number
       /** Index */
       index: number
       /** Title */
@@ -5420,6 +6759,8 @@ export interface components {
        * @default #6366f1
        */
       accent: string
+      /** Position */
+      position?: ('top' | 'bottom') | null
     }
     /** TourTrigger */
     TourTrigger: {
@@ -5437,8 +6778,15 @@ export interface components {
       audience?: components['schemas']['TourAudience'] | null
       /** Description */
       description?: string | null
+      frequency?: components['schemas']['TourFrequency'] | null
+      /** Kind */
+      kind?: ('flow' | 'banner' | 'announcement') | null
       /** Name */
       name?: string | null
+      /** Priority */
+      priority?: number | null
+      schedule?: components['schemas']['TourSchedule'] | null
+      settings?: components['schemas']['TourSettings'] | null
       /** Steps */
       steps?: components['schemas']['TourStepIn'][] | null
       theme?: components['schemas']['TourTheme'] | null
@@ -5571,6 +6919,19 @@ export interface components {
       /** Url */
       url?: string | null
     }
+    /** WidgetAckOut */
+    WidgetAckOut: {
+      /**
+       * Ok
+       * @default true
+       */
+      ok: boolean
+      /**
+       * Stored
+       * @default true
+       */
+      stored: boolean
+    }
     /** WidgetArticlesResponse */
     WidgetArticlesResponse: {
       /**
@@ -5610,6 +6971,38 @@ export interface components {
        * @default false
        */
       skipped: boolean
+    }
+    /** WidgetChecklistProgressIn */
+    WidgetChecklistProgressIn: {
+      /**
+       * Done
+       * @default true
+       */
+      done: boolean
+      /** Item Id */
+      item_id: string
+    }
+    /**
+     * WidgetChecklistProgressOut
+     * @description `stored=False` for anonymous visitors — the widget keeps local state.
+     */
+    WidgetChecklistProgressOut: {
+      /**
+       * Completed
+       * @default false
+       */
+      completed: boolean
+      /**
+       * Dismissed
+       * @default false
+       */
+      dismissed: boolean
+      /** Item State */
+      item_state?: {
+        [key: string]: string
+      }
+      /** Stored */
+      stored: boolean
     }
     /** WidgetMessageCreate */
     WidgetMessageCreate: {
@@ -5653,22 +7046,59 @@ export interface components {
       /** Message */
       message: string
     }
+    /** WidgetSurveyAckOut */
+    WidgetSurveyAckOut: {
+      /**
+       * Ok
+       * @default true
+       */
+      ok: boolean
+      /**
+       * Thanks Message
+       * @default
+       */
+      thanks_message: string
+    }
+    /** WidgetSurveyResponseIn */
+    WidgetSurveyResponseIn: {
+      /** Answers */
+      answers?: components['schemas']['SurveyAnswer'][]
+      /**
+       * Completed
+       * @default true
+       */
+      completed: boolean
+    }
     /** WidgetTourEventIn */
     WidgetTourEventIn: {
       /**
        * Event
        * @enum {string}
        */
-      event: 'started' | 'step_viewed' | 'completed' | 'dismissed'
+      event: 'started' | 'step_viewed' | 'completed' | 'dismissed' | 'step_error'
+      /** Meta */
+      meta?: {
+        [key: string]: unknown
+      } | null
       /** Step Index */
       step_index?: number | null
     }
-    /** WidgetTourOut */
+    /**
+     * WidgetTourOut
+     * @description Public tour payload. Never exposes audience/schedule internals; the
+     *     player needs kind/settings plus the frequency *type* (so `every_time`
+     *     bypasses the widget's local seen-set).
+     */
     WidgetTourOut: {
+      /** Frequency Type */
+      frequency_type: string
       /** Id */
       id: string
+      /** Kind */
+      kind: string
       /** Name */
       name: string
+      settings: components['schemas']['TourSettings']
       /** Steps */
       steps: components['schemas']['TourStepOut'][]
       theme: components['schemas']['TourTheme']
@@ -8581,6 +10011,268 @@ export interface operations {
       }
     }
   }
+  list_checklists_api_v1_w__workspace_id__checklists_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_checklist_api_v1_w__workspace_id__checklists_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChecklistCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_checklist_api_v1_w__workspace_id__checklists__checklist_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        checklist_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_checklist_api_v1_w__workspace_id__checklists__checklist_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        checklist_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_checklist_api_v1_w__workspace_id__checklists__checklist_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        checklist_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChecklistUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  pause_checklist_api_v1_w__workspace_id__checklists__checklist_id__pause_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        checklist_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  publish_checklist_api_v1_w__workspace_id__checklists__checklist_id__publish_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        checklist_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  checklist_stats_api_v1_w__workspace_id__checklists__checklist_id__stats_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        checklist_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChecklistStats']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_contacts_api_v1_w__workspace_id__contacts_get: {
     parameters: {
       query?: {
@@ -9512,7 +11204,9 @@ export interface operations {
   }
   upload_file_api_v1_w__workspace_id__files_post: {
     parameters: {
-      query?: never
+      query?: {
+        public?: boolean
+      }
       header?: never
       path: {
         workspace_id: string
@@ -9974,6 +11668,42 @@ export interface operations {
       }
     }
   }
+  update_document_api_v1_w__workspace_id__knowledge_documents__document_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        document_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DocumentUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DocumentOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   retry_document_api_v1_w__workspace_id__knowledge_documents__document_id__retry_post: {
     parameters: {
       query?: never
@@ -10226,6 +11956,38 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['DocumentOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  add_documents_batch_api_v1_w__workspace_id__knowledge_sources__source_id__documents_batch_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        source_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DocumentOut'][]
         }
       }
       /** @description Validation Error */
@@ -11170,6 +12932,303 @@ export interface operations {
       }
     }
   }
+  list_surveys_api_v1_w__workspace_id__surveys_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_survey_api_v1_w__workspace_id__surveys_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SurveyCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_survey_api_v1_w__workspace_id__surveys__survey_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_survey_api_v1_w__workspace_id__surveys__survey_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_survey_api_v1_w__workspace_id__surveys__survey_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SurveyUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  pause_survey_api_v1_w__workspace_id__surveys__survey_id__pause_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  publish_survey_api_v1_w__workspace_id__surveys__survey_id__publish_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_survey_responses_api_v1_w__workspace_id__surveys__survey_id__responses_get: {
+    parameters: {
+      query?: {
+        limit?: number | null
+        offset?: number
+      }
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['OffsetPage_SurveyResponseOut_']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  survey_results_api_v1_w__workspace_id__surveys__survey_id__results_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        survey_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SurveyResults']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_tags_api_v1_w__workspace_id__tags_get: {
     parameters: {
       query?: never
@@ -11573,6 +13632,37 @@ export interface operations {
       }
     }
   }
+  create_extension_token_route_api_v1_w__workspace_id__tours_extension_token_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExtensionTokenOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   create_recorder_token_api_v1_w__workspace_id__tours_recorder_token_post: {
     parameters: {
       query?: never
@@ -11704,6 +13794,41 @@ export interface operations {
       }
     }
   }
+  tour_events_api_v1_w__workspace_id__tours__tour_id__events_get: {
+    parameters: {
+      query?: {
+        limit?: number
+        offset?: number
+      }
+      header?: never
+      path: {
+        tour_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['OffsetPage_TourEventOut_']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   pause_tour_api_v1_w__workspace_id__tours__tour_id__pause_post: {
     parameters: {
       query?: never
@@ -11723,6 +13848,38 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['TourOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_preview_token_api_v1_w__workspace_id__tours__tour_id__preview_token_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        tour_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PreviewTokenOut']
         }
       }
       /** @description Validation Error */
@@ -12229,6 +14386,76 @@ export interface operations {
       }
     }
   }
+  dismiss_api_widget_checklists__checklist_id__dismiss_post: {
+    parameters: {
+      query: {
+        widget_key: string
+      }
+      header?: never
+      path: {
+        checklist_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WidgetAckOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  record_progress_api_widget_checklists__checklist_id__progress_post: {
+    parameters: {
+      query: {
+        widget_key: string
+      }
+      header?: never
+      path: {
+        checklist_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WidgetChecklistProgressIn']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WidgetChecklistProgressOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_conversations_api_widget_conversations_get: {
     parameters: {
       query?: never
@@ -12513,6 +14740,315 @@ export interface operations {
       }
     }
   }
+  auth_check_api_widget_dap_auth_check_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DapAuthCheckOut']
+        }
+      }
+    }
+  }
+  upload_screenshot_api_widget_dap_screenshots_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_screenshot_api_widget_dap_screenshots_post']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ScreenshotOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_dap_tours_api_widget_dap_tours_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DapTourSummary'][]
+        }
+      }
+    }
+  }
+  create_dap_tour_api_widget_dap_tours_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DapTourCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TourOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_dap_tour_api_widget_dap_tours__tour_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        tour_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TourOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  patch_dap_tour_api_widget_dap_tours__tour_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        tour_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DapTourPatch']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TourOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  put_dap_steps_api_widget_dap_tours__tour_id__steps_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        tour_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DapStepsPut']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TourOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_experiences_api_widget_experiences_get: {
+    parameters: {
+      query: {
+        widget_key: string
+        url: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExperiencesOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  serve_public_media_api_widget_media__workspace_id___key__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+        key: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  submit_response_api_widget_surveys__survey_id__responses_post: {
+    parameters: {
+      query: {
+        widget_key: string
+        url?: string | null
+      }
+      header?: never
+      path: {
+        survey_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WidgetSurveyResponseIn']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WidgetSurveyAckOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_widget_tours_api_widget_tours_get: {
     parameters: {
       query: {
@@ -12565,6 +15101,40 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['RecorderTourOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_widget_tour_api_widget_tours__tour_id__get: {
+    parameters: {
+      query?: {
+        widget_key?: string | null
+        preview_token?: string | null
+      }
+      header?: never
+      path: {
+        tour_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WidgetTourOut']
         }
       }
       /** @description Validation Error */

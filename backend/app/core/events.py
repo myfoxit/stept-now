@@ -57,6 +57,8 @@ class EventNames:
     APPROVAL_REQUESTED = "approval.requested"
     APPROVAL_DECIDED = "approval.decided"
     TOUR_EVENT = "tour.event"
+    CHECKLIST_EVENT = "checklist.event"
+    SURVEY_SUBMITTED = "survey.submitted"
 
 
 Handler = Callable[[AsyncSession, Event], Awaitable[None]]

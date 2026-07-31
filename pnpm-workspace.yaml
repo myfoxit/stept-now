@@ -3,3 +3,4 @@ packages:
   - widget
   - extension
   - e2e
+  - packages/*

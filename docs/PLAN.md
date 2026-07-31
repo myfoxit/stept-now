@@ -62,6 +62,27 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
 - [x] **W5** alembic 0001 migration + PG validation (commit 28a0f92); e2e journeys — widget→inbox→AI-citation, approval gate, dashboard nav (9 Playwright tests, commit 6644dcc); docs polish; `make verify` fully green. Merged to master.
 - [x] **W6 (competitive parity)** — from source-level gap analysis of fresh Chatwoot+Onyx clones (`docs/COMPETITIVE.md`, `docs/research/{chatwoot,onyx}-gaps.md`). Backend (5 agents): channels **whatsapp/messenger/instagram/sms/line** (verify challenges, HMAC signatures, delivery receipts, WA 24h window), **SLA policies** (frt/nrt/rt, per-episode breach events, scheduler scan), **macros**, **campaigns** (ongoing widget proactive + one_off scheduled dispatch), knowledge connectors **sitemap/crawl/github/notion** + per-source `refresh_minutes` re-sync + deletion pruning + encrypted source secrets, **LLM rerank** pass, **search analytics** (query log playground/agent/copilot/widget) + 👍/👎 message feedback, `app.core.scheduler` (@scheduled registry + lifespan loop), alembic **0002** (validated up/down/up on PG). Frontend/widget (4 agents): channel config dialogs w/ webhook hints, SLA settings+thread card, macros tab+runner, campaigns page, knowledge connector dialog + **/knowledge/analytics** dashboard + rerank toggle, widget campaign engine (glob+time-on-page, seen-set) + feedback thumbs. Seeds: SLA policy on widget inbox, 2 macros, 1 ongoing campaign.
 - [x] **Totals:** 798 tests (backend 585 (+2 pg-only) + frontend 137 + widget 47 + extension 20 + e2e 9), all green; mypy clean; all builds pass; migrations PG-validated up/down/up.
+- [~] **W7 (DAP2 — full digital adoption platform + extension port + ingestion + editor)** IN FLIGHT.
+  Contracts: `docs/DAP2-CONTRACTS.md`. Research: `docs/research/{dap-competitors,old-extension-map}.md`.
+  Session worktree: `.claude/worktrees/dap-suite` (branch `worktree-dap-suite`).
+  - Scope: tours v2 (step types tooltip/modal/banner/hotspot/action/wait, driven "do-it-for-me"
+    mode, frequency/schedule/priority/kind, self-healing selectors + breakage telemetry,
+    analytics v2), **checklists**, **surveys** (NPS/rating/text/select), widget experiences
+    bootstrap, **full Chrome extension port** from `/Users/ahoehne/repos/stept` (WXT + React
+    side panel, real email/password login → 30d extension token, record/edit/preview/drive),
+    shared `packages/dom-capture` selector+healing engine, RAG ingestion upgrades (multi-file
+    batch upload, robots/URL-filters/concurrency/incremental crawl, editable authored docs),
+    **TipTap editor** (markdown-persisting) for articles + knowledge docs.
+  - Orchestrator prep (done): registries wired (routers/models/events/routes/sidebar "Adoption"
+    group), `packages/dom-capture` workspace package, extension → WXT 0.20 + React 19, TipTap v3
+    installed, `segments.contact_matches()` helper added.
+  - Wave A (4 agents): A1 tours-v2 core + extension API + public media; A1b checklists+surveys;
+    A2 ingestion; A3 dom-capture port.
+  - Wave B (planned): B1 tours admin UI + analytics, B1b checklist/survey builders, B2 TipTap +
+    knowledge UI, B3 widget player v2 (+checklist/survey/banner renderers), B4 extension v2.
+  - Deferred to roadmap (see dap-competitors.md parking lot): goals/A-B, localization, global
+    rate limits, no-code event trackers, inline embeds, announcement feed, condition debugger,
+    mobile SDKs, flow branching, remote agentic driving.
 - [ ] Post-build notes for user: **no git origin configured** — merged to local master only, not pushed (user decides re GitHub; gh is authed as `myfoxit`). Old stept containers on 8000/80/5173 are a PRIOR build — untouched. A `build-postgres-1` container is up on 54329 (used for PG validation; `docker compose down` to stop). Use `docker compose` (v2) — the v1 `docker-compose` is broken by a pyenv SSL issue.
 
 ### Agent-orchestration lessons (for future waves / resets)

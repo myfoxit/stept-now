@@ -16,6 +16,7 @@ from app.schemas.knowledge import (
     ChunkPreviewOut,
     DocumentDetailOut,
     DocumentOut,
+    DocumentUpdate,
     SearchRequest,
     SearchResponse,
     SourceCreate,
@@ -155,6 +156,32 @@ async def add_document(source_id: str, request: Request, principal: Member, sess
     return DocumentOut.model_validate(document)
 
 
+@router.post(
+    "/knowledge/sources/{source_id}/documents/batch",
+    response_model=list[DocumentOut],
+    status_code=201,
+    dependencies=[KnowledgeWrite],
+)
+async def add_documents_batch(source_id: str, request: Request, principal: Member, session: Db):
+    """Add up to 20 documents in one multipart request (repeat the `file`
+    field). A file that cannot be read yields a `failed` document carrying the
+    error — the rest of the batch still lands."""
+    source = await knowledge_service.get_source(session, principal.workspace.id, source_id)
+    if not request.headers.get("content-type", "").startswith("multipart/form-data"):
+        raise BadRequestError("Batch uploads must be multipart/form-data")
+    form = await request.form()
+    uploads = [item for item in form.getlist("file") if isinstance(item, UploadFile)]
+    if not uploads:
+        raise BadRequestError("Multipart uploads need at least one 'file' field")
+    files = [
+        (upload.filename or "file", await upload.read(), upload.content_type) for upload in uploads
+    ]
+    documents = await knowledge_service.add_documents_from_files(
+        session, principal.workspace.id, source, actor=_actor(principal), files=files
+    )
+    return [DocumentOut.model_validate(document) for document in documents]
+
+
 # --- documents --------------------------------------------------------------
 
 
@@ -193,10 +220,31 @@ async def list_documents(
 )
 async def get_document(document_id: str, principal: Member, session: Db):
     document = await knowledge_service.get_document(session, principal.workspace.id, document_id)
+    source = await knowledge_service.get_source(session, principal.workspace.id, document.source_id)
     chunks = await knowledge_service.get_document_chunks(session, document.id, limit=5)
     detail = DocumentDetailOut.model_validate(document)
     detail.chunks = [ChunkPreviewOut.model_validate(chunk) for chunk in chunks]
+    detail.content = await knowledge_service.document_content(document, source)
     return detail
+
+
+@router.patch(
+    "/knowledge/documents/{document_id}",
+    response_model=DocumentOut,
+    dependencies=[KnowledgeWrite],
+)
+async def update_document(document_id: str, body: DocumentUpdate, principal: Member, session: Db):
+    """Edit an authored document's title/content; re-indexes inline. Documents
+    backed by a URL, the portal, or a connector return 409."""
+    document = await knowledge_service.update_document(
+        session,
+        principal.workspace.id,
+        document_id,
+        actor=_actor(principal),
+        title=body.title,
+        content=body.content,
+    )
+    return DocumentOut.model_validate(document)
 
 
 @router.delete(

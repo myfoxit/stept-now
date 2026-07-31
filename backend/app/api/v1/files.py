@@ -3,6 +3,11 @@
 Uploads return a storage key + metadata; domain objects (messages, articles)
 embed that metadata. Serving is member-authenticated; the widget re-exposes
 conversation attachments through its own authenticated routes.
+
+`?public=true` opts an upload into the DAP media namespace instead: images/video
+only, stored under `public/{workspace_id}/…` and served without auth from
+`/api/widget/media/…` (tour steps render on the customer's site, where no Stept
+session exists). Everything else is unchanged.
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from app.api.widget.media import PUBLIC_CONTENT_TYPES, public_url, save_public
 from app.core.config import get_settings
 from app.core.deps import Db, Member
 from app.core.errors import BadRequestError, PayloadTooLargeError
@@ -53,23 +59,32 @@ def file_url(workspace_id: str, key: str) -> str:
 
 
 @router.post("/files", response_model=FileOut, status_code=201)
-async def upload_file(file: UploadFile, principal: Member, session: Db) -> FileOut:
+async def upload_file(
+    file: UploadFile, principal: Member, session: Db, public: bool = False
+) -> FileOut:
     settings = get_settings()
     content_type = file.content_type or "application/octet-stream"
-    if content_type not in ALLOWED_CONTENT_TYPES:
+    allowed = PUBLIC_CONTENT_TYPES if public else ALLOWED_CONTENT_TYPES
+    if content_type not in allowed:
         raise BadRequestError(f"File type {content_type} is not allowed")
     data = await file.read()
     if len(data) > settings.upload_limit_bytes:
         raise PayloadTooLargeError(f"Files are limited to {settings.max_upload_mb} MB")
     if not data:
         raise BadRequestError("Empty file")
-    stored = await get_storage().save(file.filename or "file", data)
+    name = file.filename or "file"
+    if public:
+        key = await save_public(principal.workspace.id, name, data)
+        url = public_url(principal.workspace.id, key)
+    else:
+        key = (await get_storage().save(name, data)).key
+        url = file_url(principal.workspace.id, key)
     return FileOut(
-        key=stored.key,
-        name=file.filename or "file",
-        size=stored.size,
+        key=key,
+        name=name,
+        size=len(data),
         content_type=content_type,
-        url=file_url(principal.workspace.id, stored.key),
+        url=url,
     )
 
 

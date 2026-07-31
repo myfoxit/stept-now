@@ -170,6 +170,28 @@ async def apply_filters(
     return [c for c in contacts if all(check(c) for check in post_filters)]
 
 
+async def contact_matches(
+    session: AsyncSession, workspace_id: str, contact: Contact, filters: list[Any]
+) -> bool:
+    """Whether a single contact satisfies the filters — same semantics as
+    apply_filters, without scanning the workspace (one PK-scoped query for the
+    SQL-compiled conditions, Python evaluation for attribute post-filters)."""
+    conditions, post_filters = compile_filters(filters)
+    if contact.workspace_id != workspace_id:
+        return False
+    if conditions:
+        result = await session.execute(
+            select(Contact.id).where(
+                Contact.id == contact.id,
+                Contact.workspace_id == workspace_id,
+                *conditions,
+            )
+        )
+        if result.scalar_one_or_none() is None:
+            return False
+    return all(check(contact) for check in post_filters)
+
+
 # ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------

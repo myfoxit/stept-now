@@ -5,16 +5,24 @@ Each connector turns remote content into `FetchedDoc`s; the sync task in
 All HTTP goes through httpx.AsyncClient (10s timeout, redirects followed).
 Sitemap/crawl page fetches reuse the limits enforced by `app.rag.tasks`
 (2MB cap, text/html only); listing failures raise `FetchError`.
+
+Sitemaps surface each URL's optional <lastmod> so the sync task can skip
+refetching unchanged pages. Crawls honor robots.txt `User-agent: *` rules
+(unless respect_robots=false), filter discovered links through include/exclude
+path globs (exclude wins), and fetch each depth level concurrently
+(Semaphore(4)) with a per-fetch politeness delay.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import ipaddress
 import re
 import socket
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from typing import Any
 from urllib.parse import urldefrag, urljoin, urlsplit
 from xml.etree import ElementTree
@@ -34,6 +42,10 @@ SITEMAP_DEFAULT_MAX_PAGES = 50
 SITEMAP_INDEX_DEPTH = 2  # sitemapindex recursion depth
 CRAWL_DEFAULT_MAX_PAGES = 30
 CRAWL_DEFAULT_MAX_DEPTH = 3
+CRAWL_CONCURRENCY = 4  # simultaneous page fetches within one depth level
+CRAWL_DEFAULT_DELAY_MS = 250  # politeness pause before each fetch
+CRAWL_MAX_DELAY_MS = 2000
+ROBOTS_MAX_CHARS = 200_000  # oversized robots.txt bodies are truncated, not fatal
 NOTION_DEFAULT_MAX_PAGES = 100
 NOTION_BLOCK_DEPTH = 3  # recursion into has_children blocks
 
@@ -67,6 +79,16 @@ class FetchedDoc:
     text: str
     uri: str
     mime: str = "text/html"
+    # Merged into Document.meta on upsert (sitemap sets {"lastmod": ...}).
+    meta: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SitemapEntry:
+    """One <url> element: the location plus its optional <lastmod> stamp."""
+
+    url: str
+    lastmod: str | None = None
 
 
 def check_public_url(url: str) -> None:
@@ -107,24 +129,34 @@ def check_public_url(url: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def fetch_sitemap(config: dict[str, Any]) -> list[str]:
-    """Return page URLs listed in the configured sitemap (recursing indexes)."""
+async def fetch_sitemap(config: dict[str, Any]) -> list[SitemapEntry]:
+    """Return the entries listed in the configured sitemap (recursing indexes).
+
+    Each entry carries the <loc> URL plus its <lastmod> when the sitemap
+    provides one; the sync task stores it on the document and skips refetching
+    pages whose stamp is unchanged.
+    """
     sitemap_url = str(config.get("sitemap_url") or "").strip()
     max_pages = int(config.get("max_pages") or SITEMAP_DEFAULT_MAX_PAGES)
-    urls: list[str] = []
+    entries: list[SitemapEntry] = []
     async with httpx.AsyncClient(
         timeout=URL_FETCH_TIMEOUT_SECONDS, follow_redirects=True
     ) as client:
-        await _collect_sitemap_urls(client, sitemap_url, urls, max_pages=max_pages, depth=0)
-    if not urls:
+        await _collect_sitemap_urls(client, sitemap_url, entries, max_pages=max_pages, depth=0)
+    if not entries:
         raise FetchError(f"{sitemap_url}: sitemap contains no URLs")
-    return urls
+    return entries
 
 
 async def _collect_sitemap_urls(
-    client: httpx.AsyncClient, sitemap_url: str, urls: list[str], *, max_pages: int, depth: int
+    client: httpx.AsyncClient,
+    sitemap_url: str,
+    entries: list[SitemapEntry],
+    *,
+    max_pages: int,
+    depth: int,
 ) -> None:
-    if len(urls) >= max_pages:
+    if len(entries) >= max_pages:
         return
     check_public_url(sitemap_url)
     try:
@@ -147,16 +179,21 @@ async def _collect_sitemap_urls(
             child = (loc.text or "").strip()
             if child:
                 await _collect_sitemap_urls(
-                    client, child, urls, max_pages=max_pages, depth=depth + 1
+                    client, child, entries, max_pages=max_pages, depth=depth + 1
                 )
-            if len(urls) >= max_pages:
+            if len(entries) >= max_pages:
                 return
     elif tag == "urlset":
-        for loc in root.iterfind(f"{namespace}url/{namespace}loc"):
-            text = (loc.text or "").strip()
+        for element in root.iterfind(f"{namespace}url"):
+            loc_element = element.find(f"{namespace}loc")
+            text = (loc_element.text or "").strip() if loc_element is not None else ""
             if text:
-                urls.append(text)
-            if len(urls) >= max_pages:
+                lastmod_element = element.find(f"{namespace}lastmod")
+                lastmod = (
+                    (lastmod_element.text or "").strip() if lastmod_element is not None else ""
+                )
+                entries.append(SitemapEntry(url=text, lastmod=lastmod or None))
+            if len(entries) >= max_pages:
                 return
     else:
         raise FetchError(f"{sitemap_url}: unexpected sitemap root element <{tag}>")
@@ -173,11 +210,27 @@ async def crawl_site(config: dict[str, Any]) -> tuple[list[FetchedDoc], list[str
     Returns (docs, per-page errors). Near-duplicate pages — same (title, text)
     after extraction — are suppressed. Page fetches enforce the shared 2MB /
     text/html limits; a single broken page is recorded, never fatal.
+
+    Config knobs beyond base_url/max_pages/max_depth:
+    - `include_patterns` / `exclude_patterns`: fnmatch globs matched against a
+      discovered link's URL path (exclude wins). They filter the frontier, not
+      the explicitly configured base URL — a mistyped include never leaves the
+      crawl with nothing to start from.
+    - `respect_robots` (default true): robots.txt is fetched once per sync and
+      its `User-agent: *` rules skip disallowed URLs (including the base URL).
+    - `delay_ms` (default 250): pause before each fetch. Fetches inside one
+      depth level run concurrently (Semaphore(4)); levels stay strictly
+      ordered, so BFS semantics and the max_pages cap are unchanged.
     """
     base_url = str(config.get("base_url") or "").strip()
     max_pages = int(config.get("max_pages") or CRAWL_DEFAULT_MAX_PAGES)
     raw_depth = config.get("max_depth")
     max_depth = CRAWL_DEFAULT_MAX_DEPTH if raw_depth is None else int(raw_depth)
+    raw_delay = config.get("delay_ms")
+    delay_ms = CRAWL_DEFAULT_DELAY_MS if raw_delay is None else int(raw_delay)
+    delay_ms = max(0, min(delay_ms, CRAWL_MAX_DELAY_MS))
+    include_patterns = _pattern_list(config.get("include_patterns"))
+    exclude_patterns = _pattern_list(config.get("exclude_patterns"))
     check_public_url(base_url)
 
     start = _normalize_link(base_url)
@@ -185,33 +238,160 @@ async def crawl_site(config: dict[str, Any]) -> tuple[list[FetchedDoc], list[str
     errors: list[str] = []
     seen_content: set[int] = set()
     visited: set[str] = {start}
-    queue: deque[tuple[str, int]] = deque([(start, 0)])
+    frontier: list[str] = [start]
+    depth = 0
     fetched_count = 0
+    semaphore = asyncio.Semaphore(CRAWL_CONCURRENCY)
     async with httpx.AsyncClient(
         timeout=URL_FETCH_TIMEOUT_SECONDS, follow_redirects=True
     ) as client:
-        while queue and fetched_count < max_pages:
-            url, depth = queue.popleft()
-            fetched_count += 1
-            try:
-                check_public_url(url)
-                body = await fetch_html_bytes(url, client=client)
-                parsed = parsers.extract(url, body, "text/html")
-            except (FetchError, ParseError) as exc:
-                errors.append(f"{url}: {exc}")
-                continue
-            digest = hash((parsed.title, parsed.text))
-            if digest not in seen_content:
-                seen_content.add(digest)
-                docs.append(FetchedDoc(title=parsed.title, text=parsed.text, uri=url))
-            if depth >= max_depth:
-                continue
-            for link in _extract_links(url, body):
-                if link in visited or not _same_site(base_url, link):
+        robots = RobotsRules()
+        if bool(config.get("respect_robots", True)):
+            robots = await fetch_robots(client, base_url)
+        while frontier and fetched_count < max_pages:
+            batch = [url for url in frontier if robots.allows(url)][: max_pages - fetched_count]
+            fetched_count += len(batch)
+            results = await asyncio.gather(
+                *(
+                    _crawl_fetch(client, url, semaphore=semaphore, delay_ms=delay_ms)
+                    for url in batch
+                )
+            )
+            next_frontier: list[str] = []
+            for url, body, error in results:  # sequential: BFS order stays deterministic
+                if body is None:
+                    errors.append(f"{url}: {error}")
                     continue
-                visited.add(link)
-                queue.append((link, depth + 1))
+                try:
+                    parsed = parsers.extract(url, body, "text/html")
+                except ParseError as exc:
+                    errors.append(f"{url}: {exc}")
+                    continue
+                digest = hash((parsed.title, parsed.text))
+                if digest not in seen_content:
+                    seen_content.add(digest)
+                    docs.append(FetchedDoc(title=parsed.title, text=parsed.text, uri=url))
+                if depth >= max_depth:
+                    continue
+                for link in _extract_links(url, body):
+                    if link in visited or not _same_site(base_url, link):
+                        continue
+                    visited.add(link)
+                    if not _path_matches(link, include_patterns, exclude_patterns):
+                        continue
+                    next_frontier.append(link)
+            frontier = next_frontier
+            depth += 1
     return docs, errors
+
+
+async def _crawl_fetch(
+    client: httpx.AsyncClient, url: str, *, semaphore: asyncio.Semaphore, delay_ms: int
+) -> tuple[str, bytes | None, str | None]:
+    """Politeness-delayed, SSRF-guarded page fetch → (url, body, error)."""
+    async with semaphore:
+        if delay_ms:
+            await asyncio.sleep(delay_ms / 1000)
+        try:
+            check_public_url(url)
+            return url, await fetch_html_bytes(url, client=client), None
+        except FetchError as exc:
+            return url, None, str(exc)
+
+
+def _pattern_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _path_matches(url: str, include: list[str], exclude: list[str]) -> bool:
+    """fnmatch the URL path against the configured globs — exclude wins, and an
+    empty include list means "everything not excluded"."""
+    path = urlsplit(url).path or "/"
+    if any(fnmatch(path, pattern) for pattern in exclude):
+        return False
+    if include:
+        return any(fnmatch(path, pattern) for pattern in include)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# robots.txt
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RobotsRules:
+    """`User-agent: *` prefix rules from a robots.txt.
+
+    Matching follows the de-facto standard: the longest matching path prefix
+    wins and Allow beats Disallow on equal length. An empty rule set (no
+    robots.txt, a non-200, or an unparseable body) allows everything.
+    """
+
+    rules: list[tuple[str, bool]] = field(default_factory=list)  # (path prefix, allowed)
+
+    def allows(self, url: str) -> bool:
+        path = urlsplit(url).path or "/"
+        allowed = True
+        best = -1
+        for prefix, rule_allows in self.rules:
+            if not path.startswith(prefix) or len(prefix) < best:
+                continue
+            if len(prefix) > best or rule_allows:  # Allow wins ties
+                best = len(prefix)
+                allowed = rule_allows
+        return allowed
+
+
+def parse_robots(text: str) -> RobotsRules:
+    """Parse the `User-agent: *` group(s) of a robots.txt into prefix rules.
+
+    Consecutive User-agent lines share the following directives; a User-agent
+    line after a directive starts a new group. Empty Disallow/Allow values are
+    "allow all" markers and carry no prefix, so they are dropped. Anything
+    unparseable simply yields no rules — i.e. allow-all.
+    """
+    rules: list[tuple[str, bool]] = []
+    in_star_group = False
+    saw_directive = False
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        name, _, value = line.partition(":")
+        name = name.strip().lower()
+        value = value.strip()
+        if name == "user-agent":
+            if saw_directive:  # directives ended the previous group
+                in_star_group = False
+                saw_directive = False
+            in_star_group = in_star_group or value == "*"
+        elif name in ("allow", "disallow"):
+            saw_directive = True
+            if in_star_group and value:
+                rules.append((value, name == "allow"))
+    return RobotsRules(rules=rules)
+
+
+async def fetch_robots(client: httpx.AsyncClient, base_url: str) -> RobotsRules:
+    """Fetch {origin}/robots.txt once per sync.
+
+    Strictly best-effort: any failure at all — transport error, non-200,
+    undecodable body — means allow-all, because a missing robots.txt must never
+    turn into a failed sync.
+    """
+    parts = urlsplit(base_url)
+    robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
+    try:
+        check_public_url(robots_url)
+        response = await client.get(robots_url)
+        if response.status_code != 200:
+            return RobotsRules()
+        return parse_robots(response.text[:ROBOTS_MAX_CHARS])
+    except Exception:
+        return RobotsRules()
 
 
 def _normalize_link(url: str) -> str:
