@@ -78,7 +78,8 @@ export function AppSidebar() {
                       }
                       tooltip={item.title}
                     >
-                      <NavLink to={item.url}>
+                      {/* data-tour anchors are stable selectors for DAP product tours */}
+                      <NavLink to={item.url} data-tour={item.url.slice(1)}>
                         <item.icon />
                         <span>{item.title}</span>
                       </NavLink>
