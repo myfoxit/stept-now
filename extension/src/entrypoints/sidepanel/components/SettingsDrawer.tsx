@@ -1,0 +1,85 @@
+import { Crosshair, LogOut, X } from 'lucide-react';
+import { formatPicked } from '../../../api/client';
+import type { PanelState } from '../../../types';
+import { sendBg, useCopy } from '../lib';
+
+/** Account + tools drawer: who you are signed in as, the selector picker, and
+ * sign-out (which forgets the extension token). */
+export function SettingsDrawer({
+  open,
+  state,
+  onClose,
+}: {
+  open: boolean;
+  state: PanelState;
+  onClose: () => void;
+}) {
+  const [copied, copy] = useCopy();
+  if (!open) return null;
+  const picked = state.picked;
+
+  return (
+    <div className="drawer" role="dialog" aria-label="Settings">
+      <div className="drawer-head">
+        <span className="section-title">Settings</span>
+        <button className="icon-btn" aria-label="Close settings" onClick={onClose}>
+          <X size={15} />
+        </button>
+      </div>
+
+      <div className="drawer-body">
+        <div className="kv">
+          <span>Signed in as</span>
+          <b>{state.auth.userName || '—'}</b>
+        </div>
+        <div className="kv">
+          <span>Workspace</span>
+          <b>{state.auth.workspaceName || '—'}</b>
+        </div>
+        <div className="kv">
+          <span>Stept URL</span>
+          <b className="truncate">{state.auth.apiBase}</b>
+        </div>
+
+        <div className="drawer-section">
+          <span className="section-title">Selector picker</span>
+          <p className="hint">
+            Click any element on the page to capture the selector Stept would record for it — handy
+            for re-targeting a step by hand.
+          </p>
+          <button className="btn" onClick={() => void sendBg({ type: 'picker-start' })}>
+            <Crosshair size={13} /> Pick an element
+          </button>
+          {picked && (
+            <div className="picked">
+              <code className="picked-sel">{picked.selector || '(no selector)'}</code>
+              {picked.fallbacks.length > 0 && (
+                <div className="picked-fallbacks">
+                  {picked.fallbacks.map((f) => (
+                    <code key={f}>{f}</code>
+                  ))}
+                </div>
+              )}
+              {picked.textHint && <div className="picked-text">“{picked.textHint}”</div>}
+              <div className="row">
+                <button className="btn" onClick={() => copy(formatPicked(picked))}>
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+                <button className="btn ghost" onClick={() => void sendBg({ type: 'clear-picked' })}>
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="drawer-section">
+          <button className="btn danger-outline" onClick={() => void sendBg({ type: 'sign-out' })}>
+            <LogOut size={13} /> Sign out
+          </button>
+          <p className="hint">Forgets the stored extension token on this browser.</p>
+        </div>
+      </div>
+    </div>
+  );
+}

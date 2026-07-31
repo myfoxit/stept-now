@@ -44,8 +44,17 @@ self-hostable and MIT-licensed:
 - 🔌 **Bring your own AI** — OpenAI, Anthropic, Google, Ollama, or any OpenAI-compatible
   endpoint, configured per workspace with encrypted keys. A deterministic **mock provider**
   ships in the box so every AI feature runs offline with zero API keys.
-- 🧭 **Product tours (DAP)** — build step-by-step in-app guides with a Chrome recorder
-  extension; the widget plays them in your app. Onboarding without shipping code.
+- 🧭 **Full digital adoption platform (DAP)** — tours, banners, announcement modals,
+  hotspots, **checklists** and **surveys (NPS · rating · text · choice)**, all targeted by
+  URL, segment, schedule and frequency, and all played by the widget in your app. Steps can
+  be tooltips, modals, waits, or **actions the tour performs for the user** ("do it for me"),
+  and every step carries fallback selectors plus an element fingerprint, so a tour **heals
+  itself** when your markup shifts — and tells you it did, on a per-step funnel with
+  drop-off and self-heal counts.
+- 🎬 **Chrome recorder & driver** — sign in with your Stept account, record a flow by
+  clicking through your app (with screenshots, and credentials masked before they ever
+  leave the page), edit the steps in a side panel, then **preview** it as a guided
+  walkthrough or **drive** it: the extension performs the clicks and typing itself.
 - 📣 **Campaigns & SLAs** — proactive in-app messages (URL + time-on-page triggered) and
   one-off scheduled sends to a segment; SLA policies with first-response / next-response /
   resolution targets, breach events, and inbox badges. Plus **macros** (one-click
@@ -64,8 +73,9 @@ self-hostable and MIT-licensed:
 | Database | PostgreSQL 16 + pgvector (prod) · SQLite (tests & zero-dep dev) — one portable schema |
 | Realtime / jobs | WebSockets · pub/sub + task queue (in-memory, or Redis + ARQ) |
 | Frontend | React 19 · TypeScript · Vite · Tailwind v4 · shadcn/ui · TanStack Query |
-| Widget | Preact iframe app + a tiny loader script |
-| Extension | Chrome MV3 tour recorder |
+| Widget | Preact iframe app + a tiny loader script (tour/checklist/survey players) |
+| Extension | Chrome MV3 (WXT + React side panel) — recorder, guided preview, CDP driver |
+| Authoring | TipTap rich-text editor that reads and writes markdown |
 | Tests | pytest · vitest · Playwright |
 
 ## Quick start (zero dependencies)
@@ -141,8 +151,10 @@ backend/    FastAPI app — core (config/db/security/rbac/events/pubsub/queue/st
             models · schemas · services · api/v1 · ai (providers) · rag · agents ·
             channels · automation · dap · realtime · workers
 frontend/   React dashboard (feature-sliced, typed API client generated from OpenAPI)
-widget/     embeddable chat: loader.ts (host page) + Preact iframe app
-extension/  Chrome MV3 tour recorder
+widget/     embeddable chat + DAP players: loader.ts (host page) + Preact iframe app
+extension/  Chrome MV3 extension (WXT + React): recorder · guided preview · drive mode
+packages/   dom-capture — the shared element capture + self-healing resolution engine
+            used by BOTH the widget player and the extension (never fork it)
 e2e/        Playwright suites (hermetic full-stack)
 docs/       PLAN (build status) · CONTRACTS (domain/API contracts) · research · guides
 ```

@@ -62,7 +62,7 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
 - [x] **W5** alembic 0001 migration + PG validation (commit 28a0f92); e2e journeys — widget→inbox→AI-citation, approval gate, dashboard nav (9 Playwright tests, commit 6644dcc); docs polish; `make verify` fully green. Merged to master.
 - [x] **W6 (competitive parity)** — from source-level gap analysis of fresh Chatwoot+Onyx clones (`docs/COMPETITIVE.md`, `docs/research/{chatwoot,onyx}-gaps.md`). Backend (5 agents): channels **whatsapp/messenger/instagram/sms/line** (verify challenges, HMAC signatures, delivery receipts, WA 24h window), **SLA policies** (frt/nrt/rt, per-episode breach events, scheduler scan), **macros**, **campaigns** (ongoing widget proactive + one_off scheduled dispatch), knowledge connectors **sitemap/crawl/github/notion** + per-source `refresh_minutes` re-sync + deletion pruning + encrypted source secrets, **LLM rerank** pass, **search analytics** (query log playground/agent/copilot/widget) + 👍/👎 message feedback, `app.core.scheduler` (@scheduled registry + lifespan loop), alembic **0002** (validated up/down/up on PG). Frontend/widget (4 agents): channel config dialogs w/ webhook hints, SLA settings+thread card, macros tab+runner, campaigns page, knowledge connector dialog + **/knowledge/analytics** dashboard + rerank toggle, widget campaign engine (glob+time-on-page, seen-set) + feedback thumbs. Seeds: SLA policy on widget inbox, 2 macros, 1 ongoing campaign.
 - [x] **Totals:** 798 tests (backend 585 (+2 pg-only) + frontend 137 + widget 47 + extension 20 + e2e 9), all green; mypy clean; all builds pass; migrations PG-validated up/down/up.
-- [~] **W7 (DAP2 — full digital adoption platform + extension port + ingestion + editor)** IN FLIGHT.
+- [x] **W7 (DAP2 — full digital adoption platform + extension port + ingestion + editor)**
   Contracts: `docs/DAP2-CONTRACTS.md`. Research: `docs/research/{dap-competitors,old-extension-map}.md`.
   Session worktree: `.claude/worktrees/dap-suite` (branch `worktree-dap-suite`).
   - Scope: tours v2 (step types tooltip/modal/banner/hotspot/action/wait, driven "do-it-for-me"
@@ -76,10 +76,27 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
   - Orchestrator prep (done): registries wired (routers/models/events/routes/sidebar "Adoption"
     group), `packages/dom-capture` workspace package, extension → WXT 0.20 + React 19, TipTap v3
     installed, `segments.contact_matches()` helper added.
-  - Wave A (4 agents): A1 tours-v2 core + extension API + public media; A1b checklists+surveys;
-    A2 ingestion; A3 dom-capture port.
-  - Wave B (planned): B1 tours admin UI + analytics, B1b checklist/survey builders, B2 TipTap +
-    knowledge UI, B3 widget player v2 (+checklist/survey/banner renderers), B4 extension v2.
+  - Wave A (4 agents, done): A1 tours-v2 core + extension API + public media; A1b
+    checklists+surveys; A2 ingestion; A3 dom-capture port. Commit 5c00bdc.
+  - Wave B (5 agents, done): B1 tours admin UI + analytics, B1b checklist/survey builders,
+    B2 TipTap + knowledge UI, B3 widget player v2, B4 extension v2. Commit fcf7877 (+ extension).
+  - **Bugs found and fixed along the way** (each regression-tested): manual-trigger tours could
+    never be started (the loader re-fetched an eligibility list that excludes them); the tour
+    editor never sent `audience`, so segment targeting was API-only; a mid-tour reload re-fired
+    `started` and inflated completion rates; the widget's history patch stacked on every re-boot;
+    glob matching was case-sensitive against a case-insensitive backend; the widget markdown
+    renderer dropped root-relative images, so editor-uploaded images vanished from step bodies;
+    `SurveyResultsPage` mapped over `select`, which the API omits for surveys without a select
+    question (would throw on open) — caught by the new type drift guard.
+  - **Infrastructure**: `Storage.save_at()` so namespaced writes don't assume local disk;
+    alembic `env.py` now ignores the startup-bootstrapped expression indexes (autogenerate kept
+    proposing to drop the FTS + trigram indexes); `src/api/schema-drift.ts` fails the build when
+    a hand-written API mirror diverges from the generated schema; `make test-frontend` now also
+    runs the extension + dom-capture suites.
+  - **Extension is now WXT + React with a side panel** (a popup dies on every page click, so it
+    cannot anchor a recording session). Login is email/password → workspace pick → 30-day
+    extension token; the access token is never persisted. Drive mode uses `chrome.debugger` for
+    trusted input and degrades to synthetic events when attach is refused.
   - Deferred to roadmap (see dap-competitors.md parking lot): goals/A-B, localization, global
     rate limits, no-code event trackers, inline embeds, announcement feed, condition debugger,
     mobile SDKs, flow branching, remote agentic driving.

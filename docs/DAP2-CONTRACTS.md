@@ -39,6 +39,22 @@ ingestion upgrades, and a TipTap editor for authored content.
    `meta.reason="not_found"` and is skipped. The shared engine lives in
    `packages/dom-capture` (ported from the old repo by agent A3) and is consumed by BOTH the
    widget player and the extension — never fork it.
+
+   **Implemented divergence (deliberate, keep it).** The two players synthesize a
+   Target differently for hand-authored steps (dashboard-created: selector +
+   fallbacks + text_hint, no recorder `target`):
+   - the **widget** (`widget/src/dom-target.ts`) synthesizes a selectors-only
+     Target and keeps `text_hint` as its OWN last-resort scan (`via:'text_hint'`,
+     always `healed`). Rationale: `resolveTarget` verifies a selector hit against
+     whatever identity the Target claims, so a stale hint would make a working
+     primary selector fail.
+   - the **extension** (`extension/src/dom/resolve-step.ts#minimalTarget`) lifts
+     `text_hint` into `aria.name` so the scoring cascade can heal. Rationale:
+     without identity evidence a bare text match scores ~0.25, under the 0.45
+     verify bar.
+   Both deliver self-healing for hand-authored steps; they can pick different
+   elements only when a selector still resolves but the accessible name changed.
+   Do not "unify" these without re-deriving both failure modes.
 4. **Auth for the extension = the real login system.** Extension logs in with email/password via
    `POST /api/v1/auth/login` (fetched from the extension service worker — host_permissions bypass
    CORS), lists workspaces, then mints a long-lived scoped token:
