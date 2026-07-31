@@ -12,6 +12,7 @@ idempotent — retries and at-least-once delivery are both possible.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -91,7 +92,23 @@ class InProcessQueue:
             await asyncio.gather(*list(self._pending), return_exceptions=True)
 
     async def close(self) -> None:
-        await self.drain()
+        """Cancel outstanding fire-and-forget tasks rather than draining them.
+
+        Closing means the queue's context is going away (process shutdown, or a
+        test tearing down its engine). A task left running would resolve
+        ``get_session_factory()`` lazily and could execute against a *different*
+        engine created afterwards — which in tests leaks writes across cases.
+        Cancel instead; anything that must finish calls ``drain()`` explicitly
+        while the queue is live. Tasks are idempotent and at-least-once, so
+        cancellation at shutdown is safe.
+        """
+        pending = list(self._pending)
+        for task_ in pending:
+            task_.cancel()
+        for task_ in pending:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task_
+        self._pending.clear()
 
 
 class ArqQueue:
