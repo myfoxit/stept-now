@@ -753,6 +753,116 @@ plan), completed/dismissed exclusion, event recording validation, authz + ws iso
 
 ---
 
+# WAVE 3 — Frontend features (3 parallel agents)
+
+Shared frontend rules (all three agents): read `CLAUDE.md` §Frontend. Stack is React 19 +
+TS strict + TanStack Query v5 + react-router v7 + shadcn (`@/components/ui/*`) + Tailwind
+v4 tokens (dark mode must work) + sonner + react-hook-form/zod + lucide + recharts.
+API via `@/api/client` (`api.get/post/patch/delete`, `ws(path)` for workspace-scoped URLs,
+throws `ApiError`), realtime via `@/api/ws` (`useRealtime(type, handler)`, `sendRealtime`).
+Auth/permissions via `@/stores/auth` (`useAuthStore`, `useCurrentMembership`, `useHasPerm`,
+`currentWorkspaceId`). Types: **run `make types` yourself first** (exports OpenAPI →
+`src/api/schema.d.ts`) then import `components['schemas']['XxxOut']` via a local
+`type Xxx = components['schemas']['XxxOut']` alias where helpful — but hand-written
+interfaces matching the backend are acceptable when they read cleaner; keep them in the
+feature's `api.ts`. Every page module is a pre-registered lazy route exporting
+`Component` as default (fill the placeholder files listed per agent). Query keys start
+`[<area>, workspaceId, ...]`; mutations invalidate precisely; use `sonner` toast for
+success/error. Gate mutating UI on `useHasPerm(...)`. Ship vitest tests
+(`@/test/helpers` → `renderApp`, `mockFetch`) for non-trivial logic/components.
+
+STRICT ownership: each agent owns only its `src/features/<areas>/**` + its placeholder
+page files. NEVER edit `src/router.tsx`, `src/main.tsx`, `src/api/*`, `src/stores/*`,
+`src/components/ui/*`, `src/components/layout/*` (except FE1 may add an inbox-specific
+layout INSIDE its feature folder), `package.json`, `index.css`. Regenerate `schema.d.ts`
+via `make types` (needs backend importable — it is). Three agents run concurrently on
+different feature folders. Definition of done per agent: `cd frontend && pnpm tsc
+--noEmit && pnpm vitest run <your test globs>` green, and `pnpm build` succeeds
+(run it once at the end — it type-checks + bundles everything).
+
+## Wave 3 — Agent FE1: Inbox (the flagship screen)
+**Owns:** `src/features/inbox/**` (fill `pages/InboxPage.tsx`), `src/features/contacts/**`
+(fill `pages/ContactsPage.tsx`, `pages/ContactDetailPage.tsx`). (Contacts here because the
+inbox contact panel shares its API/hooks.)
+- **InboxPage** = 3-pane: (1) filter rail (status tabs w/ live counts from
+  `GET /conversations/counts`, assignee me/unassigned/all, inbox filter, priority);
+  (2) conversation list (infinite cursor scroll of `GET /conversations`, each row = avatar,
+  contact name, subject/preview, channel icon, unread dot, waiting-since relative time,
+  priority pill, tags); (3) thread pane (message timeline w/ public vs note styling —
+  notes yellow, activity centered muted, agent/AI messages badged, citations rendered as
+  footnote links from `meta.citations`) + composer (public reply / private note toggle,
+  attachment upload via `POST /w/{ws}/files` then send, canned-response `/` picker from
+  `GET /canned-responses`, **"Suggest reply" (copilot)** button → `POST /ai/copilot/suggest`
+  inserts draft) + right rail (contact card: attributes, tags add/remove, recent
+  conversations, notes; conversation actions: assign to member/team, status
+  open/pending/snoozed/resolved, priority, tags). Realtime: `useRealtime('message.created')`
+  appends to the open thread + bumps list; `conversation.updated` patches list/detail;
+  `typing` shows indicator; mark read on open (`POST .../read`). Optimistic send.
+- **ContactsPage**: searchable, filterable (segment dropdown) table of contacts (TanStack
+  virtual ok), row → ContactDetailPage. **ContactDetailPage**: profile (editable
+  attributes), tags, timeline (events + conversations), notes.
+- Tests: conversation-list rendering + filter switching, message bubble variants (note vs
+  public vs citation), composer note/public toggle, copilot insert, realtime append
+  handler (dispatch a fake message.created → appears), permission gating (viewer can't
+  send). ~12+ tests.
+
+## Wave 3 — Agent FE2: Knowledge, AI providers/models, Agent builder + approvals + traces, Help center
+**Owns:** `src/features/knowledge/**` (fill KnowledgePage, SourceDetailPage, ArticlesPage,
+SearchPlaygroundPage), `src/features/ai/**` (fill AiOverviewPage, ProvidersPage, AgentsPage,
+AgentBuilderPage, ApprovalsPage, RunsPage, RunDetailPage).
+- **Knowledge**: sources list + create (files upload / urls / text), source detail
+  (documents table w/ status badges, re-sync, retry failed), ArticlesPage (collections +
+  articles CRUD w/ a markdown editor — textarea + preview is fine, publish/unpublish),
+  **SearchPlaygroundPage** (query box → `POST /knowledge/search` → ranked chunks w/ scores,
+  titles, source links — showcases the RAG).
+- **AI**: ProvidersPage (add provider by kind, key entry (write-only), enable models from
+  catalog, set default, test-connection button → latency/ok). **AgentsPage** (list, status
+  live/draft/off). **AgentBuilderPage** (THE key screen: name/avatar/model picker from
+  `GET /ai/models`, system prompt editor, retrieval toggle + k + source scoping, **per-tool
+  policy matrix** auto/require_approval/disabled for each builtin tool + custom actions,
+  guardrails (max tool calls), and a **live test sandbox** panel calling
+  `POST /ai/agents/{id}/test` that renders the step trace + reply — use the mock provider
+  directive hint in placeholder text so users can try `[[tool:search_knowledge {"query":"..."}]]`).
+  Custom actions CRUD. **ApprovalsPage** (pending approvals queue from `GET /ai/approvals`,
+  each shows agent, conversation link, tool + input, approve/reject w/ note; realtime
+  `useRealtime('approval.pending')` prepends; `approval.decided` removes). **RunsPage** +
+  **RunDetailPage** (run list w/ status, RunDetail = full AgentStep timeline: llm calls,
+  tool calls/results, approvals, citations, token usage).
+- Tests: provider add + model enable flow, agent builder tool-policy matrix state, sandbox
+  trace render from a mocked test response, approvals approve/reject mutation + realtime
+  prepend, run trace step rendering, search playground results. ~12+ tests.
+
+## Wave 3 — Agent FE3: Contacts-segments? no — Automation, Tours builder, Reports, Settings/Team/RBAC
+**Owns:** `src/features/automation/**` (AutomationPage), `src/features/tours/**` (ToursPage,
+TourEditorPage), `src/features/reports/**` (ReportsPage), `src/features/settings/**`
+(SettingsLayout + section panels).
+- **AutomationPage**: rules list (enabled toggle, reorder), rule editor (event select →
+  condition builder rows [field/op/value] → action builder rows [type/params]); webhooks
+  sub-tab (CRUD, deliveries log, test). Use the same condition schema as segments.
+- **Tours**: ToursPage (list, status, stats sparkline), **TourEditorPage** (steps list
+  editor — selector, title, body markdown, placement; reorder; live preview note;
+  publish/pause; "connect recorder" → shows recorder token from
+  `POST /tours/recorder-token` + extension install hint).
+- **ReportsPage**: dashboard from `GET /reports/overview?days=` — KPI stat tiles
+  (new/resolved/resolution-rate/first-response/CSAT/AI-resolution), by-day area chart,
+  by-channel bar, by-agent table. Use **recharts** + the dataviz skill palette; must look
+  polished in light & dark.
+- **Settings** (SettingsLayout w/ sub-nav routed by `:section`): Workspace (name/logo),
+  Members (invite, role change, remove — RBAC-gated), Roles (custom role editor w/
+  permission catalog from `GET /roles/catalog`), API keys (create w/ scopes, reveal once,
+  revoke), Audit log (filterable table), Profile (name, password change), Channels
+  (inboxes list w/ per-channel config + widget embed snippet copy). Gate every section on
+  the relevant permission.
+- Tests: condition/action builder add-row + serialize, tour step editor reorder, reports
+  KPI render from mocked overview, member role change mutation gated by perm, api-key
+  create/reveal flow, roles permission toggle. ~12+ tests.
+
+## Frontend deferred to Wave 4/5
+Widget app + loader (Wave 4, separate `widget/` package), Chrome recorder extension
+(Wave 4, `extension/`), e2e journeys (Wave 5).
+
+---
+
 # Wave 3 — Frontend feature agents (FE1, FE2, FE3)
 
 Shared rules: React 19 + TS strict, shadcn components from `@/components/ui/*` ONLY (61
