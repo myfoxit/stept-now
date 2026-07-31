@@ -1,0 +1,5 @@
+packages:
+  - frontend
+  - widget
+  - extension
+  - e2e

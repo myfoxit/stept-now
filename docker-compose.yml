@@ -1,0 +1,41 @@
+# Full-fidelity dev services. Nothing here is required for `make dev` / `make test`
+# (those default to SQLite + in-memory queue/pubsub) — but Postgres mode is what
+# production runs, so develop against it when touching search/RAG.
+#
+# Ports are deliberately non-standard to avoid colliding with other local stacks.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: stept
+      POSTGRES_PASSWORD: stept
+      POSTGRES_DB: stept
+    ports:
+      - "54329:5432"
+    volumes:
+      - stept_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stept"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "63790:6379"
+    volumes:
+      - stept_redis:/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "11025:1025" # SMTP
+      - "18025:8025" # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+volumes:
+  stept_pg:
+  stept_redis:

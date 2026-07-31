@@ -1,0 +1,11 @@
+{
+  "name": "@stept/extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "preact": "^10.25.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}

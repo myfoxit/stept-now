@@ -16,3 +16,7 @@ test-results/
 uploads/
 *.local
 openapi.json
+*.db
+data/
+e2e-uploads/
+.claude/
