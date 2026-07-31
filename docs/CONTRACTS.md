@@ -857,9 +857,83 @@ TourEditorPage), `src/features/reports/**` (ReportsPage), `src/features/settings
   KPI render from mocked overview, member role change mutation gated by perm, api-key
   create/reveal flow, roles permission toggle. ~12+ tests.
 
-## Frontend deferred to Wave 4/5
-Widget app + loader (Wave 4, separate `widget/` package), Chrome recorder extension
-(Wave 4, `extension/`), e2e journeys (Wave 5).
+# WAVE 4 — Embeddable widget + Chrome tour-recorder extension
+
+Runs in parallel with Wave 3 (disjoint packages). Both talk only to the already-merged
+public backend APIs under `/api/widget/*` (see backend/app/api/widget/*.py for exact
+request/response shapes — match them). Neither imports from `frontend/`.
+
+## Wave 4 — Agent W1: Embeddable widget (`widget/` package)
+**Owns:** everything under `widget/` (package.json exists — deps: preact, vite, vitest,
+typescript; add a `build` + `test` script and `vite.config.ts`). Two build outputs into
+`widget/dist/` (served by the backend at `/widget-assets/` — see backend/app/main.py
+StaticFiles mount): (1) `loader.js` (the script sites embed) and (2) the iframe app
+(`app.html` + bundled JS/CSS).
+
+Architecture (Intercom-style, from docs/research/chatwoot.md widget section):
+- **loader.ts → loader.js** (plain TS, no framework, tiny): reads `window.SteptSettings`
+  ({workspaceKey, identity?: {external_id, email?, name?, hash}, apiBase?}). Creates a
+  launcher button (fixed corner bubble) + an iframe pointing at
+  `{apiBase or script-origin}/widget-assets/app.html#<serialized boot params>`. Manages
+  open/close, unread badge, and a **postMessage bridge** between host page and iframe
+  (messages: `stept:ready`, `stept:resize`, `stept:unread`, `stept:open`, `stept:close`,
+  and — critically — `stept:tour:start`/`stept:tour:event` for DAP). Exposes
+  `window.Stept` API: `Stept('boot', settings)`, `Stept('open')`, `Stept('close')`,
+  `Stept('shutdown')`, `Stept('show'|'hide')`, `Stept('startTour', tourId)`. Queue-style
+  shim so calls before load are replayed.
+- **The DAP tour player runs in the HOST page (not the iframe)** — it must highlight host
+  DOM elements. loader.ts contains a lightweight tour player: given a tour
+  {steps:[{selector,title,body,placement}]}, it renders a tooltip/spotlight overlay
+  positioned against `document.querySelector(step.selector)`, Next/Back/Done controls,
+  and posts `stept:tour:event` (started/step_viewed/completed/dismissed) which the loader
+  relays to `POST /api/widget/tours/{id}/events`. On boot (and on SPA url changes) it
+  calls `GET /api/widget/tours?widget_key=&url=<location.href>` and auto-starts the first
+  eligible tour (respecting already-seen exclusion the backend applies).
+- **iframe app (Preact)**: the messenger. Screens: conversation list (home), a
+  conversation thread (message bubbles: contact right, agent/AI left w/ avatar; public
+  only; citations rendered as links; typing indicator), composer (text + attachment via
+  `POST /api/widget/files`? — check: widget uses conversation POST with attachments;
+  if no widget file endpoint exists, support text-only and note it), a help-center browser
+  (search + article read via `GET /api/widget/articles`), and a pre-chat/identity gate
+  when boot returns require_identity. Boot via `POST /api/widget/boot`; persist the
+  returned `visitor_id` in localStorage (key per workspaceKey) and reuse on next boot.
+  Realtime via `/ws/widget?token=` (append incoming message.created, show typing). Theme
+  from boot `config` (accent_color, greeting). Clean, modern, mobile-friendly, self-
+  contained CSS (no external fonts/CDN).
+- A small `widget/src/api.ts` typed client (fetch-based, bearer widget token) + an
+  `api-client.test.ts` and a couple of component tests (vitest + preact; jsdom). Keep it
+  light — aim ~8 tests. Also provide `widget/demo.html` (a standalone page embedding the
+  loader against localhost:8600) for manual testing + e2e.
+- `pnpm --filter @stept/widget build` must emit `widget/dist/{loader.js,app.html,...}`.
+  Configure Vite for two entry points (library build for loader.js as an IIFE; separate
+  app build). `pnpm --filter @stept/widget test -- --run` green.
+
+## Wave 4 — Agent W2: Chrome MV3 tour-recorder extension (`extension/` package)
+**Owns:** everything under `extension/` (package.json exists — preact, vite, typescript).
+Build to `extension/dist/` (loadable unpacked).
+- **manifest.json** (MV3): name "Stept Tour Recorder", permissions [activeTab, scripting,
+  storage], action popup, a content script injectable on the active tab.
+- **Popup (Preact)**: paste a recorder token (from the dashboard's Tours → connect
+  recorder; token is a "recorder" JWT) + optional apiBase (default http://localhost:8600),
+  stored via chrome.storage. Buttons: Start recording / Stop & save. On start, tells the
+  content script to begin; shows a running list of captured steps (editable title/body,
+  delete, reorder). On save, POST `/api/widget/tours/recorder` {token, name, url_pattern?,
+  steps:[{selector,title?,body?}]} → shows the returned app_url link.
+- **Content script**: on record mode, listens for clicks; for each clicked element compute
+  a **robust, stable CSS selector** (prefer [data-tour], then id, then a short unique
+  path with :nth-of-type fallback — implement a small selector generator + uniqueness
+  check via querySelectorAll length===1) and send {selector, textHint} to the popup
+  (via chrome.runtime messaging). Visual affordance (outline on hover while recording).
+- Selector-generator unit tests (vitest, jsdom) — this is the testable core; aim ~8 tests
+  covering data-tour preference, id, nth-of-type disambiguation, uniqueness.
+- README.md in extension/ with load-unpacked instructions.
+- `pnpm --filter @stept/extension build` emits `extension/dist/` with manifest + popup +
+  content script; `pnpm --filter @stept/extension test -- --run` green (add test script).
+
+# WAVE 5 — e2e journeys, migration, docs, release (orchestrator)
+Playwright journeys (auth/onboarding, widget↔inbox realtime, KB ingest→AI answer w/
+citations, approval-gate decision, tour create→play), alembic squashed initial migration,
+docs polish, final full verify, merge to master.
 
 ---
 
