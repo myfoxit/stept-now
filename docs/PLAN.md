@@ -61,7 +61,12 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
 - [~] **W4** Widget + extension (2 agents IN FLIGHT, parallel with W3): W1 widget/ (loader+iframe app+host-DOM tour player), W2 extension/ (MV3 recorder)
 - [x] **W5** alembic 0001 migration + PG validation (commit 28a0f92); e2e journeys — widget→inbox→AI-citation, approval gate, dashboard nav (9 Playwright tests, commit 6644dcc); docs polish; `make verify` fully green. Merged to master.
 - [x] **W6 (competitive parity)** — from source-level gap analysis of fresh Chatwoot+Onyx clones (`docs/COMPETITIVE.md`, `docs/research/{chatwoot,onyx}-gaps.md`). Backend (5 agents): channels **whatsapp/messenger/instagram/sms/line** (verify challenges, HMAC signatures, delivery receipts, WA 24h window), **SLA policies** (frt/nrt/rt, per-episode breach events, scheduler scan), **macros**, **campaigns** (ongoing widget proactive + one_off scheduled dispatch), knowledge connectors **sitemap/crawl/github/notion** + per-source `refresh_minutes` re-sync + deletion pruning + encrypted source secrets, **LLM rerank** pass, **search analytics** (query log playground/agent/copilot/widget) + 👍/👎 message feedback, `app.core.scheduler` (@scheduled registry + lifespan loop), alembic **0002** (validated up/down/up on PG). Frontend/widget (4 agents): channel config dialogs w/ webhook hints, SLA settings+thread card, macros tab+runner, campaigns page, knowledge connector dialog + **/knowledge/analytics** dashboard + rerank toggle, widget campaign engine (glob+time-on-page, seen-set) + feedback thumbs. Seeds: SLA policy on widget inbox, 2 macros, 1 ongoing campaign.
-- [x] **Totals:** 798 tests (backend 585 (+2 pg-only) + frontend 137 + widget 47 + extension 20 + e2e 9), all green; mypy clean; all builds pass; migrations PG-validated up/down/up.
+- [x] **Totals after W6:** 798 tests (backend 585 (+2 pg-only) + frontend 137 + widget 47 +
+  extension 20 + e2e 9).
+- [x] **Totals after W7:** **1383 tests** — backend 771 (+2 pg-only), frontend 324, widget 134,
+  extension 92, dom-capture 45, e2e 17. `make verify` green (ruff + ruff-format + mypy on 213
+  files + every build); e2e green on repeat runs; migration `bdc4e4b7de36` PG-validated
+  up/down/up and `alembic check` reports no drift.
 - [x] **W7 (DAP2 — full digital adoption platform + extension port + ingestion + editor)**
   Contracts: `docs/DAP2-CONTRACTS.md`. Research: `docs/research/{dap-competitors,old-extension-map}.md`.
   Session worktree: `.claude/worktrees/dap-suite` (branch `worktree-dap-suite`).
