@@ -19,6 +19,7 @@ from app.ai.registry import resolve_chat
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.rag.retrieval import search_chunks
+from app.services.search_analytics import record_search
 
 _RECENT_CONTACT_MESSAGES = 3
 _HISTORY_CAP = 20
@@ -50,6 +51,14 @@ async def suggest_reply(
     context_block = "No knowledge-base sources were found."
     if query:
         results = await search_chunks(session, conversation.workspace_id, query, k=5)
+        await record_search(
+            session,
+            conversation.workspace_id,
+            query=query,
+            source="copilot",
+            results_count=len(results),
+            top_score=results[0].score if results else None,
+        )
         citations = [
             {
                 "n": index + 1,

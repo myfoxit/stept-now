@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -12,6 +13,7 @@ from app.core.config import get_settings
 from app.core.errors import BadRequestError, NotFoundError, PayloadTooLargeError, ValidationFailure
 from app.core.events import Actor
 from app.core.queue import enqueue
+from app.core.security import decrypt_secret, encrypt_secret
 from app.core.storage import get_storage
 from app.models.knowledge import Chunk, Document, KnowledgeSource
 from app.rag import tasks as rag_tasks  # noqa: F401  (registers queue tasks on import)
@@ -19,8 +21,12 @@ from app.rag.parsers import ParseError, extract, normalize_mime
 from app.rag.retrieval import search_chunks
 from app.schemas.knowledge import RetrievedChunkOut, SearchResponse, SourceOut
 from app.services import audit
+from app.services.search_analytics import record_search
 
 ARTICLES_SOURCE_NAME = "Help center articles"
+
+# Source types that support scheduled re-sync via config.refresh_minutes.
+REFRESHABLE_TYPES = frozenset({"urls", "sitemap", "crawl", "github", "notion"})
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +34,36 @@ ARTICLES_SOURCE_NAME = "Help center articles"
 # ---------------------------------------------------------------------------
 
 
+def set_source_secrets(source: KnowledgeSource, secrets: dict[str, Any] | None) -> None:
+    """Store connector credentials Fernet-encrypted; empty/None clears them."""
+    source.secrets_encrypted = encrypt_secret(json.dumps(secrets)) if secrets else None
+
+
+def get_source_secrets(source: KnowledgeSource) -> dict[str, Any]:
+    if not source.secrets_encrypted:
+        return {}
+    decrypted = json.loads(decrypt_secret(source.secrets_encrypted))
+    return decrypted if isinstance(decrypted, dict) else {}
+
+
+def _require_http_url(config: dict[str, Any], key: str, source_type: str) -> str:
+    value = config.get(key)
+    if not isinstance(value, str) or not value.strip().startswith(("http://", "https://")):
+        raise ValidationFailure(f"{source_type} sources need config.{key}: an http(s) URL")
+    return value.strip()
+
+
+def _clamp_int(config: dict[str, Any], key: str, *, cap: int, minimum: int = 1) -> None:
+    value = config.get(key)
+    if value is None:
+        return
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValidationFailure(f"config.{key} must be an integer >= {minimum}")
+    config[key] = min(value, cap)
+
+
 def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]:
+    config = dict(config)
     if source_type == "urls":
         urls = config.get("urls")
         if not isinstance(urls, list) or not urls:
@@ -36,11 +71,53 @@ def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]
         for url in urls:
             if not isinstance(url, str) or not url.strip().startswith(("http://", "https://")):
                 raise ValidationFailure(f"Invalid URL in config.urls: {url!r}")
-        config = {**config, "urls": [url.strip() for url in urls]}
+        config["urls"] = [url.strip() for url in urls]
+    elif source_type == "sitemap":
+        config["sitemap_url"] = _require_http_url(config, "sitemap_url", source_type)
+        _clamp_int(config, "max_pages", cap=500)
+    elif source_type == "crawl":
+        config["base_url"] = _require_http_url(config, "base_url", source_type)
+        _clamp_int(config, "max_pages", cap=200)
+        _clamp_int(config, "max_depth", cap=5, minimum=0)
+    elif source_type == "github":
+        for key in ("repo_owner", "repo"):
+            value = config.get(key)
+            if not isinstance(value, str) or not value.strip():
+                raise ValidationFailure(f"github sources need config.{key}")
+            config[key] = value.strip()
+        branch = config.get("branch")
+        if branch is not None and (not isinstance(branch, str) or not branch.strip()):
+            raise ValidationFailure("config.branch must be a non-empty string")
+        for key in ("include_files", "include_issues", "include_prs"):
+            if key in config and not isinstance(config[key], bool):
+                raise ValidationFailure(f"config.{key} must be a boolean")
+    elif source_type == "notion":
+        root_page_id = config.get("root_page_id")
+        if root_page_id is not None and (
+            not isinstance(root_page_id, str) or not root_page_id.strip()
+        ):
+            raise ValidationFailure("config.root_page_id must be a non-empty string")
+        _clamp_int(config, "max_pages", cap=300)
+    if source_type in REFRESHABLE_TYPES:
+        refresh = config.get("refresh_minutes")
+        if refresh is not None and (
+            isinstance(refresh, bool) or not isinstance(refresh, int) or refresh < 5
+        ):
+            raise ValidationFailure("config.refresh_minutes must be an integer >= 5")
     boost = config.get("boost")
     if boost is not None and not isinstance(boost, (int, float)):
         raise ValidationFailure("config.boost must be a number")
     return config
+
+
+def _validate_secrets(source_type: str, secrets: dict[str, Any] | None, *, creating: bool) -> None:
+    """notion requires an integration token; other types take secrets as-is."""
+    if source_type != "notion":
+        return
+    if secrets is None and not creating:  # PATCH without secrets keeps the stored token
+        return
+    if not str((secrets or {}).get("token") or "").strip():
+        raise ValidationFailure("notion sources need secrets.token (internal integration token)")
 
 
 async def _document_counts(session: AsyncSession, workspace_id: str) -> dict[str, int]:
@@ -55,6 +132,7 @@ async def _document_counts(session: AsyncSession, workspace_id: str) -> dict[str
 def source_out(source: KnowledgeSource, document_count: int) -> SourceOut:
     out = SourceOut.model_validate(source)
     out.document_count = document_count
+    out.has_secrets = source.secrets_encrypted is not None
     return out
 
 
@@ -76,15 +154,18 @@ async def create_source(
     type: str,
     name: str,
     config: dict[str, Any] | None = None,
+    secrets: dict[str, Any] | None = None,
 ) -> KnowledgeSource:
     if type == "articles":
         raise BadRequestError("The articles source is managed automatically")
+    _validate_secrets(type, secrets, creating=True)
     source = KnowledgeSource(
         workspace_id=workspace_id,
         type=type,
         name=name.strip(),
         config=_validate_config(type, config or {}),
     )
+    set_source_secrets(source, secrets)
     session.add(source)
     await session.flush()
     await audit.record(
@@ -122,12 +203,16 @@ async def update_source(
     actor: Actor,
     name: str | None = None,
     config: dict[str, Any] | None = None,
+    secrets: dict[str, Any] | None = None,
 ) -> KnowledgeSource:
     source = await get_source(session, workspace_id, source_id)
     if name is not None:
         source.name = name.strip()
     if config is not None:
         source.config = _validate_config(source.type, config)
+    if secrets is not None:  # {} clears, non-empty re-encrypts
+        _validate_secrets(source.type, secrets, creating=False)
+        set_source_secrets(source, secrets)
     await session.flush()
     await audit.record(
         session,
@@ -344,10 +429,22 @@ async def search(
     *,
     k: int = 8,
     source_ids: list[str] | None = None,
+    rerank: bool = False,
 ) -> SearchResponse:
     started = time.perf_counter()
-    results = await search_chunks(session, workspace_id, query, k=k, source_ids=source_ids)
+    results = await search_chunks(
+        session, workspace_id, query, k=k, source_ids=source_ids, rerank=rerank
+    )
     latency_ms = (time.perf_counter() - started) * 1000
+    await record_search(
+        session,
+        workspace_id,
+        query=query,
+        source="playground",
+        results_count=len(results),
+        top_score=results[0].score if results else None,
+        latency_ms=int(latency_ms),
+    )
     return SearchResponse(
         results=[
             RetrievedChunkOut(

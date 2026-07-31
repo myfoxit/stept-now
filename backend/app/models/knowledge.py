@@ -18,18 +18,23 @@ from app.models.base import TimestampMixin, WorkspaceScopedMixin, pk
 
 
 class KnowledgeSource(TimestampMixin, WorkspaceScopedMixin, Base):
-    """A grouping of documents: uploaded files, crawled URLs, pasted text, or
-    the auto-managed singleton that mirrors published help-center articles."""
+    """A grouping of documents: uploaded files, crawled URLs, pasted text,
+    connector-synced content (sitemap/crawl/github/notion), or the
+    auto-managed singleton that mirrors published help-center articles."""
 
     __tablename__ = "knowledge_sources"
 
     id: Mapped[str] = pk()
-    # "files" | "urls" | "text" | "articles"
+    # "files" | "urls" | "text" | "articles" | "sitemap" | "crawl" | "github" | "notion"
     type: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     # Per-type config, e.g. {"urls": [...]} for the urls type; optional "boost"
-    # float in [0.5, 2.0] applied multiplicatively at retrieval time.
+    # float in [0.5, 2.0] applied multiplicatively at retrieval time; optional
+    # "refresh_minutes" int >= 5 enabling scheduled re-sync.
     config: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
+    # Fernet-encrypted JSON credentials (GitHub/Notion tokens), mirroring
+    # Inbox.secrets_encrypted — write-only via the API, never returned.
+    secrets_encrypted: Mapped[str | None] = mapped_column(Text)
     # "idle" | "syncing" | "error"
     status: Mapped[str] = mapped_column(String(20), default="idle", nullable=False)
     error: Mapped[str | None] = mapped_column(Text)

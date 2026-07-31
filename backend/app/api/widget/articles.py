@@ -21,6 +21,7 @@ from app.rag.retrieval import search_chunks
 from app.schemas.articles import PortalArticleOut, PortalCollectionOut
 from app.services import articles as articles_service
 from app.services.knowledge import get_or_create_articles_source
+from app.services.search_analytics import record_search
 
 router = APIRouter()
 
@@ -57,6 +58,14 @@ async def _search_articles(
         k=SEARCH_DEPTH,
         source_ids=[source.id],
         expand_neighbors=False,
+    )
+    await record_search(
+        session,
+        workspace_id,
+        query=query,
+        source="widget",
+        results_count=len(chunks),
+        top_score=chunks[0].score if chunks else None,
     )
     if not chunks:
         return []

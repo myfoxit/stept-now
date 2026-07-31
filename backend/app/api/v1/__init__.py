@@ -19,6 +19,7 @@ from app.api.v1 import (
     audit,
     auth,
     automations,
+    campaigns,
     canned_responses,
     contacts,
     conversations,
@@ -26,11 +27,14 @@ from app.api.v1 import (
     health,
     inboxes,
     knowledge,
+    macros,
     me,
     members,
     reports,
     search,
+    search_analytics,
     segments,
+    slas,
     tags,
     teams,
     tours,
@@ -67,6 +71,10 @@ api_router.include_router(agents.router, prefix=WS, tags=["agents"])
 api_router.include_router(agent_runs.router, prefix=WS, tags=["agent-runs"])
 api_router.include_router(approvals.router, prefix=WS, tags=["approvals"])
 api_router.include_router(automations.router, prefix=WS, tags=["automations"])
+api_router.include_router(macros.router, prefix=WS, tags=["macros"])
+api_router.include_router(campaigns.router, prefix=WS, tags=["campaigns"])
+api_router.include_router(slas.router, prefix=WS, tags=["slas"])
+api_router.include_router(search_analytics.router, prefix=WS, tags=["search-analytics"])
 api_router.include_router(webhooks.router, prefix=WS, tags=["webhooks"])
 api_router.include_router(reports.router, prefix=WS, tags=["reports"])
 api_router.include_router(tours.router, prefix=WS, tags=["tours"])

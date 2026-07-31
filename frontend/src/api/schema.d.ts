@@ -21,6 +21,59 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/channels/instagram/webhook/{inbox_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Instagram Verify */
+    get: operations['instagram_verify_api_channels_instagram_webhook__inbox_id__get']
+    put?: never
+    /** Instagram Webhook */
+    post: operations['instagram_webhook_api_channels_instagram_webhook__inbox_id__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/line/webhook/{inbox_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Line Webhook */
+    post: operations['line_webhook_api_channels_line_webhook__inbox_id__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/messenger/webhook/{inbox_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Messenger Verify */
+    get: operations['messenger_verify_api_channels_messenger_webhook__inbox_id__get']
+    put?: never
+    /** Messenger Webhook */
+    post: operations['messenger_webhook_api_channels_messenger_webhook__inbox_id__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/channels/slack/events': {
     parameters: {
       query?: never
@@ -38,6 +91,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/channels/sms/status/{inbox_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Sms Status */
+    post: operations['sms_status_api_channels_sms_status__inbox_id__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/sms/webhook/{inbox_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Sms Webhook */
+    post: operations['sms_webhook_api_channels_sms_webhook__inbox_id__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/channels/telegram/webhook/{inbox_id}': {
     parameters: {
       query?: never
@@ -49,6 +136,24 @@ export interface paths {
     put?: never
     /** Telegram Webhook */
     post: operations['telegram_webhook_api_channels_telegram_webhook__inbox_id__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/whatsapp/webhook/{inbox_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Whatsapp Verify */
+    get: operations['whatsapp_verify_api_channels_whatsapp_webhook__inbox_id__get']
+    put?: never
+    /** Whatsapp Webhook */
+    post: operations['whatsapp_webhook_api_channels_whatsapp_webhook__inbox_id__post']
     delete?: never
     options?: never
     head?: never
@@ -807,6 +912,77 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/campaigns': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Campaigns */
+    get: operations['list_campaigns_api_v1_w__workspace_id__campaigns_get']
+    put?: never
+    /** Create Campaign */
+    post: operations['create_campaign_api_v1_w__workspace_id__campaigns_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/campaigns/{campaign_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Campaign */
+    get: operations['get_campaign_api_v1_w__workspace_id__campaigns__campaign_id__get']
+    put?: never
+    post?: never
+    /** Delete Campaign */
+    delete: operations['delete_campaign_api_v1_w__workspace_id__campaigns__campaign_id__delete']
+    options?: never
+    head?: never
+    /** Update Campaign */
+    patch: operations['update_campaign_api_v1_w__workspace_id__campaigns__campaign_id__patch']
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/campaigns/{campaign_id}/activate': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Activate Campaign */
+    post: operations['activate_campaign_api_v1_w__workspace_id__campaigns__campaign_id__activate_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/campaigns/{campaign_id}/pause': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Pause Campaign */
+    post: operations['pause_campaign_api_v1_w__workspace_id__campaigns__campaign_id__pause_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/canned-responses': {
     parameters: {
       query?: never
@@ -1065,6 +1241,24 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/feedback': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Message Feedback */
+    get: operations['list_message_feedback_api_v1_w__workspace_id__conversations__conversation_id__messages__message_id__feedback_get']
+    put?: never
+    /** Submit Message Feedback */
+    post: operations['submit_message_feedback_api_v1_w__workspace_id__conversations__conversation_id__messages__message_id__feedback_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/conversations/{conversation_id}/read': {
     parameters: {
       query?: never
@@ -1076,6 +1270,27 @@ export interface paths {
     put?: never
     /** Mark Read */
     post: operations['mark_read_api_v1_w__workspace_id__conversations__conversation_id__read_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/conversations/{conversation_id}/sla': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Conversation Sla */
+    get: operations['get_conversation_sla_api_v1_w__workspace_id__conversations__conversation_id__sla_get']
+    /**
+     * Put Conversation Sla
+     * @description Apply (or replace) the conversation's SLA policy; null removes it.
+     */
+    put: operations['put_conversation_sla_api_v1_w__workspace_id__conversations__conversation_id__sla_put']
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -1222,6 +1437,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/knowledge/analytics': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Knowledge Analytics */
+    get: operations['knowledge_analytics_api_v1_w__workspace_id__knowledge_analytics_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/knowledge/documents': {
     parameters: {
       query?: never
@@ -1360,6 +1592,59 @@ export interface paths {
     put?: never
     /** Sync Source */
     post: operations['sync_source_api_v1_w__workspace_id__knowledge_sources__source_id__sync_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/macros': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Macros */
+    get: operations['list_macros_api_v1_w__workspace_id__macros_get']
+    put?: never
+    /** Create Macro */
+    post: operations['create_macro_api_v1_w__workspace_id__macros_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/macros/{macro_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Delete Macro */
+    delete: operations['delete_macro_api_v1_w__workspace_id__macros__macro_id__delete']
+    options?: never
+    head?: never
+    /** Update Macro */
+    patch: operations['update_macro_api_v1_w__workspace_id__macros__macro_id__patch']
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/macros/{macro_id}/run': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Run Macro */
+    post: operations['run_macro_api_v1_w__workspace_id__macros__macro_id__run_post']
     delete?: never
     options?: never
     head?: never
@@ -1593,6 +1878,42 @@ export interface paths {
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/slas': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Sla Policies */
+    get: operations['list_sla_policies_api_v1_w__workspace_id__slas_get']
+    put?: never
+    /** Create Sla Policy */
+    post: operations['create_sla_policy_api_v1_w__workspace_id__slas_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/slas/{policy_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Delete Sla Policy */
+    delete: operations['delete_sla_policy_api_v1_w__workspace_id__slas__policy_id__delete']
+    options?: never
+    head?: never
+    /** Update Sla Policy */
+    patch: operations['update_sla_policy_api_v1_w__workspace_id__slas__policy_id__patch']
     trace?: never
   }
   '/api/v1/w/{workspace_id}/tags': {
@@ -1948,6 +2269,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/widget/campaigns': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Widget Campaigns */
+    get: operations['list_widget_campaigns_api_widget_campaigns_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/campaigns/{campaign_id}/trigger': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Trigger Campaign */
+    post: operations['trigger_campaign_api_widget_campaigns__campaign_id__trigger_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/widget/conversations': {
     parameters: {
       query?: never
@@ -1998,6 +2353,23 @@ export interface paths {
     put?: never
     /** Create Message */
     post: operations['create_message_api_widget_conversations__conversation_id__messages_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/conversations/{conversation_id}/messages/{message_id}/feedback': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Submit Feedback */
+    post: operations['submit_feedback_api_widget_conversations__conversation_id__messages__message_id__feedback_post']
     delete?: never
     options?: never
     head?: never
@@ -2493,6 +2865,17 @@ export interface components {
       /** Name */
       name?: string | null
     }
+    /** AiStats */
+    AiStats: {
+      /** Completed */
+      completed: number
+      /** Deflection Rate */
+      deflection_rate: number
+      /** Handed Off */
+      handed_off: number
+      /** Runs */
+      runs: number
+    }
     /** ApiKeyCreate */
     ApiKeyCreate: {
       /** Name */
@@ -2846,6 +3229,102 @@ export interface components {
       visitor_id?: string | null
       /** Widget Key */
       widget_key: string
+    }
+    /** CampaignCreate */
+    CampaignCreate: {
+      /** Audience */
+      audience?: {
+        [key: string]: unknown
+      }
+      /**
+       * Campaign Type
+       * @enum {string}
+       */
+      campaign_type: 'ongoing' | 'one_off'
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean
+      /** Inbox Id */
+      inbox_id: string
+      /** Message */
+      message: string
+      /** Scheduled At */
+      scheduled_at?: string | null
+      /** Sender User Id */
+      sender_user_id?: string | null
+      /** Title */
+      title: string
+      /** Trigger Rules */
+      trigger_rules?: {
+        [key: string]: unknown
+      }
+    }
+    /** CampaignOut */
+    CampaignOut: {
+      /** Audience */
+      audience: {
+        [key: string]: unknown
+      }
+      /** Campaign Type */
+      campaign_type: string
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Enabled */
+      enabled: boolean
+      /** Id */
+      id: string
+      /** Inbox Id */
+      inbox_id: string
+      /** Message */
+      message: string
+      /** Scheduled At */
+      scheduled_at?: string | null
+      /** Sender User Id */
+      sender_user_id?: string | null
+      /** Sent Count */
+      sent_count: number
+      /** Status */
+      status: string
+      /** Title */
+      title: string
+      /** Trigger Rules */
+      trigger_rules: {
+        [key: string]: unknown
+      }
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+    }
+    /**
+     * CampaignUpdate
+     * @description campaign_type and inbox_id are immutable after creation.
+     */
+    CampaignUpdate: {
+      /** Audience */
+      audience?: {
+        [key: string]: unknown
+      } | null
+      /** Enabled */
+      enabled?: boolean | null
+      /** Message */
+      message?: string | null
+      /** Scheduled At */
+      scheduled_at?: string | null
+      /** Sender User Id */
+      sender_user_id?: string | null
+      /** Title */
+      title?: string | null
+      /** Trigger Rules */
+      trigger_rules?: {
+        [key: string]: unknown
+      } | null
     }
     /** CannedResponseCreate */
     CannedResponseCreate: {
@@ -3321,6 +3800,17 @@ export interface components {
       /** Team Id */
       team_id?: string | null
     }
+    /**
+     * ConversationSlaOut
+     * @description The SLA state of one conversation (policy None → no SLA applied).
+     */
+    ConversationSlaOut: {
+      /** Events */
+      events?: components['schemas']['SlaEventOut'][]
+      policy?: components['schemas']['SlaPolicyOut'] | null
+      /** Status */
+      status?: string | null
+    }
     /** ConversationSummary */
     ConversationSummary: {
       /** Id */
@@ -3579,6 +4069,25 @@ export interface components {
       /** Uri */
       uri?: string | null
     }
+    /** FeedbackCreate */
+    FeedbackCreate: {
+      /** Comment */
+      comment?: string | null
+      /**
+       * Rating
+       * @enum {string}
+       */
+      rating: 'up' | 'down'
+    }
+    /** FeedbackStats */
+    FeedbackStats: {
+      /** Down */
+      down: number
+      /** Negative Rate */
+      negative_rate: number
+      /** Up */
+      up: number
+    }
     /** FileOut */
     FileOut: {
       /** Content Type */
@@ -3647,7 +4156,17 @@ export interface components {
        * Channel Type
        * @enum {string}
        */
-      channel_type: 'widget' | 'email' | 'slack' | 'telegram' | 'api'
+      channel_type:
+        | 'widget'
+        | 'email'
+        | 'slack'
+        | 'telegram'
+        | 'api'
+        | 'whatsapp'
+        | 'messenger'
+        | 'instagram'
+        | 'sms'
+        | 'line'
       /** Config */
       config?: {
         [key: string]: unknown
@@ -3778,6 +4297,92 @@ export interface components {
       /** Password */
       password: string
     }
+    /** MacroAction */
+    MacroAction: {
+      /** Params */
+      params?: {
+        [key: string]: unknown
+      }
+      /**
+       * Type
+       * @enum {string}
+       */
+      type:
+        | 'assign_user'
+        | 'assign_team'
+        | 'set_priority'
+        | 'set_status'
+        | 'add_tag'
+        | 'remove_tag'
+        | 'send_reply'
+        | 'send_note'
+    }
+    /** MacroActionResult */
+    MacroActionResult: {
+      /** Action */
+      action: string
+      /** Error */
+      error?: string | null
+      /** Ok */
+      ok: boolean
+    }
+    /** MacroCreate */
+    MacroCreate: {
+      /** Actions */
+      actions: components['schemas']['MacroAction'][]
+      /** Name */
+      name: string
+      /**
+       * Visibility
+       * @default personal
+       * @enum {string}
+       */
+      visibility: 'personal' | 'global'
+    }
+    /** MacroOut */
+    MacroOut: {
+      /** Actions */
+      actions: {
+        [key: string]: unknown
+      }[]
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Created By */
+      created_by?: string | null
+      /** Id */
+      id: string
+      /** Name */
+      name: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** Visibility */
+      visibility: string
+    }
+    /** MacroRunOut */
+    MacroRunOut: {
+      /** Results */
+      results: components['schemas']['MacroActionResult'][]
+    }
+    /** MacroRunRequest */
+    MacroRunRequest: {
+      /** Conversation Id */
+      conversation_id: string
+    }
+    /** MacroUpdate */
+    MacroUpdate: {
+      /** Actions */
+      actions?: components['schemas']['MacroAction'][] | null
+      /** Name */
+      name?: string | null
+      /** Visibility */
+      visibility?: ('personal' | 'global') | null
+    }
     /** MeResponse */
     MeResponse: {
       /** Memberships */
@@ -3824,6 +4429,28 @@ export interface components {
        * @enum {string}
        */
       visibility: 'public' | 'note'
+    }
+    /** MessageFeedbackOut */
+    MessageFeedbackOut: {
+      /** Actor Id */
+      actor_id?: string | null
+      /** Actor Type */
+      actor_type: string
+      /** Comment */
+      comment?: string | null
+      /** Conversation Id */
+      conversation_id: string
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Id */
+      id: string
+      /** Message Id */
+      message_id: string
+      /** Rating */
+      rating: string
     }
     /** MessageOut */
     MessageOut: {
@@ -4052,6 +4679,37 @@ export interface components {
       /** Ok */
       ok: boolean
     }
+    /** QueriesBySource */
+    QueriesBySource: {
+      /** Count */
+      count: number
+      /** Source */
+      source: string
+    }
+    /** QueriesPerDay */
+    QueriesPerDay: {
+      /** Count */
+      count: number
+      /** Date */
+      date: string
+    }
+    /** QueryStats */
+    QueryStats: {
+      /** Avg Latency Ms */
+      avg_latency_ms?: number | null
+      /** Avg Top Score */
+      avg_top_score?: number | null
+      /** By Source */
+      by_source: components['schemas']['QueriesBySource'][]
+      /** Per Day */
+      per_day: components['schemas']['QueriesPerDay'][]
+      /** Total */
+      total: number
+      /** Zero Result Count */
+      zero_result_count: number
+      /** Zero Result Rate */
+      zero_result_rate: number
+    }
     /** RecorderStepIn */
     RecorderStepIn: {
       /** Body */
@@ -4222,6 +4880,16 @@ export interface components {
       /** Permissions */
       permissions?: string[] | null
     }
+    /** SearchAnalyticsOverview */
+    SearchAnalyticsOverview: {
+      ai: components['schemas']['AiStats']
+      feedback: components['schemas']['FeedbackStats']
+      queries: components['schemas']['QueryStats']
+      /** Top Queries */
+      top_queries: components['schemas']['TopQuery'][]
+      /** Zero Result Queries */
+      zero_result_queries: components['schemas']['ZeroResultQuery'][]
+    }
     /** SearchArticle */
     SearchArticle: {
       /** Id */
@@ -4276,6 +4944,11 @@ export interface components {
       k: number
       /** Query */
       query: string
+      /**
+       * Rerank
+       * @default false
+       */
+      rerank: boolean
       /** Source Ids */
       source_ids?: string[] | null
     }
@@ -4354,6 +5027,85 @@ export interface components {
       /** Password */
       password: string
     }
+    /**
+     * SlaApplyRequest
+     * @description PUT body: a policy id applies (or replaces), null removes the SLA.
+     */
+    SlaApplyRequest: {
+      /** Sla Policy Id */
+      sla_policy_id?: string | null
+    }
+    /** SlaEventOut */
+    SlaEventOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Event Type */
+      event_type: string
+      /** Id */
+      id: string
+      /** Meta */
+      meta: {
+        [key: string]: unknown
+      }
+    }
+    /** SlaPolicyCreate */
+    SlaPolicyCreate: {
+      /** Description */
+      description?: string | null
+      /** First Response Minutes */
+      first_response_minutes?: number | null
+      /** Name */
+      name: string
+      /** Next Response Minutes */
+      next_response_minutes?: number | null
+      /** Resolution Minutes */
+      resolution_minutes?: number | null
+    }
+    /** SlaPolicyOut */
+    SlaPolicyOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Description */
+      description?: string | null
+      /** First Response Minutes */
+      first_response_minutes?: number | null
+      /** Id */
+      id: string
+      /** Name */
+      name: string
+      /** Next Response Minutes */
+      next_response_minutes?: number | null
+      /** Resolution Minutes */
+      resolution_minutes?: number | null
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+    }
+    /**
+     * SlaPolicyUpdate
+     * @description Explicit null clears a threshold; the service re-validates that at least
+     *     one threshold remains set.
+     */
+    SlaPolicyUpdate: {
+      /** Description */
+      description?: string | null
+      /** First Response Minutes */
+      first_response_minutes?: number | null
+      /** Name */
+      name?: string | null
+      /** Next Response Minutes */
+      next_response_minutes?: number | null
+      /** Resolution Minutes */
+      resolution_minutes?: number | null
+    }
     /** SourceCreate */
     SourceCreate: {
       /** Config */
@@ -4362,11 +5114,15 @@ export interface components {
       }
       /** Name */
       name: string
+      /** Secrets */
+      secrets?: {
+        [key: string]: unknown
+      } | null
       /**
        * Type
        * @enum {string}
        */
-      type: 'files' | 'urls' | 'text'
+      type: 'files' | 'urls' | 'text' | 'sitemap' | 'crawl' | 'github' | 'notion'
     }
     /** SourceOut */
     SourceOut: {
@@ -4386,6 +5142,11 @@ export interface components {
       document_count: number
       /** Error */
       error?: string | null
+      /**
+       * Has Secrets
+       * @default false
+       */
+      has_secrets: boolean
       /** Id */
       id: string
       /** Last Synced At */
@@ -4410,6 +5171,10 @@ export interface components {
       } | null
       /** Name */
       name?: string | null
+      /** Secrets */
+      secrets?: {
+        [key: string]: unknown
+      } | null
     }
     /** TagCreate */
     TagCreate: {
@@ -4522,6 +5287,15 @@ export interface components {
        * @enum {string}
        */
       policy: 'auto' | 'require_approval' | 'disabled'
+    }
+    /** TopQuery */
+    TopQuery: {
+      /** Avg Top Score */
+      avg_top_score?: number | null
+      /** Count */
+      count: number
+      /** Query */
+      query: string
     }
     /** TourAudience */
     TourAudience: {
@@ -4810,6 +5584,33 @@ export interface components {
        */
       results: components['schemas']['ArticleSearchResult'][]
     }
+    /**
+     * WidgetCampaignOut
+     * @description Public shape the embedded widget consumes (trigger rules are evaluated
+     *     client-side).
+     */
+    WidgetCampaignOut: {
+      /** Id */
+      id: string
+      /** Message */
+      message: string
+      /** Sender Name */
+      sender_name: string
+      /** Trigger Rules */
+      trigger_rules: {
+        [key: string]: unknown
+      }
+    }
+    /** WidgetCampaignTriggerOut */
+    WidgetCampaignTriggerOut: {
+      /** Conversation Id */
+      conversation_id?: string | null
+      /**
+       * Skipped
+       * @default false
+       */
+      skipped: boolean
+    }
     /** WidgetMessageCreate */
     WidgetMessageCreate: {
       /** Attachments */
@@ -4910,6 +5711,13 @@ export interface components {
         [key: string]: unknown
       } | null
     }
+    /** ZeroResultQuery */
+    ZeroResultQuery: {
+      /** Count */
+      count: number
+      /** Query */
+      query: string
+    }
   }
   responses: never
   parameters: never
@@ -4931,6 +5739,175 @@ export interface operations {
         'application/json': components['schemas']['InboundEmail']
       }
     }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  instagram_verify_api_channels_instagram_webhook__inbox_id__get: {
+    parameters: {
+      query?: {
+        'hub.mode'?: string
+        'hub.verify_token'?: string
+        'hub.challenge'?: string
+      }
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  instagram_webhook_api_channels_instagram_webhook__inbox_id__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  line_webhook_api_channels_line_webhook__inbox_id__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  messenger_verify_api_channels_messenger_webhook__inbox_id__get: {
+    parameters: {
+      query?: {
+        'hub.mode'?: string
+        'hub.verify_token'?: string
+        'hub.challenge'?: string
+      }
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  messenger_webhook_api_channels_messenger_webhook__inbox_id__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       /** @description Successful Response */
       200: {
@@ -4976,6 +5953,70 @@ export interface operations {
       }
     }
   }
+  sms_status_api_channels_sms_status__inbox_id__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  sms_webhook_api_channels_sms_webhook__inbox_id__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   telegram_webhook_api_channels_telegram_webhook__inbox_id__post: {
     parameters: {
       query?: {
@@ -4994,6 +6035,74 @@ export interface operations {
         }
       }
     }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  whatsapp_verify_api_channels_whatsapp_webhook__inbox_id__get: {
+    parameters: {
+      query?: {
+        'hub.mode'?: string
+        'hub.verify_token'?: string
+        'hub.challenge'?: string
+      }
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  whatsapp_webhook_api_channels_whatsapp_webhook__inbox_id__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       /** @description Successful Response */
       200: {
@@ -7108,6 +8217,236 @@ export interface operations {
       }
     }
   }
+  list_campaigns_api_v1_w__workspace_id__campaigns_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CampaignOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_campaign_api_v1_w__workspace_id__campaigns_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CampaignCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CampaignOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_campaign_api_v1_w__workspace_id__campaigns__campaign_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        campaign_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CampaignOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_campaign_api_v1_w__workspace_id__campaigns__campaign_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        campaign_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_campaign_api_v1_w__workspace_id__campaigns__campaign_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        campaign_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CampaignUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CampaignOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  activate_campaign_api_v1_w__workspace_id__campaigns__campaign_id__activate_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        campaign_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CampaignOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  pause_campaign_api_v1_w__workspace_id__campaigns__campaign_id__pause_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        campaign_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CampaignOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_canned_responses_api_v1_w__workspace_id__canned_responses_get: {
     parameters: {
       query?: never
@@ -7932,6 +9271,76 @@ export interface operations {
       }
     }
   }
+  list_message_feedback_api_v1_w__workspace_id__conversations__conversation_id__messages__message_id__feedback_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        message_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageFeedbackOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  submit_message_feedback_api_v1_w__workspace_id__conversations__conversation_id__messages__message_id__feedback_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        message_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FeedbackCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageFeedbackOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   mark_read_api_v1_w__workspace_id__conversations__conversation_id__read_post: {
     parameters: {
       query?: never
@@ -7951,6 +9360,74 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_conversation_sla_api_v1_w__workspace_id__conversations__conversation_id__sla_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ConversationSlaOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  put_conversation_sla_api_v1_w__workspace_id__conversations__conversation_id__sla_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SlaApplyRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ConversationSlaOut']
         }
       }
       /** @description Validation Error */
@@ -8364,6 +9841,39 @@ export interface operations {
       }
     }
   }
+  knowledge_analytics_api_v1_w__workspace_id__knowledge_analytics_get: {
+    parameters: {
+      query?: {
+        days?: number
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SearchAnalyticsOverview']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_documents_api_v1_w__workspace_id__knowledge_documents_get: {
     parameters: {
       query?: {
@@ -8748,6 +10258,176 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['SourceOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_macros_api_v1_w__workspace_id__macros_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MacroOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_macro_api_v1_w__workspace_id__macros_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MacroCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MacroOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_macro_api_v1_w__workspace_id__macros__macro_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        macro_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_macro_api_v1_w__workspace_id__macros__macro_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        macro_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MacroUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MacroOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  run_macro_api_v1_w__workspace_id__macros__macro_id__run_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        macro_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MacroRunRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MacroRunOut']
         }
       }
       /** @description Validation Error */
@@ -9343,6 +11023,140 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ContactOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_sla_policies_api_v1_w__workspace_id__slas_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SlaPolicyOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_sla_policy_api_v1_w__workspace_id__slas_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SlaPolicyCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SlaPolicyOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_sla_policy_api_v1_w__workspace_id__slas__policy_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        policy_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_sla_policy_api_v1_w__workspace_id__slas__policy_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        policy_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SlaPolicyUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SlaPolicyOut']
         }
       }
       /** @description Validation Error */
@@ -10351,6 +12165,70 @@ export interface operations {
       }
     }
   }
+  list_widget_campaigns_api_widget_campaigns_get: {
+    parameters: {
+      query: {
+        widget_key: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WidgetCampaignOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  trigger_campaign_api_widget_campaigns__campaign_id__trigger_post: {
+    parameters: {
+      query?: never
+      header?: {
+        'x-widget-token'?: string | null
+      }
+      path: {
+        campaign_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WidgetCampaignTriggerOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_conversations_api_widget_conversations_get: {
     parameters: {
       query?: never
@@ -10514,6 +12392,46 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['WidgetMessageOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  submit_feedback_api_widget_conversations__conversation_id__messages__message_id__feedback_post: {
+    parameters: {
+      query?: never
+      header?: {
+        'x-widget-token'?: string | null
+      }
+      path: {
+        conversation_id: string
+        message_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FeedbackCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
         }
       }
       /** @description Validation Error */

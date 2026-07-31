@@ -39,6 +39,7 @@ from app.models.conversation import Conversation
 from app.models.tag import Tag
 from app.rag.retrieval import search_chunks
 from app.services import conversations as conversations_service
+from app.services.search_analytics import record_search
 
 # --- policies ---------------------------------------------------------------
 
@@ -144,6 +145,14 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
         return ToolOutcome({"results": []})
     k, source_ids = _retrieval_settings(ctx.agent)
     results = await search_chunks(ctx.session, ctx.workspace_id, query, k=k, source_ids=source_ids)
+    await record_search(
+        ctx.session,
+        ctx.workspace_id,
+        query=query,
+        source="agent",
+        results_count=len(results),
+        top_score=results[0].score if results else None,
+    )
     citations = [
         {
             "n": index + 1,

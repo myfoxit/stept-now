@@ -9,7 +9,18 @@ from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
 
-ChannelTypeLiteral = Literal["widget", "email", "slack", "telegram", "api"]
+ChannelTypeLiteral = Literal[
+    "widget",
+    "email",
+    "slack",
+    "telegram",
+    "api",
+    "whatsapp",
+    "messenger",
+    "instagram",
+    "sms",
+    "line",
+]
 
 
 class InboxCreate(BaseModel):

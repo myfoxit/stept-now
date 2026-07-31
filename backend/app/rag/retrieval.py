@@ -60,8 +60,14 @@ async def search_chunks(
     k: int = 8,
     source_ids: list[str] | None = None,
     expand_neighbors: bool = True,
+    rerank: bool = False,
 ) -> list[RetrievedChunk]:
-    """Workspace-scoped hybrid search returning the top-k fused chunks."""
+    """Workspace-scoped hybrid search returning the top-k fused chunks.
+
+    With ``rerank=True`` a wider fused candidate set is passed through the LLM
+    rerank/selection pass (`app.rag.rerank`) before truncating to k — graceful
+    fallback keeps the fused order on any rerank failure.
+    """
     query = query.strip()
     if not query or k <= 0:
         return []
@@ -94,7 +100,9 @@ async def search_chunks(
         for chunk, document_title, document_updated_at, document_source_id in rows
     ]
     scored.sort(key=lambda item: (-item[0], item[1].document_id, item[1].ord))
-    top = scored[:k]
+    from app.rag.rerank import RERANK_CANDIDATES, rerank_results
+
+    top = scored[: max(k, RERANK_CANDIDATES)] if rerank else scored[:k]
 
     results = [
         RetrievedChunk(
@@ -108,6 +116,9 @@ async def search_chunks(
         )
         for score, chunk, document_title in top
     ]
+    if rerank and results:
+        results = await rerank_results(session, workspace_id, query, results, k=k)
+    results = results[:k]
     if expand_neighbors and results:
         await _expand_neighbors(session, workspace_id, results)
     return results

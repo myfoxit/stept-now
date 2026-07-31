@@ -23,6 +23,11 @@ class ChannelType(enum.StrEnum):
     SLACK = "slack"
     TELEGRAM = "telegram"
     API = "api"
+    WHATSAPP = "whatsapp"
+    MESSENGER = "messenger"
+    INSTAGRAM = "instagram"
+    SMS = "sms"
+    LINE = "line"
 
 
 class Inbox(TimestampMixin, WorkspaceScopedMixin, Base):

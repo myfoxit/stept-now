@@ -45,6 +45,10 @@ export const router = createBrowserRouter([
             path: '/knowledge/search',
             lazy: () => import('@/features/knowledge/pages/SearchPlaygroundPage'),
           },
+          {
+            path: '/knowledge/analytics',
+            lazy: () => import('@/features/knowledge/pages/KnowledgeAnalyticsPage'),
+          },
           { path: '/ai', lazy: () => import('@/features/ai/pages/AiOverviewPage') },
           { path: '/ai/providers', lazy: () => import('@/features/ai/pages/ProvidersPage') },
           { path: '/ai/agents', lazy: () => import('@/features/ai/pages/AgentsPage') },
@@ -53,6 +57,10 @@ export const router = createBrowserRouter([
           { path: '/ai/runs', lazy: () => import('@/features/ai/pages/RunsPage') },
           { path: '/ai/runs/:runId', lazy: () => import('@/features/ai/pages/RunDetailPage') },
           { path: '/automation', lazy: () => import('@/features/automation/pages/AutomationPage') },
+          {
+            path: '/campaigns',
+            lazy: () => import('@/features/campaigns/pages/CampaignsPage'),
+          },
           { path: '/tours', lazy: () => import('@/features/tours/pages/ToursPage') },
           { path: '/tours/:tourId', lazy: () => import('@/features/tours/pages/TourEditorPage') },
           { path: '/reports', lazy: () => import('@/features/reports/pages/ReportsPage') },

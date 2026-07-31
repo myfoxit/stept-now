@@ -21,6 +21,7 @@ from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging, log
 from app.core.pubsub import get_pubsub, reset_pubsub
 from app.core.queue import get_queue, reset_queue
+from app.core.scheduler import Scheduler
 from app.realtime.app_ws import router as app_ws_router
 from app.realtime.manager import manager as ws_manager
 from app.realtime.widget_ws import router as widget_ws_router
@@ -66,6 +67,12 @@ def create_app() -> FastAPI:
     configure_logging()
     settings = get_settings()
 
+    scheduler = (
+        Scheduler(settings.scheduler_tick_seconds)
+        if settings.scheduler_enabled and settings.env != "test"
+        else None
+    )
+
     @contextlib.asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if settings.env != "prod":
@@ -73,12 +80,16 @@ def create_app() -> FastAPI:
         settings.storage_dir.mkdir(parents=True, exist_ok=True)
         get_pubsub()
         get_queue()
+        if scheduler is not None:
+            scheduler.start()
         logger.info(
             "stept api ready (env=%s, db=%s)",
             settings.env,
             "sqlite" if settings.is_sqlite else "postgres",
         )
         yield
+        if scheduler is not None:
+            await scheduler.stop()
         await ws_manager.shutdown()
         await reset_queue()
         await reset_pubsub()

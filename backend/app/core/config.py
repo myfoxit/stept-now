@@ -45,6 +45,11 @@ class Settings(BaseSettings):
 
     embedding_dim: int = 384
 
+    # In-process periodic scheduler (source re-sync, SLA scans, campaign sends).
+    # Never runs under env=test — tests invoke scheduled jobs directly.
+    scheduler_enabled: bool = True
+    scheduler_tick_seconds: float = 15.0
+
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
     invitation_ttl_days: int = 7

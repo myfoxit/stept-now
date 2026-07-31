@@ -12,14 +12,19 @@ from app.schemas.common import ORMModel
 
 class SourceCreate(BaseModel):
     # "articles" is excluded on purpose: that source is managed automatically.
-    type: Literal["files", "urls", "text"]
+    type: Literal["files", "urls", "text", "sitemap", "crawl", "github", "notion"]
     name: str = Field(min_length=1, max_length=200)
     config: dict[str, Any] = Field(default_factory=dict)
+    # Connector credentials (e.g. {"token": ...}) — encrypted at rest,
+    # write-only: never returned by the API.
+    secrets: dict[str, Any] | None = None
 
 
 class SourceUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     config: dict[str, Any] | None = None
+    # Providing secrets re-encrypts them; an empty dict clears stored secrets.
+    secrets: dict[str, Any] | None = None
 
 
 class SourceOut(ORMModel):
@@ -31,6 +36,7 @@ class SourceOut(ORMModel):
     error: str | None = None
     last_synced_at: datetime | None = None
     document_count: int = 0
+    has_secrets: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -73,6 +79,8 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     k: int = Field(default=8, ge=1, le=50)
     source_ids: list[str] | None = None
+    # Pass fused candidates through the optional rerank/selection pass.
+    rerank: bool = False
 
 
 class RetrievedChunkOut(BaseModel):

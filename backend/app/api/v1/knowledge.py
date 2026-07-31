@@ -57,6 +57,7 @@ async def create_source(body: SourceCreate, principal: Member, session: Db):
         type=body.type,
         name=body.name,
         config=body.config,
+        secrets=body.secrets,
     )
     return knowledge_service.source_out(source, 0)
 
@@ -81,6 +82,7 @@ async def update_source(source_id: str, body: SourceUpdate, principal: Member, s
         actor=_actor(principal),
         name=body.name,
         config=body.config,
+        secrets=body.secrets,
     )
     count = await knowledge_service.count_documents(session, source.id)
     return knowledge_service.source_out(source, count)
@@ -230,4 +232,5 @@ async def search_knowledge(body: SearchRequest, principal: Member, session: Db):
         body.query,
         k=body.k,
         source_ids=body.source_ids,
+        rerank=body.rerank,
     )
