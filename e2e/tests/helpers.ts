@@ -71,3 +71,65 @@ export async function getDemoWidgetKey(request: APIRequestContext): Promise<stri
   expect(widget?.widget_key, 'seeded widget inbox has an embed key').toBeTruthy()
   return widget.widget_key as string
 }
+
+/** `Authorization` header for a demo bearer token. */
+export function bearer(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` }
+}
+
+// --- the embedded widget on a real host page --------------------------------
+
+/**
+ * URL of `frontend/public/widget-host.html` — a plain page on a DIFFERENT
+ * origin than the API that loads the real `loader.js` from the backend. It
+ * carries the `[data-tour="inbox"|"knowledge"|"ai"]` anchors the seeded and
+ * authored tours target.
+ *
+ * `hash` is appended verbatim: `#/inbox` makes the page URL match the seeded
+ * survey's inbox URL glob without needing a second host page.
+ */
+export function widgetHostUrl(widgetKey: string, hash = ''): string {
+  return `/widget-host.html?key=${widgetKey}&api=${encodeURIComponent(BACKEND)}${hash}`
+}
+
+/** Open the host page and wait for the loader to have mounted its launcher. */
+export async function openWidgetHost(page: Page, widgetKey: string, hash = ''): Promise<void> {
+  await page.goto(widgetHostUrl(widgetKey, hash))
+  await expect(page.locator('#stept-launcher')).toBeVisible({ timeout: 15_000 })
+}
+
+/** Every live tour in the demo workspace, newest API shape. */
+export async function liveTourIds(request: APIRequestContext): Promise<string[]> {
+  const { token, workspaceId } = await demoApiContext(request)
+  const res = await request.get(`${BACKEND}/api/v1/w/${workspaceId}/tours`, {
+    headers: bearer(token),
+  })
+  expect(res.ok(), await res.text()).toBeTruthy()
+  const tours = (await res.json()) as Array<{ id: string; status: string }>
+  return tours.filter((t) => t.status === 'live').map((t) => t.id)
+}
+
+/**
+ * Pre-fill the widget's local "already seen" tour set before the loader boots.
+ *
+ * The seeded banner ("What's new in Stept", priority 10, url `*`) is eligible on
+ * every page, so a spec about surveys or checklists would otherwise race it for
+ * the single overlay slot. Marking tours seen is exactly what the widget does
+ * after a visitor dismisses one — no product code is bypassed.
+ */
+export async function markToursSeen(
+  page: Page,
+  widgetKey: string,
+  tourIds: string[]
+): Promise<void> {
+  await page.addInitScript(
+    ({ key, ids }: { key: string; ids: string[] }) => {
+      try {
+        window.localStorage.setItem(`stept:tours-seen:${key}`, JSON.stringify(ids))
+      } catch {
+        /* private mode — the spec will simply see the seeded banner */
+      }
+    },
+    { key: widgetKey, ids: tourIds }
+  )
+}

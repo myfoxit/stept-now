@@ -123,6 +123,25 @@ describe('SurveyWidget', () => {
     expect(card()!.querySelector('.stept-sv-thanks')!.innerHTML).toContain('<strong>feedback</strong>')
   })
 
+  it('keeps the survey name as the dialog label while questions change', () => {
+    // Regression: pointing `aria-labelledby` at the question heading overrode
+    // the survey's `aria-label`, so the dialog was nameless to assistive tech
+    // and appeared to rename itself on every step.
+    widget = new SurveyWidget({ widgetKey: 'wk', onSubmit: () => {} })
+    widget.mount(
+      surveyOf([
+        question({ id: 'q1', type: 'nps', question: 'How likely are you to recommend us?' }),
+        question({ id: 'q2', type: 'text', question: 'Why?' }),
+      ]),
+    )
+    expect(card()!.getAttribute('aria-label')).toBe('How are we doing?')
+    expect(card()!.hasAttribute('aria-labelledby')).toBe(false)
+    expect(card()!.getAttribute('aria-describedby')).toBe('stept-sv-q-q1')
+    ;(card()!.querySelectorAll('.stept-sv-nps button')[9] as HTMLButtonElement).click()
+    expect(card()!.getAttribute('aria-label')).toBe('How are we doing?')
+    expect(card()!.getAttribute('aria-describedby')).toBe('stept-sv-q-q2')
+  })
+
   it('records a 1..5 star rating', () => {
     const submissions: Submission[] = []
     widget = new SurveyWidget({

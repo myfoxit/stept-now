@@ -279,7 +279,12 @@ export class SurveyWidget {
     heading.id = `stept-sv-q-${question.id}`
     heading.textContent = question.question
     card.appendChild(heading)
-    card.setAttribute('aria-labelledby', heading.id)
+    // The dialog keeps its `aria-label` (the survey name) as its accessible
+    // name: pointing `aria-labelledby` at this heading would override it, so the
+    // survey would be nameless to assistive tech and the dialog would appear to
+    // rename itself on every question. The heading is the question's label
+    // instead — each input references it via its own `aria-labelledby`.
+    card.setAttribute('aria-describedby', heading.id)
 
     switch (question.type) {
       case 'nps':

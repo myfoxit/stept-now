@@ -35,7 +35,10 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: `bash -c "cd ../backend && rm -f e2e.db && ${backendEnv} uv run python -m app.seed && ${backendEnv} uv run uvicorn app.main:app --port ${BACKEND_PORT}"`,
+      // The backend serves the embeddable widget from `widget/dist` (gitignored),
+      // and the DAP journeys drive that real bundle on a host page — so build it
+      // here instead of relying on a prior `make build`. It takes ~1s.
+      command: `bash -c "cd .. && pnpm --filter @stept/widget build && cd backend && rm -f e2e.db && ${backendEnv} uv run python -m app.seed && ${backendEnv} uv run uvicorn app.main:app --port ${BACKEND_PORT}"`,
       url: `http://localhost:${BACKEND_PORT}/api/v1/healthz`,
       reuseExistingServer: false,
       timeout: 60_000,
