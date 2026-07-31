@@ -23,6 +23,9 @@ importers:
 
   extension:
     devDependencies:
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       preact:
         specifier: ^10.25.4
         version: 10.29.7
@@ -32,6 +35,9 @@ importers:
       vite:
         specifier: ^6.0.7
         version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@25.0.1)(lightningcss@1.32.0)
 
   frontend:
     dependencies:

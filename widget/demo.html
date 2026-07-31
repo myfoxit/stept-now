@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stept widget — demo host page</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        margin: 0;
+        color: #0f172a;
+        background: #f8fafc;
+      }
+      header {
+        background: #6366f1;
+        color: #fff;
+        padding: 40px 24px;
+      }
+      header h1 {
+        margin: 0 0 6px;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 24px 120px;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        margin: 20px 0;
+      }
+      nav a {
+        padding: 8px 14px;
+        border-radius: 8px;
+        background: #6366f1;
+        color: #fff;
+        text-decoration: none;
+        font-size: 14px;
+      }
+      section[data-tour] {
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 16px 0;
+      }
+      code {
+        background: #eef2ff;
+        padding: 2px 6px;
+        border-radius: 5px;
+        font-size: 13px;
+      }
+      .note {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 10px;
+        padding: 14px 16px;
+        font-size: 14px;
+        margin: 16px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Acme Inc. — demo host page</h1>
+      <p>A plain website embedding the Stept widget + product tours.</p>
+    </header>
+
+    <main>
+      <p class="note">
+        <strong>Getting a widget key:</strong> this page reads the key from
+        <code>?key=wk_…</code> in the URL. Grab the seeded demo key from the default
+        <em>“Website widget”</em> inbox — in the dashboard it&rsquo;s shown as the embed snippet
+        (Inbox settings), or run <code>make seed</code> and copy the widget_key of that inbox from
+        the DB / <code>GET /api/v1/w/{ws}/inboxes</code>. Then open
+        <code>demo.html?key=wk_your_key&amp;api=http://localhost:8600</code>.
+      </p>
+
+      <!-- These data-tour anchors match the seeded "Welcome to Stept" tour selectors.
+           On a matching URL the loader auto-starts the first eligible tour. -->
+      <nav>
+        <a href="#" data-tour="inbox">Inbox</a>
+        <a href="#" data-tour="knowledge">Knowledge</a>
+        <a href="#" data-tour="ai">AI</a>
+      </nav>
+
+      <section data-tour="inbox">
+        <h2>Inbox</h2>
+        <p>Your team&rsquo;s shared conversations live here.</p>
+      </section>
+      <section data-tour="knowledge">
+        <h2>Knowledge</h2>
+        <p>Docs and help articles that power AI answers.</p>
+      </section>
+      <section data-tour="ai">
+        <h2>AI agents</h2>
+        <p>Automated first responders with approval gates.</p>
+      </section>
+
+      <p>
+        Try the console: <code>Stept('open')</code>, <code>Stept('close')</code>,
+        <code>Stept('startTour', '&lt;tourId&gt;')</code>, <code>Stept('shutdown')</code>.
+      </p>
+    </main>
+
+    <script>
+      // Resolve the widget key + API base from the query string so the demo stays
+      // resilient without hardcoded secrets.
+      (function () {
+        var q = new URLSearchParams(location.search)
+        var key = q.get('key') || q.get('workspaceKey') || 'wk_REPLACE_ME'
+        var api = q.get('api') || q.get('apiBase') || 'http://localhost:8600'
+
+        // The host-page settings the loader reads.
+        window.SteptSettings = { workspaceKey: key, apiBase: api }
+
+        // (Optional) advanced queue shim so Stept(...) works before loader.js loads.
+        window.Stept =
+          window.Stept ||
+          function () {
+            ;(window.Stept.q = window.Stept.q || []).push(arguments)
+          }
+
+        // Load the loader from the same backend that serves the API.
+        var s = document.createElement('script')
+        s.async = true
+        s.src = api.replace(/\/+$/, '') + '/widget-assets/loader.js'
+        document.head.appendChild(s)
+      })()
+    </script>
+  </body>
+</html>

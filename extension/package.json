@@ -3,9 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && vite build --config vite.content.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "devDependencies": {
+    "jsdom": "^25.0.1",
     "preact": "^10.25.4",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^3.2.0"
   }
 }

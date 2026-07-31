@@ -1,0 +1,92 @@
+/** Status pills + source-type iconography shared across knowledge screens. */
+
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Files,
+  Globe,
+  Loader2,
+  Type,
+  XCircle,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+
+const SOURCE_ICONS: Record<string, LucideIcon> = {
+  files: Files,
+  urls: Globe,
+  text: Type,
+  articles: FileText,
+}
+
+export function SourceTypeIcon({ type, className }: { type: string; className?: string }) {
+  const Icon = SOURCE_ICONS[type] ?? FileText
+  return <Icon className={cn('size-4', className)} aria-hidden />
+}
+
+export function SourceStatusBadge({ status, error }: { status: string; error?: string | null }) {
+  if (status === 'syncing') {
+    return (
+      <Badge variant="secondary" className="gap-1">
+        <Loader2 className="size-3 animate-spin" /> Syncing
+      </Badge>
+    )
+  }
+  if (status === 'error') {
+    const badge = (
+      <Badge variant="destructive" className="gap-1">
+        <AlertCircle className="size-3" /> Error
+      </Badge>
+    )
+    if (!error) return badge
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>{badge}</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">{error}</TooltipContent>
+      </Tooltip>
+    )
+  }
+  return (
+    <Badge variant="outline" className="gap-1">
+      <CheckCircle2 className="size-3 text-emerald-500" /> Idle
+    </Badge>
+  )
+}
+
+const DOC_STATUS: Record<
+  string,
+  { label: string; icon: LucideIcon; className: string; spin?: boolean }
+> = {
+  indexed: { label: 'Indexed', icon: CheckCircle2, className: 'text-emerald-600 dark:text-emerald-400' },
+  processing: { label: 'Processing', icon: Loader2, className: 'text-blue-600 dark:text-blue-400', spin: true },
+  pending: { label: 'Pending', icon: Clock, className: 'text-amber-600 dark:text-amber-400' },
+  failed: { label: 'Failed', icon: XCircle, className: 'text-destructive' },
+}
+
+export function DocStatusBadge({ status, error }: { status: string; error?: string | null }) {
+  const meta = DOC_STATUS[status] ?? DOC_STATUS.pending
+  const Icon = meta.icon
+  const badge = (
+    <Badge variant="outline" className={cn('gap-1', meta.className)}>
+      <Icon className={cn('size-3', meta.spin && 'animate-spin')} /> {meta.label}
+    </Badge>
+  )
+  if (status === 'failed' && error) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>{badge}</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">{error}</TooltipContent>
+      </Tooltip>
+    )
+  }
+  return badge
+}

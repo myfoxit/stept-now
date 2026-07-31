@@ -1,15 +1,46 @@
-import { Inbox } from 'lucide-react'
+/** Inbox — the flagship 3-pane screen (list · thread · context). */
 
-import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
+import { useNavigate, useParams } from 'react-router'
 
-// Placeholder — implemented by its frontend wave agent (see docs/CONTRACTS.md).
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { ConversationListPane } from '@/features/inbox/components/ConversationListPane'
+import { ContextPane } from '@/features/inbox/components/ContextPane'
+import { ThreadPane } from '@/features/inbox/components/ThreadPane'
+import { useConversation, useInboxRealtime } from '@/features/inbox/hooks'
+
 export function Component() {
+  const { conversationId } = useParams()
+  const navigate = useNavigate()
+
+  useInboxRealtime(conversationId)
+  const conversationQuery = useConversation(conversationId)
+
   return (
-    <PlaceholderPage
-      title="Inbox"
-      description="This area is being built — it arrives in an upcoming wave."
-      icon={Inbox}
-    />
+    <div className="h-full" data-tour="inbox">
+      <ResizablePanelGroup orientation="horizontal" className="h-full">
+        <ResizablePanel defaultSize="26" minSize="20" className="min-w-[16rem]">
+          <ConversationListPane
+            activeId={conversationId}
+            onSelect={(id) => navigate(`/inbox/${id}`)}
+          />
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        <ResizablePanel defaultSize="48" minSize="30">
+          <ThreadPane conversationId={conversationId} />
+        </ResizablePanel>
+
+        {conversationId ? (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize="26" minSize="18" className="hidden lg:block">
+              {conversationQuery.data ? <ContextPane conversation={conversationQuery.data} /> : null}
+            </ResizablePanel>
+          </>
+        ) : null}
+      </ResizablePanelGroup>
+    </div>
   )
 }
 
