@@ -376,5 +376,377 @@ cannot POST).
 
 ---
 
-## Wave 2 contracts (E channels, F automation/reports, G agent engine, H tours)
-Written at wave-2 kickoff — see PLAN.md.
+## Wave 2 — Agent E: Widget public API + channels (email, Slack, Telegram)
+
+**Owns:** `app/api/widget/{deps,boot,conversations,articles,csat}.py`,
+`app/realtime/widget_ws.py`, `app/channels/{email,slack,telegram}.py` (new modules),
+`app/api/channels/{email,slack,telegram}.py`, `tests/widget/*`, `tests/channels/*`.
+(`app/api/widget/tours.py` belongs to agent H — do not touch.)
+
+Consumes (wave-1, now merged): B's `app/services/conversations.py`
+(ingest_inbound/add_message/update_status), B's Inbox/ContactInbox models +
+`register_sender`, A's contacts + csat services, D's retrieval/articles services.
+
+### Widget auth (deps.py)
+- `resolve_inbox(session, widget_key) -> Inbox` (404 if unknown/disabled; channel_type
+  must be "widget").
+- `WidgetPrincipal` dataclass: workspace, inbox, contact, contact_inbox.
+- Dependency `widget_auth`: header `X-Widget-Token` (JWT typ "widget" carrying ws + sub
+  =contact_id + inbox) → load rows → principal. 401 on invalid.
+
+### boot.py — POST /api/widget/boot
+Body {widget_key, visitor_id?, identity?: {external_id, email?, name?, hash}}.
+- Identity verification: if identity present, verify hash =
+  compute_identity_hash(workspace.settings["identity_secret"], external_id); mismatch →
+  403. If inbox.config.require_identity and no identity → return {require_identity: true}
+  variant (no token).
+- find_or_create contact (verified=True when HMAC ok), find/create ContactInbox
+  (source_id = external_id or visitor_id or new uuid — return visitor_id so the widget
+  persists it), touch last_seen.
+- Response: {token (create_widget_token), visitor_id, contact {id,name,email},
+  workspace {name, logo_url}, config (inbox public config), conversations: last 10
+  summaries [{id, status, last_message_preview, last_activity_at, unread bool via
+  contact_last_seen_at}], help_center_enabled bool (any published article)}.
+
+### conversations.py (all authed by widget_auth; NOTES AND ACTIVITY NEVER EXPOSED —
+filter visibility=="public")
+- GET /api/widget/conversations; POST /api/widget/conversations {message, attachments?}
+  → ingest_inbound on principal's inbox/contact (source_id from contact_inbox).
+- GET /api/widget/conversations/{id}/messages (cursor; ownership check contact_id);
+  POST …/messages {message}; POST …/read (contact_last_seen_at=now);
+  POST …/typing {is_typing} → broadcast to conv topic (source "contact").
+- Message shape out: {id, direction, author_type, author_name, content, attachments,
+  created_at, meta.citations only (strip the rest)}.
+
+### widget_ws.py — /ws/widget?token=
+Decode widget token → join conversation_topic for each of the contact's conversations
+(+ re-join on "subscribe" {conversation_id} client message after creating new conv).
+Forward typing from client. Server pushes message.created / typing / conversation.updated
+(already broadcast by B on conv topics).
+
+### articles.py / csat.py
+- GET /api/widget/articles?query= → published articles: query empty → collections tree;
+  else D's search restricted to the "articles" source mapped back to articles
+  [{title, slug, snippet}].
+- GET /api/widget/articles/{slug} → {title, body, collection}.
+- POST /api/widget/conversations/{id}/csat {rating 1..5, feedback?} → A's
+  csat.record_response (ownership check).
+
+### Channel adapters (app/channels/<ch>.py + inbound routers)
+Register outbound senders via `@register_sender("<type>")` from app.channels.registry:
+`async def send(session, inbox, message) -> None` (raise on failure — registry task marks
+delivery_status; set "sent" on success — check registry semantics and keep consistent).
+- **email.py**: outbound SMTP via app.services.email.send_email with
+  from_override=inbox.config["address"], reply_to `reply+{conversation_id}@` domain of
+  address, subject "Re: {conversation.subject or 'your conversation'}",
+  headers In-Reply-To/References from last inbound meta when present. Inbound router
+  POST /api/channels/email/inbound (open JSON: {to, from|from_email, subject, text,
+  html?, message_id, in_reply_to?}): resolve conversation by reply+<uuid> in `to`, else
+  by in_reply_to lookup (message meta), else new conversation on the email inbox matching
+  `to` address; ingest_inbound (contact from `from`, message_source_id=message_id,
+  strip quoted reply tails naively: split on "\nOn " + "wrote:" heuristic + "-----Original").
+- **slack.py**: secrets {bot_token, signing_secret}. Inbound POST /api/channels/slack/events:
+  url_verification → echo challenge; verify X-Slack-Signature (v0 HMAC of
+  "v0:{ts}:{body}" with signing_secret, reject stale ts >5min); event_callback
+  message events (ignore bot_id/message_changed): source_id = "{channel}:{thread_ts or ts}"
+  → ingest_inbound (contact name from user id — display "Slack user {id}", meta
+  {slack_user}); route inbox by team_id in config or single slack inbox per ws (find
+  first enabled slack inbox — document). Outbound sender: chat.postMessage {channel,
+  thread_ts} from conversation's contact_inbox.source_id split; httpx, raise on !ok.
+- **telegram.py**: secrets {bot_token}, config {webhook_secret}. Inbound POST
+  /api/channels/telegram/webhook/{inbox_id} (query `secret` must equal config
+  webhook_secret): message updates → source_id=str(chat.id), contact name from
+  first_name/username; ingest. Outbound: sendMessage chat_id=source_id. Include
+  POST /inboxes/{id}/telegram/setup helper? No — document manual setWebhook in config
+  UI copy (skip API).
+
+### Tests
+Widget: boot happy/HMAC-mismatch/require_identity, visitor persistence (same visitor_id
+→ same contact), conversation create+reply+read+unread, NOTES INVISIBLE (create note via
+B service, widget messages excludes), csat, articles search, ws-token 401s, cross-contact
+ownership 403/404. Channels (respx outbound): email inbound routes by reply+uuid /
+new-conversation path + outbound smtp (monkeypatch send_email), slack signature
+verify (valid/invalid/stale), slack event→conversation + threaded outbound payload,
+telegram webhook secret + inbound/outbound, dedupe by message_source_id, sender
+registered check (deliver_message no longer fails for these types).
+
+---
+
+## Wave 2 — Agent F: Automation rules, outbound webhooks, reports, global search
+
+**Owns:** `app/models/{automation,webhook}.py`, `app/schemas/{automations,webhooks,reports}.py`,
+`app/automation/{engine.py,seed.py}` (+ conditions.py/actions.py as needed),
+`app/services/{webhooks.py,reports.py}`, `app/api/v1/{automations,webhooks,reports,search}.py`,
+`tests/automation/*`, `tests/reports/*`.
+
+### Models
+- `AutomationRule`: ws, name, event (one of EventNames values: conversation.created,
+  message.created, conversation.status_changed, csat.submitted, contact.created),
+  conditions JSON, actions JSON, enabled bool, ord int, created_by. Condition schema:
+  [{"field": "inbox_id|channel_type|status|priority|subject_contains|content_contains|
+  contact.email|contact.attributes.<k>|tag", "op": "eq|neq|contains|in|exists", "value"}]
+  (AND). Actions: [{"type": "assign_user"|"assign_team"|"set_priority"|"add_tag"|
+  "set_status"|"send_reply"|"send_note"|"notify_member"|"send_webhook", "params": {…}}].
+- `Webhook`: ws, url, secret (plain — used for signing, generated server-side, shown once?
+  store plain, return always — it's a signing secret the user needs; fine), events JSON
+  list (subset of EventNames + "*"), enabled, description. `WebhookDelivery`: ws,
+  webhook_id FK, event_name, payload JSON, status ("pending"|"success"|"failed"),
+  response_code, error, attempts, created_at. Index (webhook_id, created_at).
+
+### Engine (app/automation/engine.py)
+- Subscribe via @on(...) for the five events (registration happens on module import;
+  import engine at top of app/api/v1/automations.py so it registers with app build).
+- Evaluation: load enabled rules for (ws, event) ordered by ord; hydrate context
+  (conversation/contact/message from payload ids); check conditions; execute actions via
+  B's services (add_message for send_reply/send_note w/ author_type "system",
+  author_name "Automation"), notifications.notify for notify_member, enqueue webhook
+  delivery for send_webhook. Guard: rules acting on message.created must skip messages
+  authored by system/automation (loop prevention) + cap 1 execution per (rule,
+  conversation, message) — track via handled ids in payload/meta.
+- Webhook fan-out: also subscribe "*": for each enabled webhook where event in list or
+  "*": enqueue task "deliver_webhook" {delivery_id} (create WebhookDelivery row first).
+  Task posts JSON {event, workspace_id, payload, timestamp} with headers
+  X-Stept-Event + X-Stept-Signature: sha256 hmac of body with secret; 10s timeout;
+  success 2xx; on final failure mark failed (queue retries 3x automatically).
+
+### Reports (app/services/reports.py + api)
+GET /reports/overview?days=7|30|90 (reports:read) → {totals: {new_conversations,
+resolved_conversations, resolution_rate, median_first_response_minutes,
+median_resolution_minutes, csat_avg, csat_count, ai_runs, ai_resolved,
+ai_resolution_rate}, by_day: [{date, new, resolved}], by_channel: [{channel_type,
+count}], by_agent: [{user_id, name, resolved, median_first_response_minutes}]}.
+Compute portable SQL (python medians fine). AgentRun table may not exist rows if G
+unfinished — query defensively (table exists from model stub? G owns model — import
+inside try/except ImportError and zero the ai_* stats if unavailable).
+
+### Global search — app/api/v1/search.py
+GET /search?q=&limit=5 → {conversations: [{id, number, subject, contact_name,
+last_activity_at}], contacts: [{id, name, email}], articles: [{id, title, slug}],
+documents: [{document_id, title, snippet(160), score}]} — ilike for entities, D's
+search_chunks for documents. Perms: each section filtered by caller's read perms
+(conversations:read, contacts:read, knowledge:read) — include only permitted sections.
+
+### APIs
+GET/POST /automations, GET/PATCH/DELETE /automations/{id}, POST /automations/{id}/toggle,
+POST /automations/reorder {ordered_ids} (automations:read/manage). GET/POST /webhooks,
+PATCH/DELETE /webhooks/{id}, GET /webhooks/{id}/deliveries (OffsetPage), POST
+/webhooks/{id}/test (send sample payload now) (webhooks:manage). Reports + search above.
+
+### Seed (app/automation/seed.py)
+2 rules ("VIP tagging": contact.attributes.plan eq enterprise → add_tag vip +
+set_priority high, on conversation.created; "Away autoreply" example disabled), 1 webhook
+disabled example. Idempotent.
+
+### Tests
+Rule evaluation matrix (conditions ops incl. contact.attributes, actions incl.
+send_reply author system + loop prevention), ordering, toggle, webhook delivery task
+(respx: success, 500→retry→failed, signature correct), deliveries listing, reports math
+on seeded fixtures (build 6 conversations w/ known timestamps → assert medians/rates),
+search across entities + permission filtering, authz.
+
+---
+
+## Wave 2 — Agent G: AI agent engine (tools, runs, APPROVAL GATES, traces, copilot)
+
+**Owns:** `app/models/{agent.py,agent_run.py}`, `app/schemas/agents.py`,
+`app/agents/{tools.py,engine.py,copilot.py,tasks.py,seed.py}`,
+`app/api/v1/{agents,agent_runs,approvals}.py`, `tests/agents/*`.
+
+Background (MANDATORY): docs/research/claude-agent-sdk.md — the defer-and-resume
+state machine, allow/deny result union, lease+reaper; docs/research/vercel-ai.md —
+denial-as-tool-result. Providers via app/ai/registry.resolve_chat (wave-1 C, merged);
+retrieval via app/rag/retrieval.search_chunks (wave-1 D); conversations via B's
+services (add_message, update_status).
+
+### Models
+- `Agent` (agent.py): ws, name, description, avatar_emoji, status ("draft"|"live"|"off"),
+  model_ref str nullable ("provider_id:model_key"; null → ws default → mock),
+  system_prompt text, temperature float nullable, settings JSON
+  {retrieval: {enabled: true, k: 6, source_ids: null}, handoff_message: str,
+  guardrails: {max_tool_calls: 8, require_citations: false}}, tools JSON:
+  [{"key": "search_knowledge"|"handoff_to_human"|"tag_conversation"|
+  "close_conversation"|"collect_contact_details"|"note_to_team"|"action:<action_id>",
+  "policy": "auto"|"require_approval"|"disabled"}] — unlisted builtin keys use
+  DEFAULT_POLICIES = {search_knowledge: auto, handoff_to_human: auto, note_to_team: auto,
+  collect_contact_details: auto, tag_conversation: auto, close_conversation:
+  require_approval, action:*: require_approval}.
+- `CustomAction` (agent.py): ws, name (slug-ish), description (shown to LLM), method,
+  url (may contain {param} templates), headers JSON (values encrypted via
+  encrypt_secret at rest — decrypt only at execution), body_template str (json with
+  {param} placeholders), params_schema JSON (JSON Schema object exposed to the LLM),
+  timeout_s int default 10, allowed_domains derived: host of url is the only allowed
+  host (enforce at execution after templating).
+- `AgentRun` (agent_run.py): ws, conversation_id (GUID), agent_id FK,
+  trigger_message_id GUID nullable, status ("queued"|"running"|"awaiting_approval"|
+  "completed"|"failed"|"handed_off"|"canceled"), error nullable, input_tokens int,
+  output_tokens int, started_at, finished_at, lease_expires_at, messages_snapshot JSON
+  (provider ChatMessage list, serialized dicts — for pause/resume), pending_tool_call
+  JSON nullable {id, name, input, approval_request_id}, citations JSON (last search
+  results for [n] mapping), reply_message_id GUID nullable.
+- `AgentStep`: run_id FK indexed, ord, kind ("llm_call"|"tool_call"|"tool_result"|
+  "approval_request"|"approval_decision"|"final_reply"|"guardrail"|"error"|"handoff"),
+  name nullable, input JSON, output JSON, latency_ms int nullable, input_tokens,
+  output_tokens, created_at.
+- `ApprovalRequest`: ws, run_id FK, conversation_id, agent_id, tool_key, tool_input JSON,
+  status ("pending"|"approved"|"rejected"|"expired"), requested_at, expires_at
+  (+24h), decided_by GUID nullable, decided_at, note nullable. Index (ws, status).
+
+### Engine semantics (engine.py + tasks.py)
+- Trigger: @on(EventNames.CONVERSATION_CREATED): if conversation's inbox
+  config.ai_agent_id → set conversation.ai_agent_id + status "pending" (activity
+  message "Sage joined the conversation" style). @on(MESSAGE_CREATED): payload direction
+  "in" + visibility public + conversation.ai_agent_id + conversation.status=="pending"
+  + no run active (queued/running/awaiting_approval) for the conversation → create
+  AgentRun(queued) + enqueue "execute_agent_run" {run_id}.
+- execute_agent_run task: session_scope; guard status in (queued, running w/ expired
+  lease → treat as crash-resume from snapshot? v1: expired running → mark failed);
+  set running + lease now+120s. Build/extend messages: system = compose(system_prompt,
+  workspace name, tool usage guidance, retrieval instruction "cite sources as [n]"),
+  history = conversation public messages (contact→user, others→assistant) capped last 30.
+  Loop (max guardrails.max_tool_calls, default 8):
+  provider, model_key = await resolve_chat(session, ws, agent.model_ref);
+  result = await provider.generate(ChatRequest(model=model_key, messages, tools=
+  enabled ToolSpecs, temperature)); record llm_call step (+usage aggregate on run).
+  - result.tool_calls → process FIRST call only per iteration (append assistant msg w/
+    all calls but execute sequentially; simplest correct: if multiple, handle first,
+    append tool-error "one tool at a time" for the rest).
+    policy disabled → tool_result step {"error": "tool disabled"} appended, continue.
+    policy auto → execute via tools.py registry, steps tool_call+tool_result, continue.
+    policy require_approval → persist ApprovalRequest + pending_tool_call +
+    messages_snapshot (serialize ChatMessages incl. the assistant tool_call msg),
+    status awaiting_approval, step approval_request; notify ALL members w/ ai:approve
+    perm (notifications.notify type "approval", link "/ai/approvals") + broadcast ws
+    topic "approval.pending" {approval_id, conversation_id, agent name, tool_key,
+    tool_input} + emit approval.requested; RETURN (paused — survives restarts).
+  - result.content (no calls) → final: post-process citations: map [n] markers against
+    run.citations (from last search_knowledge result); n beyond range stripped.
+    add_message(conversation, direction "out", author_type "agent", author_id agent.id,
+    author_name agent.name, content, meta {agent_run_id, citations}) via B; step
+    final_reply; status completed (+ reply_message_id, finished_at); emit
+    agent_run.completed; broadcast "agent_run.updated". Empty content → execute
+    handoff_to_human fallback.
+  - Loop exhausted → guardrail step + handoff fallback.
+  - ProviderError retryable → raise (queue retries); non-retryable → status failed +
+    error + handoff fallback (conversation must never be stranded: status pending →
+    open + activity note "AI agent failed — waiting for a teammate").
+- decide_approval(session, approval, *, approved, decided_by, note): guard pending
+  (+expiry check → expired). Record decision step; approved → re-enqueue
+  execute_agent_run (engine restores messages_snapshot, executes pending tool, appends
+  tool_result, continues loop); rejected → tool_result {"error": "Rejected by {name}:
+  {note}"} appended to snapshot, re-enqueue (LLM sees denial and adapts — denial-as-
+  tool-result per research). Broadcast approval.decided + emit event. Approvals listing
+  auto-expires overdue pending rows (lazy, on list/decide).
+- tools.py registry: ToolSpec builders + executors
+  `async def execute(session, run, conversation, agent, name, input) -> dict`:
+  - search_knowledge{query} → search_chunks(k from settings, source_ids) → store
+    citations on run → {"results": [{"n": i+1, "title", "content": first 500 chars,
+    "url"}]}
+  - handoff_to_human{reason?} → conversation status "open" via B update_status (actor
+    agent), activity message "Handed off to team{: reason}", run status handed_off,
+    signals loop stop → {"ok": true, "note": "conversation handed to a human"}
+  - tag_conversation{tag_name} → existing tag lookup (no auto-create) + B add_tag →
+    {"ok"|"error": "unknown tag"}
+  - close_conversation{closing_message?} → optional final reply then status resolved →
+    {"ok": true}
+  - collect_contact_details{email?, name?} → update contact fields if empty/changed,
+    activity note → {"ok": true}
+  - note_to_team{text} → add_message visibility "note", author agent → {"ok": true}
+  - action:<id> → validate input against params_schema (jsonschema-lite: required keys
+    + type checks manually — no new deps), template url/body ({param} substitution,
+    url-encode in url), enforce final host == original url host, httpx request w/
+    timeout, response {"status": code, "body": first 2000 chars}. Decrypt headers at
+    call time only.
+- copilot.py: `async def suggest_reply(session, conversation, member_name) ->
+  {content, citations}` — retrieval on last ≤3 contact messages + single generate with
+  drafting system prompt; POST /ai/copilot/suggest {conversation_id}
+  (conversations:write) → suggestion (never auto-sends).
+
+### Sandbox test endpoint
+POST /ai/agents/{id}/test {message, history?: [{role, content}]} (ai:manage) — runs the
+SAME loop against an ephemeral in-memory context (no conversation writes; handoff/close/
+tag/note become dry-run results {"dry_run": true, ...}; search + actions real but
+actions still domain-enforced) → {reply, steps: serialized, citations}. Implement via
+engine mode flag, not a fork of the loop.
+
+### APIs
+GET/POST /ai/agents (ai:read/manage), GET/PATCH/DELETE /ai/agents/{id}, POST test (above).
+GET/POST /ai/actions, PATCH/DELETE /ai/actions/{id} (ai:manage; headers write-only
+masked on read), POST /ai/actions/{id}/test {params} → dry HTTP call result.
+GET /ai/runs (filters agent_id/conversation_id/status; OffsetPage; summary rows),
+GET /ai/runs/{id} → {run, steps[]}. GET /ai/approvals?status=pending (ai:approve
+or ai:read? decide: ai:approve to act, listing needs ai:read — use ai:approve for both
+per contract simplicity), POST /ai/approvals/{id}/decide {approved, note?} (ai:approve).
+
+### Seed (app/agents/seed.py)
+Agent "Sage" live, model_ref null (→ mock), retrieval on, tools defaults (+
+close_conversation require_approval), system prompt referencing Stept docs; wire it as
+default: set demo widget inbox config.ai_agent_id = sage.id (mutate inbox config via B
+model directly). Idempotent.
+
+### Tests (tests/agents/) — mock provider directives drive everything ([[tool:...]])
+Full happy path: contact msg w/ [[tool:search_knowledge {"query":"widget"}]] on seeded
+docs → run completed, reply contains citation [1] + meta.citations non-empty, steps
+sequence llm_call→tool_call→tool_result→llm_call→final_reply. APPROVAL GATE: agent w/
+close_conversation policy require_approval + directive → run awaiting_approval +
+ApprovalRequest pending + notification created; decide approve → run completes +
+conversation resolved; decide reject → run completes with polite reply, conversation
+NOT resolved; expiry → expired + resume-as-rejected. Disabled tool → error result +
+model continues. handoff → status open + run handed_off. Guardrail max_tool_calls
+loop (script many directives) → handoff. Custom action: respx endpoint + templating +
+host enforcement (redirect/other-host blocked) + schema validation error. Copilot
+suggestion w/ citations. Sandbox test endpoint dry-run (no conversation mutations).
+Trigger wiring: conversation created on inbox w/ ai_agent_id → pending + run on first
+contact message; human takeover (status open) stops further runs. Provider failure
+(patch resolve_chat to raise) → conversation open + activity note. Authz: agent role
+can approve (ai:approve), viewer cannot; ai:manage required for agent CRUD.
+
+---
+
+## Wave 2 — Agent H: DAP tours backend
+
+**Owns:** `app/models/tour.py`, `app/schemas/tours.py`, `app/services/tours.py`,
+`app/dap/seed.py`, `app/api/v1/tours.py`, `app/api/widget/tours.py`, `tests/tours/*`.
+
+### Models
+- `Tour`: ws, name, description, status ("draft"|"live"|"paused"), trigger JSON
+  {"type": "manual"|"url_match", "url_pattern": str? (glob-ish: * wildcard)}, audience
+  JSON {"type": "all"} | {"type": "filters", "filters": [segment-filter schema from A]},
+  steps JSON [{"id": str, "selector": str, "title": str, "body": markdown, "placement":
+  "auto"|"top"|"bottom"|"left"|"right"}], theme JSON {accent}, version int (increment
+  on steps change), created_by. `TourEvent`: ws, tour_id FK, contact_id GUID nullable,
+  event ("started"|"step_viewed"|"completed"|"dismissed"), step_index int nullable,
+  created_at, meta. Index (tour_id, created_at).
+
+### APIs
+- App: GET/POST /tours (tours:read/manage), GET/PATCH/DELETE /tours/{id}, POST
+  /tours/{id}/publish, POST /tours/{id}/pause, GET /tours/{id}/stats → {starts,
+  completions, dismissals, completion_rate, steps: [{index, title, viewed, drop_off}]},
+  POST /tours/recorder-token → {token: create_recorder_token(ws, user), expires_days: 7}
+  (tours:manage).
+- Widget/public (implement OWN light auth — do NOT depend on app/api/widget/deps.py):
+  `_resolve(session, widget_key) -> (workspace_id, inbox)` via Inbox.widget_key;
+  optional `X-Widget-Token` decoded via security.decode_token("widget") for contact_id.
+  - GET /api/widget/tours?widget_key=&url= → live tours where trigger.url_match matches
+    url (fnmatch) or manual excluded; audience filters evaluated against contact when
+    token present (A's segments.apply-filter logic reuse — import
+    app.services.segments helper if it exposes one, else implement minimal matcher);
+    exclude tours the contact already completed/dismissed (TourEvent lookup). Response
+    [{id, name, steps, theme, version}].
+  - POST /api/widget/tours/{id}/events {event, step_index?} (widget_key required,
+    contact from token optional) → record TourEvent. started/step_viewed/completed/
+    dismissed only.
+  - POST /api/widget/tours/recorder {token, name, url_pattern?, steps: [{selector,
+    title?, body?}]} — recorder token auth (decode "recorder" typ; ws from claim; check
+    user still member w/ tours:manage) → create draft Tour (fill default titles "Step
+    N"), version 1 → {id, name, app_url: settings.app_base_url + "/tours/" + id}.
+
+### Seed (app/dap/seed.py)
+1 live tour "Welcome to Stept" (3 steps w/ selectors matching the Stept dashboard:
+[data-tour="inbox"], [data-tour="knowledge"], [data-tour="ai"]), url_match "*/inbox*";
+1 draft. A few TourEvents for stats. Idempotent.
+
+### Tests (tests/tours/)
+CRUD + publish/pause + version bump on steps change, stats math from seeded events,
+recorder-token flow (mint → create draft via public endpoint → 401 on bad/expired token
+→ member-without-perm 403), widget delivery: url matching, audience filters (attributes
+plan), completed/dismissed exclusion, event recording validation, authz + ws isolation.
