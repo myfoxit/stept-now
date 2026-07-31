@@ -88,6 +88,12 @@ email:    owner@stept.dev
 password: stept-demo
 ```
 
+> **Upgrading an existing checkout?** The dev SQLite database (`backend/stept.db`) is
+> disposable and is *not* migrated automatically — after pulling schema changes, run
+> `rm backend/stept.db && make seed`. (A half-migrated DB makes `make seed` fail and roll
+> back, which then breaks login.) Postgres deployments migrate with
+> `cd backend && uv run alembic upgrade head`.
+
 ## Full-fidelity mode (Postgres + Redis + Mailpit)
 
 Develop against what production runs — especially when touching search/RAG:
