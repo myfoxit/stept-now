@@ -750,3 +750,79 @@ CRUD + publish/pause + version bump on steps change, stats math from seeded even
 recorder-token flow (mint → create draft via public endpoint → 401 on bad/expired token
 → member-without-perm 403), widget delivery: url matching, audience filters (attributes
 plan), completed/dismissed exclusion, event recording validation, authz + ws isolation.
+
+---
+
+# Wave 3 — Frontend feature agents (FE1, FE2, FE3)
+
+Shared rules: React 19 + TS strict, shadcn components from `@/components/ui/*` ONLY (61
+vendored — includes chat primitives message.tsx / message-scroller.tsx / attachment.tsx,
+resizable.tsx panels, chart.tsx for recharts, empty.tsx, field.tsx, spinner.tsx, kbd.tsx,
+combobox.tsx, sidebar.tsx). Data via TanStack Query + `api`/`ws()` from `@/api/client`
+(query keys `[area, workspaceId, …]`), realtime via `useRealtime(type, handler)` from
+`@/api/ws` (server pushes documented per domain below), permissions via
+`useHasPerm('perm')` from `@/stores/auth` (hide/disable UI the user can't use), toasts
+via sonner, forms react-hook-form+zod, dates via `@/lib/format`. Generated API types:
+`import type { paths, components } from '@/api/schema'` — prefer
+`components['schemas']['X']`; hand-write minimal local interfaces only when generation
+lags. EVERY list needs: loading skeletons, empty state (empty.tsx with guidance CTA),
+error state with retry. Dark mode must look right (tokens only). Key flows keyboard-
+accessible. Feature dirs are yours alone: `src/features/<area>/{api.ts,hooks.ts,
+components/,pages/}` — page files are pre-registered in src/router.tsx (NEVER edit
+router.tsx, main.tsx, App shell, package.json, components/ui/*). Each agent adds vitest
+tests (renderApp + mockFetch from `@/test/helpers`) for its critical components/hooks —
+aim 10+ per agent. Verify: `cd frontend && pnpm tsc --noEmit && pnpm test -- --run &&
+pnpm build` (fix everything you broke).
+
+## FE1 — Inbox (the flagship screen)
+
+**Owns:** `src/features/inbox/**`. Routes: /inbox/:conversationId?.
+
+3-pane layout via resizable panels: (1) conversation list pane — status tabs w/ counts
+from GET /conversations/counts (Open, Mine, Unassigned, Pending [AI], Snoozed, Resolved),
+filter popover (inbox, priority, tag, assignee), search input (q), infinite cursor list
+(useInfiniteQuery), rows: contact name/avatar-initials, preview, time (timeAgo), unread
+dot, priority flag, channel icon, AI badge when status pending; (2) thread pane —
+header (contact name, channel, copy conversation number, status/priority/assignee/team
+controls, snooze w/ date popover, resolve/reopen buttons), message scroller (grouped by
+day, direction-aligned bubbles, notes rendered distinctly [amber tint + lock icon],
+activity lines centered/muted, attachments (image preview / file chip w/ size),
+citations in agent messages as numbered chips linking meta.citations urls, delivery
+status/error on outbound), composer: Reply/Note tabs, textarea (Enter sends,
+Shift+Enter newline), canned-response slash-popup (type "/" → filter shortcuts → insert
+content w/ {{contact.name}} substituted), attachment upload (POST /files then attach),
+typing indicator emission (ws send typing debounced), "AI Copilot suggest" button →
+POST /ai/copilot/suggest → editable draft inserted into composer w/ citation chips;
+(3) context pane — contact card (name/email/attrs, link to /contacts/:id), conversation
+attributes, tags editor (combobox add/remove), pending approval card when an
+approval.pending arrives for this conversation (Approve/Reject inline w/ note →
+POST /ai/approvals/{id}/decide), recent conversations of contact.
+
+Realtime: message.created (append/invalidate + list bump + sound? skip sound),
+conversation.updated (update row + open thread), typing (show "… is typing" in thread +
+list), presence.state/presence.changed (green dot on assignee avatars), approval.pending
+(toast + context card + invalidate approvals), agent_run.updated (refresh AI badge).
+Mark read: POST /conversations/{id}/read on open/focus. New-conversation button (pick
+contact + inbox → POST /conversations).
+
+Tests: list row rendering states (unread/priority/AI), composer canned-insertion +
+Enter-to-send, status change optimistic flow, approval card decide calls, realtime
+handler updates cache (simulate handler call).
+
+## FE2 — Knowledge, AI, Help Center
+
+**Owns:** `src/features/knowledge/**`, `src/features/ai/**`. Routes: /knowledge,
+/knowledge/sources/:sourceId, /knowledge/articles, /knowledge/search, /ai, /ai/providers,
+/ai/agents, /ai/agents/:agentId, /ai/approvals, /ai/runs, /ai/runs/:runId.
+
+Knowledge: sources overview (cards w/ type icon, doc counts, status badge incl. error
+tooltip, sync button firing POST sync + poll/refetch), add-source dialog (tabs: Upload
+files [multi-file dropzone → POST documents multipart, per-file progress/status], Add
+URLs [textarea one-per-line → source config], Paste text [title+markdown]); source
+detail: documents table (status chips w/ error popover, retry, delete, token counts);
+Search playground: query box → POST /knowledge/search → ranked results w/ score bars,
+content preview, doc link — sell the RAG quality. Articles: collections sidebar (CRUD,
+icon picker w/ emoji), article list (status filter), editor page: title, collection
+select, markdown textarea w/ live preview split (render via marked? NO new deps — write
+a tiny md renderer or reuse a util: simple regex-based renderer acceptable, or reuse
+widget approach — keep minimal headings/bold/l

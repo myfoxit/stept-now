@@ -1,8 +1,274 @@
-"""conversations API — implemented by its wave agent (see docs/CONTRACTS.md).
+"""Conversations API: the inbox feed, threads, messages, tags, read state.
 
-The empty router is pre-registered; add routes here, never touch the registry.
+Permissions: read → conversations:read, posting messages / starting
+conversations / marking read → conversations:write, workflow mutations
+(status, assignment, priority, tags) → conversations:manage.
 """
 
-from fastapi import APIRouter
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
+
+from app.core.deps import Db, Member, Principal, require_perm
+from app.core.errors import NotFoundError
+from app.core.events import Actor
+from app.core.pagination import CursorPage
+from app.core.permissions import Perm
+from app.models.contact import Contact
+from app.models.message import AuthorType, MessageDirection
+from app.schemas.common import Msg
+from app.schemas.conversations import (
+    ConversationCounts,
+    ConversationCreate,
+    ConversationListItem,
+    ConversationOut,
+    ConversationPatch,
+    TagRequest,
+)
+from app.schemas.messages import MessageCreate, MessageOut
+from app.services import conversations as conversations_service
+from app.services import inboxes as inboxes_service
 
 router = APIRouter()
+
+
+def _actor(principal: Principal) -> Actor:
+    return Actor(type=principal.kind, id=principal.actor_id, label=principal.label)
+
+
+def _author(principal: Principal) -> tuple[str, str | None, str]:
+    """(author_type, author_id, author_name) for messages created via this API."""
+    if principal.user is not None:
+        return AuthorType.USER.value, principal.user.id, principal.user.name
+    return AuthorType.SYSTEM.value, principal.actor_id, principal.label
+
+
+@router.get(
+    "/conversations",
+    response_model=CursorPage[ConversationListItem],
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def list_conversations(
+    principal: Member,
+    session: Db,
+    status: Annotated[list[str] | None, Query()] = None,
+    inbox_id: str | None = None,
+    assignee: str | None = None,
+    team_id: str | None = None,
+    contact_id: str | None = None,
+    tag_id: str | None = None,
+    priority: str | None = None,
+    q: str | None = None,
+    cursor: str | None = None,
+    limit: int | None = None,
+) -> CursorPage[ConversationListItem]:
+    items, next_cursor = await conversations_service.list_conversations(
+        session,
+        principal.workspace.id,
+        status=status,
+        inbox_id=inbox_id,
+        assignee=assignee,
+        team_id=team_id,
+        contact_id=contact_id,
+        tag_id=tag_id,
+        priority=priority,
+        q=q,
+        cursor=cursor,
+        limit=limit,
+        current_user_id=principal.user.id if principal.user is not None else None,
+    )
+    return CursorPage(items=items, next_cursor=next_cursor)
+
+
+@router.get(
+    "/conversations/counts",
+    response_model=ConversationCounts,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def conversation_counts(principal: Member, session: Db) -> ConversationCounts:
+    return await conversations_service.counts(
+        session,
+        principal.workspace.id,
+        user_id=principal.user.id if principal.user is not None else None,
+    )
+
+
+@router.post(
+    "/conversations",
+    response_model=ConversationOut,
+    status_code=201,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_WRITE))],
+)
+async def create_conversation(
+    body: ConversationCreate, principal: Member, session: Db
+) -> ConversationOut:
+    """Outbound start: open a conversation with a contact and send the first message."""
+    workspace_id = principal.workspace.id
+    contact = await session.get(Contact, body.contact_id)
+    if contact is None or contact.workspace_id != workspace_id:
+        raise NotFoundError("Contact not found")
+    inbox = await inboxes_service.get_inbox(session, workspace_id, body.inbox_id)
+    actor = _actor(principal)
+    conversation = await conversations_service.create_conversation(
+        session,
+        inbox=inbox,
+        contact=contact,
+        subject=body.subject,
+        actor=actor,
+    )
+    author_type, author_id, author_name = _author(principal)
+    await conversations_service.add_message(
+        session,
+        conversation,
+        direction=MessageDirection.OUT.value,
+        author_type=author_type,
+        author_id=author_id,
+        author_name=author_name,
+        content=body.content,
+        actor=actor,
+    )
+    return await conversations_service.conversation_out(session, conversation, inbox=inbox)
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationOut,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def get_conversation(conversation_id: str, principal: Member, session: Db) -> ConversationOut:
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    return await conversations_service.conversation_out(session, conversation)
+
+
+@router.patch(
+    "/conversations/{conversation_id}",
+    response_model=ConversationOut,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_MANAGE))],
+)
+async def update_conversation(
+    conversation_id: str, body: ConversationPatch, principal: Member, session: Db
+) -> ConversationOut:
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    actor = _actor(principal)
+    provided = body.model_fields_set
+    if body.status is not None:
+        await conversations_service.update_status(
+            session, conversation, body.status, actor=actor, snoozed_until=body.snoozed_until
+        )
+    if body.priority is not None:
+        await conversations_service.set_priority(session, conversation, body.priority, actor=actor)
+    if "assignee_user_id" in provided or "team_id" in provided:
+        await conversations_service.assign(
+            session,
+            conversation,
+            assignee_user_id=(
+                body.assignee_user_id
+                if "assignee_user_id" in provided
+                else conversations_service.UNSET
+            ),
+            team_id=(body.team_id if "team_id" in provided else conversations_service.UNSET),
+            actor=actor,
+        )
+    return await conversations_service.conversation_out(session, conversation)
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages",
+    response_model=CursorPage[MessageOut],
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def list_messages(
+    conversation_id: str,
+    principal: Member,
+    session: Db,
+    cursor: str | None = None,
+    limit: int | None = None,
+) -> CursorPage[MessageOut]:
+    """Newest page first; the cursor walks toward older messages. Items within a
+    page are ascending (chat order)."""
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    messages, next_cursor = await conversations_service.list_messages(
+        session, conversation, cursor=cursor, limit=limit
+    )
+    return CursorPage(
+        items=[MessageOut.model_validate(m) for m in messages], next_cursor=next_cursor
+    )
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=MessageOut,
+    status_code=201,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_WRITE))],
+)
+async def create_message(
+    conversation_id: str, body: MessageCreate, principal: Member, session: Db
+) -> MessageOut:
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    author_type, author_id, author_name = _author(principal)
+    message = await conversations_service.add_message(
+        session,
+        conversation,
+        direction=MessageDirection.OUT.value,
+        author_type=author_type,
+        author_id=author_id,
+        author_name=author_name,
+        content=body.content,
+        visibility=body.visibility,
+        attachments=[a.model_dump() for a in body.attachments],
+        actor=_actor(principal),
+    )
+    return MessageOut.model_validate(message)
+
+
+@router.post(
+    "/conversations/{conversation_id}/tags",
+    response_model=ConversationOut,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_MANAGE))],
+)
+async def add_tag(
+    conversation_id: str, body: TagRequest, principal: Member, session: Db
+) -> ConversationOut:
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    await conversations_service.add_tag(session, conversation, body.tag_id, actor=_actor(principal))
+    return await conversations_service.conversation_out(session, conversation)
+
+
+@router.delete(
+    "/conversations/{conversation_id}/tags/{tag_id}",
+    response_model=ConversationOut,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_MANAGE))],
+)
+async def remove_tag(
+    conversation_id: str, tag_id: str, principal: Member, session: Db
+) -> ConversationOut:
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    await conversations_service.remove_tag(session, conversation, tag_id, actor=_actor(principal))
+    return await conversations_service.conversation_out(session, conversation)
+
+
+@router.post(
+    "/conversations/{conversation_id}/read",
+    response_model=Msg,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_WRITE))],
+)
+async def mark_read(conversation_id: str, principal: Member, session: Db) -> Msg:
+    conversation = await conversations_service.get_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    await conversations_service.mark_read(session, conversation)
+    return Msg(message="Conversation marked read")
