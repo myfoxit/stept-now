@@ -836,6 +836,22 @@ textarea:focus {
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.toggle-row > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.toggle-row input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 .kv {
   display: flex;
   align-items: baseline;

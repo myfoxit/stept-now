@@ -10,9 +10,11 @@ import {
   localInputToIso,
   moveStep,
   prependEvent,
+  readableTextOn,
   serializeFilters,
   serializeStep,
   serializeTour,
+  targetBBox,
   toStepDraft,
   toTourDraft,
   validateSteps,
@@ -239,7 +241,7 @@ describe('serializeTour', () => {
       show_progress: true,
       dismissable: true,
     })
-    expect(body.theme).toEqual({ accent: '#6366f1' })
+    expect(body.theme).toMatchObject({ accent: '#6366f1' })
   })
 
   it('sends an empty filter list when the audience is everyone, and no cooldown otherwise', () => {
@@ -258,8 +260,111 @@ describe('serializeTour', () => {
     const draft = toTourDraft(
       makeTour({ kind: 'banner', theme: { accent: '#111', position: 'top' } })
     )
-    expect(serializeTour(draft, []).theme).toEqual({ accent: '#111', position: 'top' })
-    expect(serializeTour({ ...draft, kind: 'flow' }, []).theme).toEqual({ accent: '#111' })
+    expect(serializeTour(draft, []).theme).toMatchObject({ accent: '#111', position: 'top' })
+    expect(serializeTour({ ...draft, kind: 'flow' }, []).theme?.position).toBeUndefined()
+  })
+
+  it('always sends banner presentation, even for a flow tour', () => {
+    // A flow can contain `banner` steps. Dropping the block when the kind is
+    // not `banner` would silently reset their styling on the next save.
+    const draft = {
+      ...toTourDraft(makeTour({ kind: 'flow' })),
+      bannerLayout: 'inline' as const,
+      bannerFullWidth: false,
+      bannerMaxWidth: '720',
+      bannerAlign: 'center' as const,
+      bannerBackground: '#0f172a',
+      bannerTextColor: '',
+      bannerIcon: '🎉',
+      bannerDismiss: 'never_again' as const,
+      bannerRounded: true,
+    }
+    expect(serializeTour(draft, []).theme?.banner).toEqual({
+      layout: 'inline',
+      full_width: false,
+      max_width: 720,
+      align: 'center',
+      background: '#0f172a',
+      // Blank means "derive from the accent" — it must be null, not "".
+      text_color: null,
+      icon: '🎉',
+      dismiss: 'never_again',
+      rounded: true,
+    })
+  })
+
+  it('drops the width when the bar is full width, and clamps it otherwise', () => {
+    const base = toTourDraft(makeTour())
+    expect(
+      serializeTour({ ...base, bannerFullWidth: true, bannerMaxWidth: '900' }, []).theme?.banner
+        ?.max_width
+    ).toBeNull()
+    expect(
+      serializeTour({ ...base, bannerFullWidth: false, bannerMaxWidth: '10' }, []).theme?.banner
+        ?.max_width
+    ).toBe(240)
+    expect(
+      serializeTour({ ...base, bannerFullWidth: false, bannerMaxWidth: '99999' }, []).theme?.banner
+        ?.max_width
+    ).toBe(2000)
+    expect(
+      serializeTour({ ...base, bannerFullWidth: false, bannerMaxWidth: '  ' }, []).theme?.banner
+        ?.max_width
+    ).toBeNull()
+  })
+
+  it('round-trips step CTAs and collapses empty ones', () => {
+    const withCta = {
+      ...emptyStep(),
+      selector: '#a',
+      ctaLabel: '  Start setup ',
+      ctaUrl: ' https://example.com ',
+      secondaryCtaLabel: '   ',
+      secondaryCtaUrl: '',
+    }
+    const step = serializeStep(withCta)
+    expect(step.cta).toEqual({ label: 'Start setup', url: 'https://example.com' })
+    // An untouched pair must not persist as an empty button.
+    expect(step.secondary_cta).toBeUndefined()
+
+    // A label with no link is valid: it just relabels the advance button.
+    expect(serializeStep({ ...withCta, ctaUrl: '' }).cta).toEqual({
+      label: 'Start setup',
+      url: null,
+    })
+  })
+
+  it('carries the sandbox key through the draft round trip', () => {
+    const draft = toStepDraft(makeStep({ sandbox_key: 'public/w1/snap.json' }))
+    expect(draft.sandboxKey).toBe('public/w1/snap.json')
+    expect(serializeStep(draft).sandbox_key).toBe('public/w1/snap.json')
+    // Absent stays absent rather than becoming an explicit null.
+    expect(serializeStep(emptyStep()).sandbox_key).toBeUndefined()
+  })
+
+  it('picks a readable foreground for light and dark backgrounds', () => {
+    expect(readableTextOn('#0f172a')).toBe('#ffffff')
+    expect(readableTextOn('#fef3c7')).toBe('#0f172a')
+    expect(readableTextOn('#fff')).toBe('#0f172a')
+    // Unmeasurable literals fall back to white, the bar's historic colour.
+    expect(readableTextOn('rebeccapurple')).toBe('#ffffff')
+    expect(readableTextOn('')).toBe('#ffffff')
+  })
+
+  it('reads the recorded element geometry defensively', () => {
+    expect(targetBBox(null)).toBeNull()
+    expect(targetBBox({})).toBeNull()
+    expect(targetBBox({ bbox: 'nope' })).toBeNull()
+    expect(targetBBox({ bbox: { x: 1, y: 2 } })).toBeNull()
+    // A bbox with no viewport falls back to the 1280x800 the recorder assumes.
+    expect(targetBBox({ bbox: { x: 1, y: 2, w: 3, h: 4 } })).toEqual({
+      x: 1,
+      y: 2,
+      w: 3,
+      h: 4,
+      vw: 1280,
+      vh: 800,
+    })
   })
 
   it('round-trips a schedule through the datetime-local inputs', () => {

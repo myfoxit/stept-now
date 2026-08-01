@@ -61,6 +61,18 @@ def _norm_advance(value: dict[str, Any] | None) -> dict[str, Any]:
     return {"on": value.get("on") or "button", "delay_ms": value.get("delay_ms")}
 
 
+def _norm_cta(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A CTA with neither a label nor a URL is indistinguishable from none —
+    collapse it so an empty form row cannot bump the tour version."""
+    if not value:
+        return None
+    label = (value.get("label") or "").strip()
+    url = (value.get("url") or "").strip() or None
+    if not label and not url:
+        return None
+    return {"label": label, "url": url}
+
+
 def _norm_action(value: dict[str, Any] | None, step_type: str) -> dict[str, Any] | None:
     if step_type != "action" or not value:
         return None
@@ -99,8 +111,11 @@ def _normalize_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "body": step.get("body") or "",
                 "media": _norm_media(step.get("media")),
                 "screenshot_key": step.get("screenshot_key") or None,
+                "sandbox_key": step.get("sandbox_key") or None,
                 "placement": step.get("placement") or "auto",
                 "advance": _norm_advance(step.get("advance")),
+                "cta": _norm_cta(step.get("cta")),
+                "secondary_cta": _norm_cta(step.get("secondary_cta")),
                 "action": _norm_action(step.get("action"), step_type),
                 "wait": _norm_wait(step.get("wait"), step_type),
             }
@@ -108,8 +123,9 @@ def _normalize_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-# Content fields participate in the version bump; `target` and `screenshot_key`
-# are re-capture artifacts and must NOT invalidate in-flight playback.
+# Content fields participate in the version bump; `target`, `screenshot_key` and
+# `sandbox_key` are re-capture artifacts and must NOT invalidate in-flight
+# playback — re-recording a screen should not restart everyone mid-tour.
 _CONTENT_FIELDS = (
     "type",
     "selector",
@@ -120,10 +136,12 @@ _CONTENT_FIELDS = (
     "media",
     "placement",
     "advance",
+    "cta",
+    "secondary_cta",
     "action",
     "wait",
 )
-_ALL_FIELDS = (*_CONTENT_FIELDS, "target", "screenshot_key")
+_ALL_FIELDS = (*_CONTENT_FIELDS, "target", "screenshot_key", "sandbox_key")
 
 
 def _signature(steps: list[dict[str, Any]], fields: tuple[str, ...]) -> list[str]:

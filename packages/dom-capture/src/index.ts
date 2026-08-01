@@ -51,6 +51,20 @@ export type { ResolveResult, ResolveVia } from './resolve';
 export { elementTextHint, serializeSelector, simpleProjection, textHintOf } from './projection';
 export type { SimpleProjection } from './projection';
 
+// ---- sandbox snapshots (DOM replica capture + render) ----
+export {
+  absolutizeCss,
+  absolutizeSrcset,
+  absolutizeUrl,
+  captureSnapshot,
+  collectStyles,
+  renderSnapshot,
+  SANDBOX_ATTR,
+  snapshotBytes,
+  SNAPSHOT_VERSION,
+} from './snapshot';
+export type { CaptureOptions, PageSnapshot, RenderOptions, SnapshotViewport } from './snapshot';
+
 // ---- dom utilities (shared by recorder + player) ----
 export {
   allElements,

@@ -12,6 +12,7 @@ export type TourStepIn = components['schemas']['TourStepIn']
 export type TourEvent = components['schemas']['TourEventOut']
 export type TourEventsPage = components['schemas']['OffsetPage_TourEventOut_']
 export type RecorderToken = components['schemas']['RecorderTokenOut']
+export type ExtensionRelease = components['schemas']['ExtensionReleaseOut']
 export type PreviewToken = components['schemas']['PreviewTokenOut']
 export type UploadedFile = components['schemas']['FileOut']
 export type SegmentFilter = components['schemas']['SegmentFilter']
@@ -19,6 +20,11 @@ export type FilterOp = SegmentFilter['op']
 export type TourKind = NonNullable<TourCreate['kind']>
 export type StepType = NonNullable<TourStepIn['type']>
 export type StepPlacement = NonNullable<TourStepIn['placement']>
+export type StepCta = components['schemas']['StepCta']
+export type BannerTheme = components['schemas']['BannerTheme']
+export type BannerLayout = NonNullable<BannerTheme['layout']>
+export type BannerAlign = NonNullable<BannerTheme['align']>
+export type BannerDismiss = NonNullable<BannerTheme['dismiss']>
 
 export const toursApi = {
   list: () => api.get<Tour[]>(ws('/tours')),
@@ -32,6 +38,12 @@ export const toursApi = {
   events: (id: string, limit: number, offset: number) =>
     api.get<TourEventsPage>(ws(`/tours/${id}/events`), { query: { limit, offset } }),
   recorderToken: () => api.post<RecorderToken>(ws('/tours/recorder-token')),
+  /**
+   * Public, unversioned and outside `/api/v1` — the artifact is identical for
+   * every workspace, so it is served as a plain static asset rather than
+   * workspace-scoped API data.
+   */
+  extensionRelease: () => api.get<ExtensionRelease>('/extension-assets/release.json'),
   previewToken: (id: string) => api.post<PreviewToken>(ws(`/tours/${id}/preview-token`)),
   /**
    * Step media must render on the customer's site, where no Stept session

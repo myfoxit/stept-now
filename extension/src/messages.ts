@@ -1,3 +1,4 @@
+import type { PageSnapshot } from '@stept/dom-capture';
 import type { PanelState, PickedSelector, RawEvent, TourStep } from './types';
 import type { GuideStepPayload } from './guide/guide-core';
 
@@ -22,6 +23,9 @@ export type ContentToBg =
   | { type: 'content-ready' }
   /** pointerdown fired: screenshot NOW, before click effects repaint. */
   | { type: 'pre-capture'; token: string }
+  /** The DOM replica taken at that same pointerdown, carrying the SAME token —
+   * only the content script can produce this, since only it has the document. */
+  | { type: 'snapshot'; token: string; snapshot: PageSnapshot }
   /** Guide overlay → engine, anchored to the step index it happened on so a
    * stale message from a page we already advanced past can't double-advance. */
   | {
@@ -32,7 +36,12 @@ export type ContentToBg =
   /** Selector picker captured an element (or the user pressed Escape). */
   | { type: 'picked'; picked: PickedSelector | null };
 
-export type BgToContent = { type: 'set-recording'; recording: boolean };
+export type BgToContent = {
+  type: 'set-recording';
+  recording: boolean;
+  /** capture a DOM replica alongside each screenshot (sandbox mode) */
+  sandbox?: boolean;
+};
 
 /** Background → guide overlay (tabs.sendMessage to the guided tab). */
 export type BgToGuideContent =
@@ -78,6 +87,8 @@ export type PanelToBg =
   | { type: 'start-recording'; tabId?: number }
   | { type: 'stop-recording' }
   | { type: 'pause-recording'; paused: boolean }
+  /** toggle sandbox capture; takes effect on the next pointerdown */
+  | { type: 'set-sandbox'; sandbox: boolean }
   /** delete raw events by index (a compiled step's `sources`) */
   | { type: 'delete-events'; indexes: number[] }
   | { type: 'retitle-step'; stepId: string; title: string }

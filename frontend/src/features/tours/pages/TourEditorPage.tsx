@@ -1,4 +1,13 @@
-import { ArrowLeft, BarChart3, PauseCircle, PlayCircle, Radio, Save, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  BarChart3,
+  MonitorPlay,
+  PauseCircle,
+  PlayCircle,
+  Radio,
+  Save,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -15,18 +24,27 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { useHasPerm } from '@/stores/auth'
+import { useAuthStore, useHasPerm } from '@/stores/auth'
 
 import type { TourKind } from '../api'
 import { AudienceEditor } from '../components/AudienceEditor'
+import { BannerDesigner } from '../components/BannerDesigner'
 import { PreviewLinkCard } from '../components/PreviewLinkCard'
 import { RecorderDialog } from '../components/RecorderDialog'
+import { SandboxPlayer } from '../components/SandboxPlayer'
 import { StepEditor } from '../components/StepEditor'
 import { StepPreview } from '../components/StepPreview'
 import { TourKindBadge, TourModeBadge } from '../components/TourBadges'
@@ -75,6 +93,7 @@ function SettingSwitch({
 export function Component() {
   const { tourId } = useParams<{ tourId: string }>()
   const canManage = useHasPerm('tours:manage')
+  const workspaceId = useAuthStore((state) => state.workspaceId) ?? ''
   const navigate = useNavigate()
   const tourQuery = useTour(tourId)
   const update = useUpdateTour()
@@ -86,6 +105,7 @@ export function Component() {
   const [steps, setSteps] = useState<StepDraft[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [recorderOpen, setRecorderOpen] = useState(false)
+  const [sandboxOpen, setSandboxOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const tour = tourQuery.data
@@ -141,6 +161,9 @@ export function Component() {
   }
 
   const selected = steps[selectedIndex] ?? steps[0] ?? null
+  // Banner styling matters for a `banner` tour, and for any flow that contains
+  // a banner step — hiding it behind the tour kind alone would strand those.
+  const showsBanner = draft.kind === 'banner' || steps.some((step) => step.type === 'banner')
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -165,6 +188,9 @@ export function Component() {
             <Link to={`/tours/${tour.id}/analytics`}>
               <BarChart3 className="size-4" /> Analytics
             </Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSandboxOpen(true)}>
+            <MonitorPlay className="size-4" /> Sandbox
           </Button>
           {canManage ? (
             <>
@@ -249,23 +275,6 @@ export function Component() {
                     ))}
                   </NativeSelect>
                 </div>
-                {draft.kind === 'banner' ? (
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="banner-position">Banner position</Label>
-                    <NativeSelect
-                      id="banner-position"
-                      className="w-full"
-                      value={draft.bannerPosition}
-                      disabled={!canManage}
-                      onChange={(e) =>
-                        patch({ bannerPosition: e.target.value as 'top' | 'bottom' })
-                      }
-                    >
-                      <NativeSelectOption value="top">Top of the page</NativeSelectOption>
-                      <NativeSelectOption value="bottom">Bottom of the page</NativeSelectOption>
-                    </NativeSelect>
-                  </div>
-                ) : null}
                 <div className="grid gap-1.5">
                   <Label htmlFor="tour-trigger">Trigger</Label>
                   <NativeSelect
@@ -316,6 +325,17 @@ export function Component() {
                 </div>
               </CardContent>
             </Card>
+
+            {showsBanner ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Banner design</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BannerDesigner draft={draft} disabled={!canManage} onChange={patch} />
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader>
@@ -489,6 +509,24 @@ export function Component() {
       </div>
 
       <RecorderDialog open={recorderOpen} onOpenChange={setRecorderOpen} />
+
+      <Dialog open={sandboxOpen} onOpenChange={setSandboxOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Sandbox</DialogTitle>
+            <DialogDescription>
+              Walk the tour against the screens the recorder captured — no sign-in, no risk of
+              touching real data.
+            </DialogDescription>
+          </DialogHeader>
+          <SandboxPlayer
+            steps={steps}
+            accent={draft.accent}
+            workspaceId={workspaceId}
+            showProgress={draft.showProgress}
+          />
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     app_base_url: str = "http://localhost:5273"
     cors_origins: list[str] = []
 
+    # Set once the recorder is listed, so the dashboard can offer a one-click
+    # install instead of the load-unpacked walkthrough.
+    extension_web_store_url: str = ""
+
     database_url: str = "sqlite+aiosqlite:///./stept.db"
     redis_url: str | None = None
 

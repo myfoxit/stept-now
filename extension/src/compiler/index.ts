@@ -514,6 +514,23 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
     if (last) delete sources[last.id];
   }
 
+  // ---- pass 5b: sandbox replicas ------------------------------------------
+  // A DOM replica is captured by the same pointerdown that fires the
+  // screenshot, so rather than thread `sandbox_key` through all eight step
+  // constructors it is attached here from the step's own source events. Folds
+  // and reorders above have already settled, and `sources` survives them, so
+  // a step that absorbed another still inherits whichever replica exists.
+  for (const step of steps) {
+    if (step.sandbox_key) continue;
+    for (const index of sources[step.id] ?? []) {
+      const key = events[index]?.sandboxKey;
+      if (key) {
+        step.sandbox_key = key;
+        break;
+      }
+    }
+  }
+
   // ---- pass 6: overrides, ordering, titling, lint -------------------------
   const titleOverrides = opts.titleOverrides ?? {};
   const bodyOverrides = opts.bodyOverrides ?? {};

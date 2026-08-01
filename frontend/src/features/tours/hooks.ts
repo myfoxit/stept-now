@@ -168,6 +168,19 @@ export function usePauseTour() {
   })
 }
 
+/**
+ * The recorder build available for download. Workspace-independent, so it sits
+ * outside the `[AREA, workspaceId]` key space and is cached for the session.
+ */
+export function useExtensionRelease() {
+  return useQuery({
+    queryKey: [AREA, 'extension-release'],
+    queryFn: toursApi.extensionRelease,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+}
+
 export function useRecorderToken() {
   return useMutation({
     mutationFn: () => toursApi.recorderToken(),

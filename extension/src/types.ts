@@ -49,6 +49,8 @@ export interface TourStep {
   body: string;
   media?: StepMedia | null;
   screenshot_key?: string | null;
+  /** public key of the DOM replica backing sandbox playback for this step */
+  sandbox_key?: string | null;
   placement: StepPlacement;
   advance: StepAdvance;
   action?: StepAction | null;
@@ -94,6 +96,8 @@ interface RawBase {
   pageTitle?: string;
   /** storage key of the eagerly-uploaded pre-action screenshot */
   screenshotKey?: string;
+  /** storage key of the pre-action DOM replica (sandbox capture only) */
+  sandboxKey?: string;
   url?: string;
 }
 
@@ -138,6 +142,8 @@ export interface StoredSession {
   workspaceId: string;
   workspaceName: string;
   userName: string;
+  /** Dashboard origin, learned from /dap/auth/check. Falls back to apiBase. */
+  appBaseUrl: string;
 }
 
 export interface AuthState {
@@ -234,6 +240,10 @@ export interface PanelState {
   auth: AuthState;
   recording: boolean;
   paused: boolean;
+  /** capture a DOM replica per step so the tour can be replayed in a sandbox */
+  sandbox: boolean;
+  /** replicas captured this session, and their total size (panel warns near the cap) */
+  sandboxStats: { captured: number; bytes: number };
   events: RawEvent[];
   startedAt: number | null;
   startUrl: string | null;
@@ -266,6 +276,8 @@ export function emptyPanelState(apiBase = DEFAULT_API_BASE): PanelState {
     },
     recording: false,
     paused: false,
+    sandbox: false,
+    sandboxStats: { captured: 0, bytes: 0 },
     events: [],
     startedAt: null,
     startUrl: null,

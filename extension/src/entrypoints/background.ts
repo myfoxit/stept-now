@@ -1,3 +1,4 @@
+import type { PageSnapshot } from '@stept/dom-capture';
 import {
   ApiError,
   ConflictError,
@@ -133,7 +134,12 @@ export default defineBackground(() => {
     try {
       const check = await api.check();
       if (session) {
-        session = { ...session, workspaceName: check.workspace_name, userName: check.user_name };
+        session = {
+          ...session,
+          workspaceName: check.workspace_name,
+          userName: check.user_name,
+          appBaseUrl: check.app_base_url || session.appBaseUrl,
+        };
         await saveSession(session);
         applySession(session);
       }
@@ -255,7 +261,9 @@ export default defineBackground(() => {
 
   function setContentRecording(recording: boolean): void {
     for (const tabId of recordedTabIds) {
-      chrome.tabs.sendMessage(tabId, { type: 'set-recording', recording }).catch(() => {});
+      chrome.tabs
+        .sendMessage(tabId, { type: 'set-recording', recording, sandbox: state.sandbox })
+        .catch(() => {});
     }
   }
 
@@ -270,9 +278,11 @@ export default defineBackground(() => {
     recordedTabIds = new Set([tab.id]);
     tabShots.clear();
     captureHold.clear();
+    pendingSnapshots.clear();
     Object.assign(state, {
       recording: true,
       paused: false,
+      sandboxStats: { captured: 0, bytes: 0 },
       events: [],
       titleOverrides: {},
       bodyOverrides: {},
@@ -366,10 +376,52 @@ export default defineBackground(() => {
     await task.finally(() => pendingPreCaptures.delete(token));
   }
 
+  // ---- sandbox replicas: uploaded per token, keyed like pre-captures ------
+
+  /** In-flight replica uploads by token, plus the key each resolved to. Held by
+   * TOKEN rather than by tab because a replica is pinned to the one gesture
+   * that produced it — see CaptureHold for why token pairing is load-bearing. */
+  const pendingSnapshots = new Map<string, Promise<string | null>>();
+  const snapshotKeys = new Map<string, string>();
+
+  function uploadSnapshot(token: string, snapshot: PageSnapshot): void {
+    if (!state.recording || state.paused || !session || !state.sandbox) return;
+    const task = (async (): Promise<string | null> => {
+      try {
+        const { key, bytes } = await api.uploadSnapshot(snapshot);
+        snapshotKeys.set(token, key);
+        state.sandboxStats = {
+          captured: state.sandboxStats.captured + 1,
+          bytes: state.sandboxStats.bytes + bytes,
+        };
+        return key;
+      } catch {
+        // Over the size cap, offline, or token revoked. A step without a
+        // replica still plays from its screenshot — never break the recording.
+        return null;
+      }
+    })();
+    pendingSnapshots.set(token, task);
+    void task.finally(() => {
+      pendingSnapshots.delete(token);
+      // The map is only ever read by the event carrying this token, which has
+      // long since arrived; anything older is an abandoned pointerdown.
+      if (snapshotKeys.size > 50) snapshotKeys.clear();
+    });
+  }
+
   const SHOTWORTHY = new Set(['pointer', 'select', 'check', 'upload', 'hover', 'input']);
 
   async function addEvent(event: RawEvent, captureToken?: string): Promise<void> {
     if (!state.recording || state.paused) return;
+    if (captureToken && !event.sandboxKey) {
+      await pendingSnapshots.get(captureToken)?.catch(() => null);
+      const key = snapshotKeys.get(captureToken);
+      if (key) {
+        event.sandboxKey = key;
+        snapshotKeys.delete(captureToken);
+      }
+    }
     if (SHOTWORTHY.has(event.kind) && !event.screenshotKey) {
       // prefer the pointerdown-time pre-capture: it shows the page the user
       // acted ON, not the state after the click's effects. The token pairs the
@@ -490,6 +542,11 @@ export default defineBackground(() => {
             void preCapture(sender.tab.id, msg.token);
           }
           return;
+        case 'snapshot':
+          if (sender.tab?.id != null && recordedTabIds.has(sender.tab.id)) {
+            uploadSnapshot(msg.token, msg.snapshot);
+          }
+          return;
         case 'guide-event':
           void onGuideEvent(msg.event, msg.index, sender.tab?.id);
           return;
@@ -532,6 +589,14 @@ export default defineBackground(() => {
       case 'pause-recording':
         state.paused = msg.paused;
         refreshBadge();
+        void persist();
+        return false;
+      case 'set-sandbox':
+        state.sandbox = msg.sandbox;
+        // Live-toggle: the content scripts learn on the next broadcast, so a
+        // recording already in progress starts (or stops) capturing replicas
+        // without being restarted.
+        if (state.recording) setContentRecording(true);
         void persist();
         return false;
       case 'delete-events':
@@ -707,6 +772,7 @@ export default defineBackground(() => {
         workspaceId,
         workspaceName: workspaceName ?? '',
         userName,
+        appBaseUrl: '', // filled in by the validateSession() call below
       };
       await saveSession(next);
       applySession(next);
@@ -728,6 +794,7 @@ export default defineBackground(() => {
       workspaceId: 'pending',
       workspaceName: '',
       userName: '',
+      appBaseUrl: '',
     };
     const previous = session;
     session = probe;
@@ -739,6 +806,7 @@ export default defineBackground(() => {
         workspaceId: check.workspace_id,
         workspaceName: check.workspace_name,
         userName: check.user_name,
+        appBaseUrl: check.app_base_url || '',
       };
       await saveApiBase(apiBase);
       await saveSession(next);
@@ -788,7 +856,7 @@ export default defineBackground(() => {
         lastSave: {
           tourId: tour.id,
           name: tour.name,
-          appUrl: tourAppUrl(session.apiBase, session.workspaceId, tour.id),
+          appUrl: tourAppUrl(session.appBaseUrl || session.apiBase, tour.id),
         },
       });
       recordedTabIds.clear();

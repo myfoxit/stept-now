@@ -10,6 +10,7 @@ the Chrome extension recorder, and the widget player (see docs/DAP2-CONTRACTS.md
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from typing import Any, Literal
 
@@ -28,6 +29,24 @@ FrequencyType = Literal["once", "until_completed", "until_dismissed", "every_tim
 
 MAX_TARGET_BYTES = 8 * 1024  # opaque @stept/dom-capture Target descriptor cap
 
+# Colour literals reach the customer's page as inline CSS custom properties.
+# Anything outside this grammar could close the declaration and inject rules,
+# so new colour fields are validated even though the legacy `accent` is not
+# (tightening `accent` retroactively would make already-stored tours unreadable).
+_COLOR_RE = re.compile(
+    r"^(#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})"
+    r"|rgba?\((?:\s*\d{1,3}\s*,){2}\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)"
+    r"|[a-zA-Z]{3,20})$"
+)
+
+
+def _validate_color(value: str | None) -> str | None:
+    if value is None or value == "":
+        return None
+    if not _COLOR_RE.match(value.strip()):
+        raise PydanticCustomError("bad_color", "not a CSS colour literal")
+    return value.strip()
+
 
 # ---------------------------------------------------------------------------
 # building blocks
@@ -44,10 +63,47 @@ class TourAudience(BaseModel):
     filters: list[SegmentFilter] = Field(default_factory=list)
 
 
+class BannerTheme(BaseModel):
+    """How banner-kind tours and `banner` steps are drawn.
+
+    Defaults reproduce the pre-v2.1 bar exactly (full-width accent overlay
+    docked bottom), so tours saved before these fields existed keep rendering
+    unchanged.
+    """
+
+    # `overlay` floats above the page; `inline` pushes the document down/up so
+    # the bar never covers the host app's own navigation.
+    layout: Literal["overlay", "inline"] = "overlay"
+    full_width: bool = True
+    # Only consulted when `full_width` is off.
+    max_width: int | None = Field(default=None, ge=240, le=2000)
+    align: Literal["start", "center"] = "start"
+    # None = derive from the tour accent.
+    background: str | None = Field(default=None, max_length=32)
+    text_color: str | None = Field(default=None, max_length=32)
+    # A single emoji rendered before the text.
+    icon: str | None = Field(default=None, max_length=8)
+    # `never_again` suppresses the banner for that contact regardless of the
+    # tour's frequency setting.
+    dismiss: Literal["dismiss", "never_again"] = "dismiss"
+    rounded: bool = False
+
+    @field_validator("background", "text_color")
+    @classmethod
+    def _colors(cls, value: str | None) -> str | None:
+        return _validate_color(value)
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
+
+
 class TourTheme(BaseModel):
     accent: str = Field(default="#6366f1", max_length=32)
     # Banner kind only: where the bar docks.
     position: Literal["top", "bottom"] | None = None
+    banner: BannerTheme = Field(default_factory=BannerTheme)
 
 
 class TourSchedule(BaseModel):
@@ -72,6 +128,29 @@ class TourSettings(BaseModel):
 class StepMedia(BaseModel):
     type: Literal["image", "video"]
     url: str = Field(min_length=1, max_length=2000)
+
+
+class StepCta(BaseModel):
+    """A button on a step. Empty `label` means "use the player default"
+    (Next / Got it), so authoring a URL without relabelling still works."""
+
+    label: str = Field(default="", max_length=60)
+    url: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("url")
+    @classmethod
+    def _safe_url(cls, value: str | None) -> str | None:
+        """The player puts this in an `href`/`window.open` on the customer's own
+        page — `javascript:` and `data:` there would be a stored XSS."""
+        if value is None:
+            return None
+        url = value.strip()
+        if not url:
+            return None
+        scheme = url.split(":", 1)[0].lower() if ":" in url.split("/", 1)[0] else ""
+        if scheme and scheme not in ("http", "https", "mailto", "tel"):
+            raise PydanticCustomError("bad_url", "CTA links must be http(s), mailto or tel")
+        return url
 
 
 class StepAdvance(BaseModel):
@@ -139,8 +218,12 @@ class TourStepIn(BaseModel):
     body: str = ""  # markdown
     media: StepMedia | None = None
     screenshot_key: str | None = Field(default=None, max_length=500)
+    # Public key of the DOM replica captured for sandbox playback (v2.1).
+    sandbox_key: str | None = Field(default=None, max_length=500)
     placement: StepPlacement = "auto"
     advance: StepAdvance = Field(default_factory=StepAdvance)
+    cta: StepCta | None = None
+    secondary_cta: StepCta | None = None
     action: StepAction | None = None
     wait: StepWait | None = None
 
@@ -210,8 +293,11 @@ class TourStepOut(BaseModel):
     body: str = ""
     media: StepMedia | None = None
     screenshot_key: str | None = None
+    sandbox_key: str | None = None
     placement: str = "auto"
     advance: StepAdvance = Field(default_factory=StepAdvance)
+    cta: StepCta | None = None
+    secondary_cta: StepCta | None = None
     action: StepAction | None = None
     wait: StepWait | None = None
 
@@ -383,10 +469,20 @@ class DapAuthCheckOut(BaseModel):
     workspace_name: str
     user_name: str
     perms_ok: bool = True
+    # The dashboard origin, which is not the API origin the extension talks to.
+    # Without it the extension cannot build a working "Open in Stept" link.
+    app_base_url: str = ""
 
 
 class ScreenshotOut(BaseModel):
     key: str
+
+
+class SnapshotOut(BaseModel):
+    """Public key of an uploaded DOM replica (sandbox capture)."""
+
+    key: str
+    bytes: int
 
 
 # ---------------------------------------------------------------------------

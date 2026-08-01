@@ -16,6 +16,7 @@ Both are mounted under the open-CORS `/api/widget` prefix and never use cookies.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Request, UploadFile
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.widget.media import save_public
 from app.api.widget.tours import contact_from_token, resolve_widget_key
+from app.core.config import get_settings
 from app.core.deps import Db
 from app.core.errors import PayloadTooLargeError, UnauthorizedError, ValidationFailure
 from app.core.events import Actor
@@ -36,6 +38,7 @@ from app.schemas.tours import (
     DapTourSummary,
     ExperiencesOut,
     ScreenshotOut,
+    SnapshotOut,
     TourOut,
 )
 from app.services import tours as tours_service
@@ -44,6 +47,10 @@ router = APIRouter()
 
 SCREENSHOT_CONTENT_TYPES = {"image/png", "image/jpeg"}
 SCREENSHOT_MAX_BYTES = 2 * 1024 * 1024
+# A DOM replica is one page's markup plus its inlined same-origin CSS. Real
+# app screens land at 200 KB–2 MB; the cap is the point past which a capture is
+# more likely a runaway data-URI than a usable sandbox screen.
+SNAPSHOT_MAX_BYTES = 8 * 1024 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +126,7 @@ async def auth_check(request: Request, session: Db):
         workspace_name=workspace.name if workspace is not None else "",
         user_name=user.name if user is not None else "",
         perms_ok=True,
+        app_base_url=get_settings().app_base_url,
     )
 
 
@@ -208,3 +216,30 @@ async def upload_screenshot(file: UploadFile, request: Request, session: Db):
         raise PayloadTooLargeError("Screenshots are limited to 2 MB")
     key = await save_public(workspace_id, file.filename or "screenshot.png", data)
     return ScreenshotOut(key=key)
+
+
+@router.post("/dap/snapshots", response_model=SnapshotOut, status_code=201)
+async def upload_snapshot(file: UploadFile, request: Request, session: Db):
+    """Store one sandbox DOM replica and hand back its `sandbox_key`.
+
+    Like screenshots this is tour-independent: the recorder captures a replica
+    per step long before a draft exists. The body is the JSON envelope produced
+    by `@stept/dom-capture`'s `captureSnapshot` — it is stored and re-served
+    verbatim as `application/json`, never as HTML, so the markup inside can only
+    ever execute inside the sandboxed iframe the player builds for it.
+    """
+    workspace_id, _user_id = await authorize_extension(session, request)
+    data = await file.read()
+    if not data:
+        raise ValidationFailure("Empty snapshot")
+    if len(data) > SNAPSHOT_MAX_BYTES:
+        raise PayloadTooLargeError("Sandbox snapshots are limited to 8 MB")
+    try:
+        envelope = json.loads(data)
+    except ValueError as exc:
+        raise ValidationFailure("Snapshot must be JSON") from exc
+    if not isinstance(envelope, dict) or not isinstance(envelope.get("html"), str):
+        raise ValidationFailure("Snapshot must be an object with an `html` string")
+    # Force the extension so the public media route serves it as JSON.
+    key = await save_public(workspace_id, "snapshot.json", data)
+    return SnapshotOut(key=key, bytes=len(data))

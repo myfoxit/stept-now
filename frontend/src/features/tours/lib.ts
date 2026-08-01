@@ -7,10 +7,15 @@
  */
 
 import type {
+  BannerAlign,
+  BannerDismiss,
+  BannerLayout,
+  BannerTheme,
   FilterOp,
   SegmentFilter,
   StepPlacement,
   StepType,
+  StepCta,
   Tour,
   TourCreate,
   TourDayStat,
@@ -84,6 +89,48 @@ export const MODES: { value: TourMode; label: string; hint: string }[] = [
   { value: 'guided', label: 'Guided', hint: 'The user performs each step' },
   { value: 'driven', label: 'Do it for me', hint: 'Action steps run automatically' },
 ]
+
+// --- banner presentation -----------------------------------------------------
+
+export const BANNER_LAYOUTS: { value: BannerLayout; label: string; hint: string }[] = [
+  { value: 'overlay', label: 'Float over the page', hint: 'Can cover your own header' },
+  { value: 'inline', label: 'Push the page', hint: 'Nothing is hidden; the layout shifts' },
+]
+
+export const BANNER_ALIGNS: { value: BannerAlign; label: string }[] = [
+  { value: 'start', label: 'Left' },
+  { value: 'center', label: 'Centred' },
+]
+
+export const BANNER_DISMISS: { value: BannerDismiss; label: string; hint: string }[] = [
+  { value: 'dismiss', label: 'Close for now', hint: 'Comes back per your frequency rule' },
+  { value: 'never_again', label: 'Close for good', hint: 'Never shown to that person again' },
+]
+
+/** Emoji offered as one-click banner icons; any single character is allowed. */
+export const BANNER_ICONS = ['🎉', '✨', '📣', '🚀', '⚠️', '🛠️', '💡', '🎁'] as const
+
+/**
+ * Readable foreground for a hex background, via the WCAG relative-luminance
+ * threshold. Used only as the *default* — an explicit `text_color` always wins.
+ */
+export function readableTextOn(background: string): '#0f172a' | '#ffffff' {
+  const hex = background.trim().replace('#', '')
+  const full =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : hex.slice(0, 6)
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return '#ffffff'
+  const channel = (offset: number) => {
+    const value = Number.parseInt(full.slice(offset, offset + 2), 16) / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  }
+  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4)
+  return luminance > 0.45 ? '#0f172a' : '#ffffff'
+}
 
 /** Types that anchor to a page element and therefore need a selector. */
 const SELECTOR_TYPES: StepType[] = ['tooltip', 'hotspot', 'action']
@@ -200,10 +247,17 @@ export interface StepDraft {
   /** Opaque @stept/dom-capture descriptor from the recorder — passthrough only. */
   target: Record<string, unknown> | null
   screenshotKey: string | null
+  /** Public key of the DOM replica behind sandbox playback — recorder artifact. */
+  sandboxKey: string | null
   title: string
   body: string
   mediaType: 'image' | 'video'
   mediaUrl: string
+  /** Primary button override; empty label = the player's default (Next / Got it). */
+  ctaLabel: string
+  ctaUrl: string
+  secondaryCtaLabel: string
+  secondaryCtaUrl: string
   placement: StepPlacement
   advanceOn: AdvanceOn
   /** Kept as a string so the number input can be cleared while typing. */
@@ -227,10 +281,15 @@ export function emptyStep(type: StepType = 'tooltip'): StepDraft {
     textHint: '',
     target: null,
     screenshotKey: null,
+    sandboxKey: null,
     title: '',
     body: '',
     mediaType: 'image',
     mediaUrl: '',
+    ctaLabel: '',
+    ctaUrl: '',
+    secondaryCtaLabel: '',
+    secondaryCtaUrl: '',
     placement: 'auto',
     advanceOn: 'button',
     delayMs: '3000',
@@ -256,10 +315,15 @@ export function toStepDraft(step: TourStep): StepDraft {
     textHint: step.text_hint ?? '',
     target: (step.target as Record<string, unknown> | null) ?? null,
     screenshotKey: step.screenshot_key ?? null,
+    sandboxKey: step.sandbox_key ?? null,
     title: step.title ?? '',
     body: step.body ?? '',
     mediaType: step.media?.type ?? 'image',
     mediaUrl: step.media?.url ?? '',
+    ctaLabel: step.cta?.label ?? '',
+    ctaUrl: step.cta?.url ?? '',
+    secondaryCtaLabel: step.secondary_cta?.label ?? '',
+    secondaryCtaUrl: step.secondary_cta?.url ?? '',
     placement: (step.placement ?? 'auto') as StepPlacement,
     advanceOn: (step.advance?.on ?? 'button') as AdvanceOn,
     delayMs: step.advance?.delay_ms != null ? String(step.advance.delay_ms) : base.delayMs,
@@ -277,6 +341,18 @@ export function toStepDraft(step: TourStep): StepDraft {
 function toInt(value: string, fallback: number): number {
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+/**
+ * A CTA is only sent when it says something. An untouched pair of inputs must
+ * serialize to nothing at all — sending `{label: "", url: null}` would persist
+ * an empty button and bump the tour version on every save.
+ */
+export function serializeCta(label: string, url: string): StepCta | null {
+  const trimmedLabel = label.trim()
+  const trimmedUrl = url.trim()
+  if (!trimmedLabel && !trimmedUrl) return null
+  return { label: trimmedLabel, url: trimmedUrl || null }
 }
 
 /**
@@ -305,9 +381,14 @@ export function serializeStep(draft: StepDraft): TourStepIn {
   }
   if (draft.target) step.target = draft.target
   if (draft.screenshotKey) step.screenshot_key = draft.screenshotKey
+  if (draft.sandboxKey) step.sandbox_key = draft.sandboxKey
   if (draft.mediaUrl.trim()) {
     step.media = { type: draft.mediaType, url: draft.mediaUrl.trim() }
   }
+  const cta = serializeCta(draft.ctaLabel, draft.ctaUrl)
+  if (cta) step.cta = cta
+  const secondary = serializeCta(draft.secondaryCtaLabel, draft.secondaryCtaUrl)
+  if (secondary) step.secondary_cta = secondary
   if (draft.type === 'action') {
     step.action = {
       kind: draft.actionKind,
@@ -385,6 +466,17 @@ export interface TourDraft {
   urlPattern: string
   accent: string
   bannerPosition: 'top' | 'bottom'
+  bannerLayout: BannerLayout
+  bannerFullWidth: boolean
+  /** Kept as a string so the number input can be cleared mid-edit. */
+  bannerMaxWidth: string
+  bannerAlign: BannerAlign
+  /** Empty means "derive from the accent". */
+  bannerBackground: string
+  bannerTextColor: string
+  bannerIcon: string
+  bannerDismiss: BannerDismiss
+  bannerRounded: boolean
   audienceType: 'all' | 'filters'
   filters: FilterDraft[]
   /** `datetime-local` input values (local time), empty = unset. */
@@ -408,6 +500,15 @@ export function toTourDraft(tour: Tour): TourDraft {
     urlPattern: tour.trigger?.url_pattern ?? '',
     accent: tour.theme?.accent ?? '#6366f1',
     bannerPosition: tour.theme?.position ?? 'bottom',
+    bannerLayout: tour.theme?.banner?.layout ?? 'overlay',
+    bannerFullWidth: tour.theme?.banner?.full_width ?? true,
+    bannerMaxWidth: tour.theme?.banner?.max_width != null ? String(tour.theme.banner.max_width) : '',
+    bannerAlign: tour.theme?.banner?.align ?? 'start',
+    bannerBackground: tour.theme?.banner?.background ?? '',
+    bannerTextColor: tour.theme?.banner?.text_color ?? '',
+    bannerIcon: tour.theme?.banner?.icon ?? '',
+    bannerDismiss: tour.theme?.banner?.dismiss ?? 'dismiss',
+    bannerRounded: tour.theme?.banner?.rounded ?? false,
     audienceType: tour.audience?.type ?? 'all',
     filters: (tour.audience?.filters ?? []).map(toFilterDraft),
     startAt: isoToLocalInput(tour.schedule?.start_at),
@@ -462,9 +563,41 @@ export function serializeTour(draft: TourDraft, steps: StepDraft[]): TourUpdate 
     theme: {
       accent: draft.accent,
       ...(draft.kind === 'banner' ? { position: draft.bannerPosition } : {}),
+      banner: serializeBannerTheme(draft),
     },
     steps: steps.map(serializeStep),
   }
+}
+
+/**
+ * Banner presentation. Sent on every save regardless of kind: a `flow` tour can
+ * still contain `banner` steps, and dropping the block when the kind is not
+ * `banner` would silently reset styling the moment someone changed the kind.
+ *
+ * Blank colours are sent as `null`, not `""` — the player reads null as
+ * "derive from the accent", while an empty string is a CSS value of nothing.
+ */
+export function serializeBannerTheme(draft: TourDraft): BannerTheme {
+  return {
+    layout: draft.bannerLayout,
+    full_width: draft.bannerFullWidth,
+    max_width: draft.bannerFullWidth ? null : clampBannerWidth(draft.bannerMaxWidth),
+    align: draft.bannerAlign,
+    background: draft.bannerBackground.trim() || null,
+    text_color: draft.bannerTextColor.trim() || null,
+    icon: draft.bannerIcon.trim() || null,
+    dismiss: draft.bannerDismiss,
+    rounded: draft.bannerRounded,
+  }
+}
+
+/** The API accepts 240..2000; anything outside is clamped rather than rejected. */
+export function clampBannerWidth(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const parsed = Number.parseInt(trimmed, 10)
+  if (!Number.isFinite(parsed)) return null
+  return Math.min(2000, Math.max(240, parsed))
 }
 
 /** Payload for "Duplicate": everything but ids, status, stats and step ids. */
@@ -558,6 +691,34 @@ export function describeStep(draft: StepDraft): string {
 /** Public media URL for a recorder screenshot key (served without auth). */
 export function mediaSrc(workspaceId: string, key: string): string {
   return `/api/widget/media/${workspaceId}/${key}`
+}
+
+export interface TargetBox {
+  x: number
+  y: number
+  w: number
+  h: number
+  /** Viewport the shot was taken at — the box is a fraction of this, not of px. */
+  vw: number
+  vh: number
+}
+
+/**
+ * The recorded element's geometry, read defensively out of the opaque `target`
+ * descriptor. The dashboard never parses `target` otherwise — it is passthrough
+ * JSON owned by `@stept/dom-capture` — so anything malformed just means "no box"
+ * rather than a crashed editor.
+ */
+export function targetBBox(target: Record<string, unknown> | null): TargetBox | null {
+  if (!target || typeof target !== 'object') return null
+  const bbox = (target as { bbox?: unknown }).bbox
+  if (!bbox || typeof bbox !== 'object') return null
+  const { x, y, w, h, viewport } = bbox as Record<string, unknown>
+  if (![x, y, w, h].every((n) => typeof n === 'number' && Number.isFinite(n))) return null
+  const vp = (viewport ?? {}) as Record<string, unknown>
+  const vw = typeof vp.w === 'number' && vp.w > 0 ? vp.w : 1280
+  const vh = typeof vp.h === 'number' && vp.h > 0 ? vp.h : 800
+  return { x: x as number, y: y as number, w: w as number, h: h as number, vw, vh }
 }
 
 /** The link an author pastes into their browser to preview an unpublished tour. */

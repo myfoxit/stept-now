@@ -135,6 +135,8 @@ describe('TourEditorPage', () => {
 
     const card = within(await screen.findByTestId('tour-step'))
     await userEvent.selectOptions(card.getByLabelText('Type'), 'action')
+    // Action config is secondary detail, so it lives behind the disclosure.
+    await userEvent.click(card.getByRole('button', { name: /advanced/i }))
     await userEvent.selectOptions(card.getByLabelText('Action'), 'fill')
     await userEvent.type(card.getByLabelText('Value to type'), 'ada@acme.test')
     await userEvent.click(screen.getByRole('button', { name: /^Save/ }))
@@ -178,18 +180,60 @@ describe('TourEditorPage', () => {
     )
   })
 
-  it('previews the selected step and shows banner position only for banner tours', async () => {
+  it('previews the selected step and shows the banner designer for banner tours', async () => {
     mockTour(makeTour({ kind: 'banner', theme: { accent: '#6366f1', position: 'top' } }))
     renderEditor()
 
     await screen.findByTestId('tour-step')
-    expect(screen.getByLabelText('Banner position')).toBeInTheDocument()
+    expect(screen.getByText('Banner design')).toBeInTheDocument()
+    expect(screen.getByLabelText('Dock it')).toHaveValue('top')
+    expect(screen.getByTestId('banner-preview')).toBeInTheDocument()
     // Preview renders the step's markdown body as formatted text.
     const preview = within(screen.getByTestId('step-preview'))
     expect(preview.getByText('Start here')).toBeInTheDocument()
 
+    // A flow whose steps are all tooltips has no bar to style.
     await userEvent.selectOptions(screen.getByLabelText('Kind'), 'flow')
-    expect(screen.queryByLabelText('Banner position')).not.toBeInTheDocument()
+    expect(screen.queryByText('Banner design')).not.toBeInTheDocument()
+  })
+
+  it('keeps the banner designer for a flow that contains a banner step', async () => {
+    mockTour(makeTour({ kind: 'flow', steps: [makeStep({ id: 's1', type: 'banner' })] }))
+    renderEditor()
+
+    await screen.findByTestId('tour-step')
+    expect(screen.getByText('Banner design')).toBeInTheDocument()
+  })
+
+  it('saves the banner presentation the designer captured', async () => {
+    const captured = mockTour(makeTour({ kind: 'banner' }))
+    renderEditor()
+
+    await screen.findByTestId('tour-step')
+    await userEvent.selectOptions(screen.getByLabelText('Layout'), 'inline')
+    await userEvent.click(screen.getByRole('button', { name: /use 🎉 as the banner icon/i }))
+    await userEvent.selectOptions(screen.getByLabelText('Close button'), 'never_again')
+    await userEvent.click(screen.getByRole('button', { name: /^Save/ }))
+
+    await waitFor(() => expect(captured.body).toBeDefined())
+    expect(captured.body!.theme).toMatchObject({
+      banner: expect.objectContaining({
+        layout: 'inline',
+        icon: '🎉',
+        dismiss: 'never_again',
+      }),
+    })
+  })
+
+  it('opens the sandbox on the first step', async () => {
+    mockTour()
+    renderEditor()
+
+    await screen.findByTestId('tour-step')
+    await userEvent.click(screen.getByRole('button', { name: /^Sandbox$/ }))
+
+    expect(await screen.findByTestId('sandbox-stage')).toBeInTheDocument()
+    expect(screen.getByText('Step 1 of 1')).toBeInTheDocument()
   })
 
   it('hides mutating controls and disables inputs without tours:manage', async () => {

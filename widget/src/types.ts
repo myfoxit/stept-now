@@ -177,10 +177,21 @@ export interface TourStep {
   body: string
   media?: StepMedia | null
   screenshot_key?: string | null
+  /** Public key of the DOM replica used for sandbox playback (not used here). */
+  sandbox_key?: string | null
   placement: StepPlacement
   advance?: StepAdvance
+  /** Author-supplied button copy. An empty label falls back to Next / Got it. */
+  cta?: StepCta | null
+  secondary_cta?: StepCta | null
   action?: StepAction | null
   wait?: StepWait | null
+}
+
+export interface StepCta {
+  label: string
+  /** When set, the button opens this instead of advancing. */
+  url?: string | null
 }
 
 export interface TourSettings {
@@ -192,12 +203,26 @@ export interface TourSettings {
 
 export type TourKind = 'flow' | 'banner' | 'announcement'
 
+/** Presentation of `banner` steps. Every field is optional: a tour saved before
+ * these existed must render as the original full-width accent bar. */
+export interface BannerTheme {
+  layout?: 'overlay' | 'inline' | null
+  full_width?: boolean | null
+  max_width?: number | null
+  align?: 'start' | 'center' | null
+  background?: string | null
+  text_color?: string | null
+  icon?: string | null
+  dismiss?: 'dismiss' | 'never_again' | null
+  rounded?: boolean | null
+}
+
 export interface Tour {
   id: string
   name: string
   kind?: TourKind
   steps: TourStep[]
-  theme: { accent: string; position?: 'top' | 'bottom' | null }
+  theme: { accent: string; position?: 'top' | 'bottom' | null; banner?: BannerTheme | null }
   version: number
   settings?: TourSettings
   /** `every_time` bypasses the widget's local seen-set. */

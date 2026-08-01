@@ -1,7 +1,12 @@
-import { Crosshair, LogOut, X } from 'lucide-react';
+import { Boxes, Crosshair, LogOut, X } from 'lucide-react';
 import { formatPicked } from '../../../api/client';
 import type { PanelState } from '../../../types';
 import { sendBg, useCopy } from '../lib';
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 /** Account + tools drawer: who you are signed in as, the selector picker, and
  * sign-out (which forgets the extension token). */
@@ -39,6 +44,35 @@ export function SettingsDrawer({
         <div className="kv">
           <span>Stept URL</span>
           <b className="truncate">{state.auth.apiBase}</b>
+        </div>
+
+        <div className="drawer-section">
+          <span className="section-title">Sandbox capture</span>
+          <p className="hint">
+            Also save a copy of each screen while recording, so the tour can be replayed as an
+            interactive demo without anyone signing in to your app. Slower to record, and the
+            copy is only as private as the data on screen.
+          </p>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={state.sandbox}
+              onChange={(e) => void sendBg({ type: 'set-sandbox', sandbox: e.target.checked })}
+            />
+            <span>
+              <Boxes size={13} /> Capture screens for sandbox
+            </span>
+          </label>
+          {state.sandboxStats.captured > 0 && (
+            <div className="kv">
+              <span>Captured</span>
+              <b>
+                {state.sandboxStats.captured} screen
+                {state.sandboxStats.captured === 1 ? '' : 's'} ·{' '}
+                {formatBytes(state.sandboxStats.bytes)}
+              </b>
+            </div>
+          )}
         </div>
 
         <div className="drawer-section">

@@ -51,8 +51,9 @@ test-frontend: ## Frontend + widget + extension + dom-capture unit tests
 	pnpm --filter @stept/extension test -- --run
 	pnpm --filter @stept/dom-capture test -- --run
 
-build: ## Production builds (frontend, widget, extension)
+build: ## Production builds (frontend, widget, extension + its downloadable zip)
 	pnpm -r build
+	pnpm --filter @stept/extension zip
 
 e2e: ## Playwright end-to-end suite (starts its own servers)
 	pnpm --filter @stept/e2e test

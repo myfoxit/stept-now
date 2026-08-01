@@ -16,6 +16,9 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   srcDir: 'src',
+  // `publicDir` resolves against the project root, not `srcDir`, so the icons
+  // under src/public are silently dropped from the build without this.
+  publicDir: 'src/public',
   // Loaded unpacked from `extension/dist/chrome-mv3` — a visible folder, not
   // WXT's hidden `.output` default (macOS hides dotfolders in the file picker).
   outDir: 'dist',

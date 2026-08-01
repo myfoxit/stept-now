@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 import app as app_pkg
 from app.api.channels import channels_router
+from app.api.extension_assets import router as extension_assets_router
 from app.api.portal import router as portal_router
 from app.api.v1 import api_router
 from app.api.widget import widget_router
@@ -29,7 +30,7 @@ from app.realtime.widget_ws import router as widget_ws_router
 logger = log("main")
 
 # Paths embeddable third-party pages may call (open CORS, no credentials).
-OPEN_CORS_PREFIXES = ("/api/widget", "/portal", "/widget-assets")
+OPEN_CORS_PREFIXES = ("/api/widget", "/portal", "/widget-assets", "/extension-assets")
 
 
 class PathAwareCORS:
@@ -133,6 +134,7 @@ def create_app() -> FastAPI:
     application.include_router(widget_router, prefix="/api/widget")
     application.include_router(channels_router, prefix="/api/channels")
     application.include_router(portal_router, prefix="/portal")
+    application.include_router(extension_assets_router, prefix="/extension-assets")
     application.include_router(app_ws_router)
     application.include_router(widget_ws_router)
 

@@ -232,6 +232,155 @@ describe('TourPlayer rendering', () => {
     expect(document.querySelector('.stept-tour-root')!.classList.contains('stept-veil')).toBe(false)
   })
 
+  it('keeps a pre-v2.1 banner looking exactly as it did', () => {
+    // No `theme.banner` at all: full-width accent overlay, no icon, no extras.
+    makePlayer([]).start(
+      tourOf([step({ id: 's1', type: 'banner', title: 'New!' })], {
+        kind: 'banner',
+        theme: { accent: '#123456', position: 'bottom' },
+      }),
+    )
+    const banner = document.querySelector('.stept-tour-banner') as HTMLElement
+    expect(banner.classList.contains('stept-bottom')).toBe(true)
+    expect(banner.classList.contains('stept-inline')).toBe(false)
+    expect(banner.classList.contains('stept-boxed')).toBe(false)
+    expect(banner.style.getPropertyValue('--stept-banner-bg')).toBe('#123456')
+    expect(banner.style.width).toBe('')
+    expect(banner.querySelector('.stept-tour-banner-icon')).toBeNull()
+  })
+
+  it('applies every banner presentation option', () => {
+    makePlayer([]).start(
+      tourOf([step({ id: 's1', type: 'banner', title: 'Maintenance' })], {
+        kind: 'banner',
+        theme: {
+          accent: '#6366f1',
+          position: 'top',
+          banner: {
+            layout: 'inline',
+            full_width: false,
+            max_width: 720,
+            align: 'center',
+            background: '#0f172a',
+            text_color: '#f8fafc',
+            icon: '🎉',
+            dismiss: 'never_again',
+            rounded: true,
+          },
+        },
+      }),
+    )
+    const banner = document.querySelector('.stept-tour-banner') as HTMLElement
+    expect(banner.classList.contains('stept-inline')).toBe(true)
+    expect(banner.classList.contains('stept-boxed')).toBe(true)
+    expect(banner.classList.contains('stept-center')).toBe(true)
+    expect(banner.style.width).toBe('720px')
+    expect(banner.style.getPropertyValue('--stept-banner-bg')).toBe('#0f172a')
+    expect(banner.style.getPropertyValue('--stept-banner-fg')).toBe('#f8fafc')
+    expect(banner.querySelector('.stept-tour-banner-icon')!.textContent).toBe('🎉')
+    // Decorative: a screen reader should hear the title, not "party popper".
+    expect(banner.querySelector('.stept-tour-banner-icon')!.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('puts an inline banner into the document flow so it pushes the page', () => {
+    document.body.innerHTML = '<main id="app">content</main>'
+    makePlayer([]).start(
+      tourOf([step({ id: 's1', type: 'banner', title: 'Heads up' })], {
+        kind: 'banner',
+        theme: { accent: '#000', position: 'top', banner: { layout: 'inline' } },
+      }),
+    )
+    const banner = document.querySelector('.stept-tour-banner') as HTMLElement
+    // First child of <body>, NOT inside the fixed-position overlay root.
+    expect(document.body.firstChild).toBe(banner)
+    expect(banner.closest('.stept-tour-root')).toBeNull()
+  })
+
+  it('derives a readable foreground when the author sets only a background', () => {
+    makePlayer([]).start(
+      tourOf([step({ id: 's1', type: 'banner', title: 'Pale' })], {
+        kind: 'banner',
+        theme: { accent: '#000', banner: { background: '#fef3c7' } },
+      }),
+    )
+    const banner = document.querySelector('.stept-tour-banner') as HTMLElement
+    expect(banner.style.getPropertyValue('--stept-banner-fg')).toBe('#0f172a')
+  })
+
+  it('marks a never-again dismissal so the backend can outrank the frequency rule', () => {
+    const events: Recorded[] = []
+    makePlayer(events).start(
+      tourOf([step({ id: 's1', type: 'banner', title: 'Bye' })], {
+        kind: 'banner',
+        theme: { accent: '#000', banner: { dismiss: 'never_again' } },
+      }),
+    )
+    const close = document.querySelector('.stept-tour-close') as HTMLElement
+    expect(close.getAttribute('aria-label')).toBe('Dismiss and never show again')
+    close.click()
+    expect(events.find((e) => e.event === 'dismissed')!.meta!.never_again).toBe(true)
+  })
+
+  it('leaves an ordinary dismissal unmarked', () => {
+    const events: Recorded[] = []
+    makePlayer(events).start(
+      tourOf([step({ id: 's1', type: 'banner', title: 'Bye' })], { kind: 'banner' }),
+    )
+    ;(document.querySelector('.stept-tour-close') as HTMLElement).click()
+    expect(events.find((e) => e.event === 'dismissed')!.meta!.never_again).toBeUndefined()
+  })
+
+  it('uses author button copy and opens a CTA link safely', () => {
+    // spyOn, not a spread of `window`: an object literal loses the prototype
+    // methods (addEventListener) the player binds on start.
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    makePlayer([]).start(
+      tourOf(
+        [
+          step({
+            id: 's1',
+            type: 'banner',
+            title: 'Read up',
+            cta: { label: 'Read the post', url: 'https://blog.example.com/x' },
+            secondary_cta: { label: 'Not now' },
+          }),
+          step({ id: 's2', type: 'banner', title: 'Second' }),
+        ],
+        { kind: 'banner' },
+      ),
+    )
+    const banner = document.querySelector('.stept-tour-banner') as HTMLElement
+    const buttons = [...banner.querySelectorAll('.stept-tour-btn')] as HTMLElement[]
+    expect(buttons.map((b) => b.textContent)).toEqual(['Not now', 'Read the post'])
+
+    buttons[1]!.click()
+    expect(open).toHaveBeenCalledWith(
+      'https://blog.example.com/x',
+      '_blank',
+      'noopener,noreferrer',
+    )
+    // A link CTA reports engagement; it must NOT advance the tour.
+    expect(banner.querySelector('strong')!.textContent).toBe('Read up')
+    open.mockRestore()
+  })
+
+  it('falls back to Next / Got it when no CTA copy is authored', () => {
+    makePlayer([]).start(
+      tourOf(
+        [
+          step({ id: 's1', type: 'banner', title: 'One' }),
+          step({ id: 's2', type: 'banner', title: 'Two' }),
+        ],
+        { kind: 'banner' },
+      ),
+    )
+    const banner = () => document.querySelector('.stept-tour-banner') as HTMLElement
+    const primary = () => banner().querySelector('.stept-tour-btn.primary') as HTMLElement
+    expect(primary().textContent).toBe('Next')
+    primary().click()
+    expect(primary().textContent).toBe('Got it')
+  })
+
   it('shows a hotspot beacon that opens the tooltip on click', () => {
     document.body.innerHTML = '<button id="save">Save</button>'
     const events: Recorded[] = []

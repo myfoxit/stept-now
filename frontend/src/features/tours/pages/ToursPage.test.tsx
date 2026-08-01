@@ -143,4 +143,26 @@ describe('ToursPage', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Banners' }))
     expect(screen.getByText('No banners yet')).toBeInTheDocument()
   })
+
+  it('offers recording as the primary way to create a tour', async () => {
+    mockFetch({
+      'GET /api/v1/w/w1/tours': () => ({ body: [] }),
+      'GET /extension-assets/release.json': () => ({
+        body: { available: false, api_base: 'http://localhost:8600', web_store_url: null },
+      }),
+      'POST /api/v1/w/w1/tours/recorder-token': () => ({
+        body: { token: 'tok_abc', expires_days: 7 },
+      }),
+    })
+    renderApp(<ToursPage />)
+
+    // Both entry points stay available — recording is the default, not the only way.
+    expect(await screen.findByText('No tours yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /build one by hand/i })).toBeInTheDocument()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /record a tour/i })[0])
+    expect(
+      await screen.findByRole('heading', { name: /record a tour with the chrome extension/i }),
+    ).toBeInTheDocument()
+  })
 })

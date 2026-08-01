@@ -20,6 +20,7 @@ export async function loadSession(): Promise<StoredSession | null> {
     workspaceId: raw.workspaceId,
     workspaceName: raw.workspaceName ?? '',
     userName: raw.userName ?? '',
+    appBaseUrl: raw.appBaseUrl ?? '',
   };
 }
 

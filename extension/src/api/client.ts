@@ -1,3 +1,4 @@
+import type { PageSnapshot } from '@stept/dom-capture';
 import type { PickedSelector, TourDetail, TourStep, TourSummary, WorkspaceChoice } from '../types';
 
 /**
@@ -153,6 +154,8 @@ export interface AuthCheck {
   workspace_name: string;
   user_name: string;
   perms_ok: boolean;
+  /** Dashboard origin. Absent on backends older than the deep-link fix. */
+  app_base_url?: string;
 }
 
 export class DapClient {
@@ -248,6 +251,21 @@ export class DapClient {
     const body = (await res.json()) as { key: string };
     return body.key;
   }
+
+  /** Upload one sandbox DOM replica, same eager timing as a screenshot.
+   * Sent as multipart rather than a JSON body so it reuses the media pipeline
+   * (and so the server can cap it by size before parsing). */
+  async uploadSnapshot(snapshot: PageSnapshot): Promise<{ key: string; bytes: number }> {
+    const form = new FormData();
+    const blob = new Blob([JSON.stringify(snapshot)], { type: 'application/json' });
+    form.append('file', blob, 'snapshot.json');
+    const res = await request(this.url('/snapshots'), {
+      method: 'POST',
+      headers: this.headers(),
+      body: form,
+    });
+    return (await res.json()) as { key: string; bytes: number };
+  }
 }
 
 /** Strip the fields the backend does not accept and drop nulls it would reject.
@@ -267,6 +285,7 @@ function wireStep(step: TourStep): Record<string, unknown> {
   if (step.target) out.target = step.target;
   if (step.media) out.media = step.media;
   if (step.screenshot_key) out.screenshot_key = step.screenshot_key;
+  if (step.sandbox_key) out.sandbox_key = step.sandbox_key;
   if (step.type === 'action' && step.action) out.action = step.action;
   if (step.type === 'wait' && step.wait) out.wait = step.wait;
   return out;
@@ -278,9 +297,13 @@ export function screenshotUrl(apiBase: string, workspaceId: string, key: string)
   return `${normalizeBase(apiBase)}/api/widget/media/${encodeURIComponent(workspaceId)}/${key}`;
 }
 
-/** Deep link into the dashboard's tour editor. */
-export function tourAppUrl(apiBase: string, workspaceId: string, tourId: string): string {
-  return `${normalizeBase(apiBase)}/w/${workspaceId}/tours/${tourId}`;
+/** Deep link into the dashboard's tour editor.
+ *
+ * Takes the DASHBOARD origin, not the API origin — they differ in every
+ * deployment (and in dev: :5273 vs :8600). The route is `/tours/:id`; there is
+ * no `/w/{workspace}` prefix in the dashboard router. */
+export function tourAppUrl(appBaseUrl: string, tourId: string): string {
+  return `${normalizeBase(appBaseUrl)}/tours/${encodeURIComponent(tourId)}`;
 }
 
 /** The picker's clipboard payload — kept here so the panel and the picker

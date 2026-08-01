@@ -21,6 +21,7 @@ import { resolveStepTarget, stepNeedsTarget, waitForTarget, type StepErrorReason
 import { globMatch } from './loader-core'
 import type {
   StepAction,
+  StepCta,
   Tour,
   TourEventMeta,
   TourEventName,
@@ -205,6 +206,31 @@ export function resolveMediaUrl(url: string, apiBase = ''): string {
   return trimmed.startsWith('/') ? `${base}${trimmed}` : `${base}/${trimmed}`
 }
 
+/**
+ * Foreground that stays readable on `background`, by WCAG relative luminance.
+ *
+ * Only the DEFAULT: an explicit `text_color` always wins. Non-hex literals
+ * (`rebeccapurple`, `rgb(...)`) can't be measured without a layout, so they get
+ * white — the same colour the bar has always used.
+ */
+export function readableOn(background: string): string {
+  const hex = (background ?? '').trim().replace('#', '')
+  const full =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : hex.slice(0, 6)
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return '#fff'
+  const channel = (offset: number): number => {
+    const value = parseInt(full.slice(offset, offset + 2), 16) / 255
+    return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4)
+  }
+  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4)
+  return luminance > 0.45 ? '#0f172a' : '#fff'
+}
+
 /** Same fix for images the editor embedded in a markdown body. */
 export function absolutizeMedia(root: ParentNode, apiBase: string): void {
   if (!apiBase) return
@@ -340,17 +366,35 @@ const CSS = `
   font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--stept-accent,#6366f1);color:#fff}
 .stept-tour-banner{position:fixed;left:0;right:0;z-index:2147483001;pointer-events:auto;
   display:flex;align-items:center;gap:12px;padding:12px 16px;box-sizing:border-box;
-  background:var(--stept-accent,#6366f1);color:#fff;
+  background:var(--stept-banner-bg,var(--stept-accent,#6366f1));color:var(--stept-banner-fg,#fff);
   font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   box-shadow:0 6px 24px rgba(15,23,42,.22)}
 .stept-tour-banner[hidden]{display:none}
 .stept-tour-banner.stept-top{top:0}
 .stept-tour-banner.stept-bottom{bottom:0}
+/* Inline: the bar is in flow at the top/bottom of the body, so the page moves
+   instead of being covered. position:static is what does the work — it drops
+   the fixed offsets set above. */
+.stept-tour-banner.stept-inline{position:static;box-shadow:none}
+/* Narrower than the viewport: centre the bar and round it off the edge. */
+.stept-tour-banner.stept-boxed{left:50%;right:auto;transform:translateX(-50%);
+  max-width:calc(100vw - 24px);border-radius:10px}
+.stept-tour-banner.stept-boxed.stept-top{top:12px}
+.stept-tour-banner.stept-boxed.stept-bottom{bottom:12px}
+.stept-tour-banner.stept-inline.stept-boxed{transform:none;margin:12px auto}
+.stept-tour-banner.stept-rounded{border-radius:10px}
+.stept-tour-banner.stept-center{justify-content:center;text-align:center}
+.stept-tour-banner.stept-center .stept-tour-banner-text{flex:0 1 auto}
+.stept-tour-banner .stept-tour-banner-icon{flex:none;font-size:18px;line-height:1}
 .stept-tour-banner .stept-tour-banner-text{flex:1;min-width:0}
 .stept-tour-banner strong{display:block;font-size:14px}
-.stept-tour-banner .stept-tour-body{color:rgba(255,255,255,.92);margin:0}
-.stept-tour-banner .stept-tour-btn.primary{background:#fff;color:#0f172a}
-.stept-tour-banner .stept-tour-close{position:static;color:rgba(255,255,255,.85)}
+.stept-tour-banner .stept-tour-body{color:inherit;opacity:.92;margin:0}
+.stept-tour-banner .stept-tour-btn{flex:none}
+.stept-tour-banner .stept-tour-btn.primary{background:var(--stept-banner-fg,#fff);
+  color:var(--stept-banner-bg,#0f172a)}
+.stept-tour-banner .stept-tour-btn.ghost{background:transparent;color:inherit;
+  border:1px solid currentColor;opacity:.85}
+.stept-tour-banner .stept-tour-close{position:static;color:inherit;opacity:.85}
 .stept-tour-beacon{position:fixed;z-index:2147483001;width:18px;height:18px;border-radius:50%;
   background:var(--stept-accent,#6366f1);border:0;padding:0;cursor:pointer;pointer-events:auto;
   box-shadow:0 0 0 4px rgba(99,102,241,.35);animation:stept-tour-pulse 1.8s ease-out infinite}
@@ -470,8 +514,9 @@ export class TourPlayer {
     if (this.index > 0) this.showStep(this.index - 1)
   }
 
-  dismiss(): void {
-    this.finish('dismissed')
+  /** `neverAgain` marks the dismissal as final, whatever the frequency rule. */
+  dismiss(neverAgain = false): void {
+    this.finish('dismissed', neverAgain ? { never_again: true } : undefined)
   }
 
   /** Tear the player down without reporting anything (e.g. loader shutdown). */
@@ -487,9 +532,9 @@ export class TourPlayer {
     else this.showStep(index)
   }
 
-  private finish(event: 'completed' | 'dismissed'): void {
+  private finish(event: 'completed' | 'dismissed', extra?: TourEventMeta): void {
     if (!this.tour) return
-    this.emit(event, event === 'dismissed' ? this.index : null)
+    this.emit(event, event === 'dismissed' ? this.index : null, extra)
     this.clearProgress()
     this.teardown()
   }
@@ -644,10 +689,44 @@ export class TourPlayer {
     // A banner is an announcement, never a modal: the page stays fully usable.
     this.root?.classList.remove('stept-veil')
 
+    const theme = this.tour.theme?.banner ?? {}
     const position = this.tour.theme?.position === 'top' ? 'top' : 'bottom'
-    banner.className = `stept-tour-banner stept-${position}`
+    const fullWidth = theme.full_width !== false
+    const inline = theme.layout === 'inline'
+
+    banner.className = [
+      'stept-tour-banner',
+      `stept-${position}`,
+      inline ? 'stept-inline' : '',
+      !fullWidth ? 'stept-boxed' : '',
+      fullWidth && theme.rounded ? 'stept-rounded' : '',
+      theme.align === 'center' ? 'stept-center' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    // Colours are author-supplied CSS literals, validated server-side against a
+    // colour grammar; `setProperty` keeps them inside their own declaration.
+    const background = theme.background || this.accent
+    banner.style.setProperty('--stept-banner-bg', background)
+    banner.style.setProperty('--stept-banner-fg', theme.text_color || readableOn(background))
+    banner.style.width = !fullWidth && theme.max_width ? `${theme.max_width}px` : ''
+
+    // Inline layout re-parents the bar into the document flow. Re-homing on
+    // every render is intentional: the author can flip `layout` between saves
+    // and a live-updating preview must follow without a reload.
+    this.mountBanner(banner, inline, position)
+
     banner.hidden = false
     banner.innerHTML = ''
+
+    if (theme.icon) {
+      const icon = el2(this.doc, 'span', 'stept-tour-banner-icon')
+      icon.textContent = theme.icon
+      icon.setAttribute('aria-hidden', 'true')
+      banner.appendChild(icon)
+    }
+
     const text = el2(this.doc, 'div', 'stept-tour-banner-text')
     if (step.title) {
       const strong = el2(this.doc, 'strong')
@@ -664,12 +743,57 @@ export class TourPlayer {
     }
     banner.appendChild(text)
 
+    if (step.secondary_cta?.label) {
+      banner.appendChild(this.ctaButton(step.secondary_cta, 'ghost', i))
+    }
     const isLast = i === this.tour.steps.length - 1
-    const cta = el2(this.doc, 'button', 'stept-tour-btn primary')
-    cta.textContent = isLast ? 'Got it' : 'Next'
-    cta.onclick = () => this.next()
-    banner.appendChild(cta)
-    if (this.settings.dismissable) banner.appendChild(this.closeButton())
+    banner.appendChild(
+      this.ctaButton(step.cta ?? null, 'primary', i, isLast ? 'Got it' : 'Next'),
+    )
+    if (this.settings.dismissable) {
+      banner.appendChild(this.closeButton(theme.dismiss === 'never_again'))
+    }
+  }
+
+  /**
+   * Put the bar where the layout demands: in `<body>` flow for `inline`
+   * (first or last child, so it pushes rather than covers), back in the
+   * fixed-position overlay root otherwise.
+   */
+  private mountBanner(banner: HTMLElement, inline: boolean, position: 'top' | 'bottom'): void {
+    const body = this.doc.body
+    if (!inline) {
+      if (this.root && banner.parentNode !== this.root) this.root.appendChild(banner)
+      return
+    }
+    if (position === 'top') {
+      if (body.firstChild !== banner) body.insertBefore(banner, body.firstChild)
+    } else if (body.lastChild !== banner) {
+      body.appendChild(banner)
+    }
+  }
+
+  /** A step button: author copy when given, otherwise the player's default. */
+  private ctaButton(
+    cta: StepCta | null,
+    variant: 'primary' | 'ghost',
+    index: number,
+    fallbackLabel = '',
+  ): HTMLElement {
+    const button = el2(this.doc, 'button', `stept-tour-btn ${variant}`)
+    button.textContent = cta?.label?.trim() || fallbackLabel
+    const url = cta?.url?.trim()
+    button.onclick = () => {
+      if (url) {
+        // `noopener` is not optional: without it the opened page can reach back
+        // through `window.opener` and navigate the customer's app.
+        this.win.open(url, '_blank', 'noopener,noreferrer')
+        this.emit('step_viewed', index, { cta: cta?.label || url })
+        return
+      }
+      this.next()
+    }
+    return button
   }
 
   private runDrivenAction(action: StepAction, el: HTMLElement | null, i: number): void {
@@ -744,11 +868,13 @@ export class TourPlayer {
 
   // --- chrome --------------------------------------------------------------
 
-  private closeButton(): HTMLElement {
+  /** `permanent` reports `meta.never_again`, which the backend honours over the
+   * tour's own frequency rule — the difference between "not now" and "stop". */
+  private closeButton(permanent = false): HTMLElement {
     const close = el2(this.doc, 'button', 'stept-tour-close')
     close.textContent = '×'
-    close.setAttribute('aria-label', 'Dismiss tour')
-    close.onclick = () => this.dismiss()
+    close.setAttribute('aria-label', permanent ? 'Dismiss and never show again' : 'Dismiss tour')
+    close.onclick = () => this.dismiss(permanent)
     return close
   }
 

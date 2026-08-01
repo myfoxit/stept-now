@@ -1,4 +1,4 @@
-import { buildTarget, type Target } from '@stept/dom-capture';
+import { buildTarget, captureSnapshot, type Target } from '@stept/dom-capture';
 import type { BgToContent, ContentToBg } from '../messages';
 import { isSensitiveFieldAttrs, looksLikeSecret } from '../secret-redaction';
 import type { RawEvent } from '../types';
@@ -28,6 +28,7 @@ export default defineContentScript({
     g.__steptRecorderInit = true;
 
     let recording = false;
+    let sandbox = false;
     let pendingDownTarget: Target | null = null;
     let pendingCaptureToken: string | null = null;
 
@@ -51,10 +52,37 @@ export default defineContentScript({
     chrome.runtime.onMessage.addListener((msg: BgToContent) => {
       if (msg?.type === 'set-recording') {
         recording = msg.recording;
+        sandbox = msg.sandbox === true;
         if (recording) armSpaWatcher();
       }
     });
     send({ type: 'content-ready' });
+
+    /**
+     * Freeze the page for sandbox playback, at the same pointerdown moment as
+     * the screenshot and under the same token.
+     *
+     * Only the TOP frame captures: `captureSnapshot` walks `document`, and a
+     * sub-frame would ship a replica of its own island as if it were the whole
+     * screen. Cost is bounded by skipping a screen we already froze — clicking
+     * five things on one page is one replica, not five.
+     */
+    let lastSnapshotSignature: string | null = null;
+
+    const snapshotNow = (token: string): void => {
+      if (!sandbox || window.top !== window) return;
+      try {
+        const snapshot = captureSnapshot(document);
+        // Cheap identity for "same screen, still": URL plus markup size. A real
+        // navigation or an expanded panel changes one of them.
+        const signature = `${location.href}|${snapshot.html.length}`;
+        if (signature === lastSnapshotSignature) return;
+        lastSnapshotSignature = signature;
+        send({ type: 'snapshot', token, snapshot });
+      } catch {
+        /* a hostile getter or a detached document — the step keeps its screenshot */
+      }
+    };
 
     const capture = (el: Element): Target | null => {
       try {
@@ -88,6 +116,7 @@ export default defineContentScript({
         // to the pointer event that echoes this token.
         pendingCaptureToken = `pc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         send({ type: 'pre-capture', token: pendingCaptureToken });
+        snapshotNow(pendingCaptureToken);
       },
       { capture: true, passive: true },
     );

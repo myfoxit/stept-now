@@ -18,6 +18,7 @@ export default defineConfig({
         '/ws': { target: wsBackend, ws: true },
         '/portal': { target: backend, changeOrigin: true },
         '/widget-assets': { target: backend, changeOrigin: true },
+        '/extension-assets': { target: backend, changeOrigin: true },
       }
     })(),
   },

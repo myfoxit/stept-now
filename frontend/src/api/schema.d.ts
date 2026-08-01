@@ -2770,6 +2770,32 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/widget/dap/snapshots': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Upload Snapshot
+     * @description Store one sandbox DOM replica and hand back its `sandbox_key`.
+     *
+     *     Like screenshots this is tour-independent: the recorder captures a replica
+     *     per step long before a draft exists. The body is the JSON envelope produced
+     *     by `@stept/dom-capture`'s `captureSnapshot` — it is stored and re-served
+     *     verbatim as `application/json`, never as HTML, so the markup inside can only
+     *     ever execute inside the sandboxed iframe the player builds for it.
+     */
+    post: operations['upload_snapshot_api_widget_dap_snapshots_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/widget/dap/tours': {
     parameters: {
       query?: never
@@ -2957,6 +2983,40 @@ export interface paths {
     put?: never
     /** Record Widget Event */
     post: operations['record_widget_event_api_widget_tours__tour_id__events_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/extension-assets/release.json': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Extension Release */
+    get: operations['extension_release_extension_assets_release_json_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/extension-assets/stept-recorder.zip': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Download Extension */
+    get: operations['download_extension_extension_assets_stept_recorder_zip_get']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -3708,6 +3768,52 @@ export interface components {
       /** Ord */
       ord?: number | null
     }
+    /**
+     * BannerTheme
+     * @description How banner-kind tours and `banner` steps are drawn.
+     *
+     *     Defaults reproduce the pre-v2.1 bar exactly (full-width accent overlay
+     *     docked bottom), so tours saved before these fields existed keep rendering
+     *     unchanged.
+     */
+    BannerTheme: {
+      /**
+       * Align
+       * @default start
+       * @enum {string}
+       */
+      align: 'start' | 'center'
+      /** Background */
+      background?: string | null
+      /**
+       * Dismiss
+       * @default dismiss
+       * @enum {string}
+       */
+      dismiss: 'dismiss' | 'never_again'
+      /**
+       * Full Width
+       * @default true
+       */
+      full_width: boolean
+      /** Icon */
+      icon?: string | null
+      /**
+       * Layout
+       * @default overlay
+       * @enum {string}
+       */
+      layout: 'overlay' | 'inline'
+      /** Max Width */
+      max_width?: number | null
+      /**
+       * Rounded
+       * @default false
+       */
+      rounded: boolean
+      /** Text Color */
+      text_color?: string | null
+    }
     /** Body_upload_file_api_v1_w__workspace_id__files_post */
     Body_upload_file_api_v1_w__workspace_id__files_post: {
       /** File */
@@ -3715,6 +3821,11 @@ export interface components {
     }
     /** Body_upload_screenshot_api_widget_dap_screenshots_post */
     Body_upload_screenshot_api_widget_dap_screenshots_post: {
+      /** File */
+      file: string
+    }
+    /** Body_upload_snapshot_api_widget_dap_snapshots_post */
+    Body_upload_snapshot_api_widget_dap_snapshots_post: {
       /** File */
       file: string
     }
@@ -4710,6 +4821,11 @@ export interface components {
     /** DapAuthCheckOut */
     DapAuthCheckOut: {
       /**
+       * App Base Url
+       * @default
+       */
+      app_base_url: string
+      /**
        * Perms Ok
        * @default true
        */
@@ -4863,6 +4979,26 @@ export interface components {
       }[]
       /** Tours */
       tours?: components['schemas']['WidgetTourOut'][]
+    }
+    /**
+     * ExtensionReleaseOut
+     * @description Describes the recorder build the dashboard can hand out.
+     */
+    ExtensionReleaseOut: {
+      /** Api Base */
+      api_base: string
+      /** Available */
+      available: boolean
+      /** Download Url */
+      download_url?: string | null
+      /** Sha256 */
+      sha256?: string | null
+      /** Size Bytes */
+      size_bytes?: number | null
+      /** Version */
+      version?: string | null
+      /** Web Store Url */
+      web_store_url?: string | null
     }
     /** ExtensionTokenOut */
     ExtensionTokenOut: {
@@ -5948,6 +6084,16 @@ export interface components {
       /** Resolution Minutes */
       resolution_minutes?: number | null
     }
+    /**
+     * SnapshotOut
+     * @description Public key of an uploaded DOM replica (sandbox capture).
+     */
+    SnapshotOut: {
+      /** Bytes */
+      bytes: number
+      /** Key */
+      key: string
+    }
     /** SourceCreate */
     SourceCreate: {
       /** Config */
@@ -6040,6 +6186,20 @@ export interface components {
        * @enum {string}
        */
       on: 'button' | 'element_click' | 'input' | 'delay'
+    }
+    /**
+     * StepCta
+     * @description A button on a step. Empty `label` means "use the player default"
+     *     (Next / Got it), so authoring a URL without relabelling still works.
+     */
+    StepCta: {
+      /**
+       * Label
+       * @default
+       */
+      label: string
+      /** Url */
+      url?: string | null
     }
     /** StepMedia */
     StepMedia: {
@@ -6645,6 +6805,7 @@ export interface components {
        * @default
        */
       body: string
+      cta?: components['schemas']['StepCta'] | null
       /** Fallback Selectors */
       fallback_selectors?: string[]
       /** Id */
@@ -6656,8 +6817,11 @@ export interface components {
        * @enum {string}
        */
       placement: 'auto' | 'top' | 'bottom' | 'left' | 'right' | 'center'
+      /** Sandbox Key */
+      sandbox_key?: string | null
       /** Screenshot Key */
       screenshot_key?: string | null
+      secondary_cta?: components['schemas']['StepCta'] | null
       /**
        * Selector
        * @default
@@ -6697,6 +6861,7 @@ export interface components {
        * @default
        */
       body: string
+      cta?: components['schemas']['StepCta'] | null
       /** Fallback Selectors */
       fallback_selectors?: string[]
       /** Id */
@@ -6707,8 +6872,11 @@ export interface components {
        * @default auto
        */
       placement: string
+      /** Sandbox Key */
+      sandbox_key?: string | null
       /** Screenshot Key */
       screenshot_key?: string | null
+      secondary_cta?: components['schemas']['StepCta'] | null
       /**
        * Selector
        * @default
@@ -6759,6 +6927,7 @@ export interface components {
        * @default #6366f1
        */
       accent: string
+      banner?: components['schemas']['BannerTheme']
       /** Position */
       position?: ('top' | 'bottom') | null
     }
@@ -14793,6 +14962,39 @@ export interface operations {
       }
     }
   }
+  upload_snapshot_api_widget_dap_snapshots_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_snapshot_api_widget_dap_snapshots_post']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnapshotOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_dap_tours_api_widget_dap_tours_get: {
     parameters: {
       query?: never
@@ -15181,6 +15383,46 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  extension_release_extension_assets_release_json_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExtensionReleaseOut']
+        }
+      }
+    }
+  }
+  download_extension_extension_assets_stept_recorder_zip_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
         }
       }
     }

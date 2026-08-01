@@ -1,4 +1,4 @@
-import { BarChart3, Copy, Map as MapIcon, Plus } from 'lucide-react'
+import { BarChart3, Copy, Map as MapIcon, Plus, Radio } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useHasPerm } from '@/stores/auth'
 
 import type { Tour, TourKind } from '../api'
+import { RecorderDialog } from '../components/RecorderDialog'
 import { Sparkline } from '../components/Sparkline'
 import { TourKindBadge, TourModeBadge } from '../components/TourBadges'
 import { TourStatusBadge } from '../components/TourStatusBadge'
@@ -122,6 +123,7 @@ export function Component() {
 
   const [kind, setKind] = useState<'all' | TourKind>('all')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [recorderOpen, setRecorderOpen] = useState(false)
   const [name, setName] = useState('')
   const [newKind, setNewKind] = useState<TourKind>('flow')
 
@@ -154,9 +156,14 @@ export function Component() {
           </p>
         </div>
         {canManage ? (
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="size-4" /> New tour
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(true)}>
+              <Plus className="size-4" /> New tour
+            </Button>
+            <Button onClick={() => setRecorderOpen(true)}>
+              <Radio className="size-4" /> Record a tour
+            </Button>
+          </div>
         ) : null}
       </header>
 
@@ -197,14 +204,20 @@ export function Component() {
                         : `No ${KIND_TABS.find((t) => t.value === kind)?.label.toLowerCase()} yet`}
                     </EmptyTitle>
                     <EmptyDescription>
-                      Build a guided walkthrough, ship a banner, or record one from your live app.
+                      The fastest way to build one is to click through your product once and let
+                      the recorder capture the steps for you.
                     </EmptyDescription>
                   </EmptyHeader>
                   {canManage ? (
                     <EmptyContent>
-                      <Button onClick={() => setDialogOpen(true)}>
-                        <Plus className="size-4" /> Create a tour
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button onClick={() => setRecorderOpen(true)}>
+                          <Radio className="size-4" /> Record a tour
+                        </Button>
+                        <Button variant="outline" onClick={() => setDialogOpen(true)}>
+                          <Plus className="size-4" /> Build one by hand
+                        </Button>
+                      </div>
                     </EmptyContent>
                   ) : null}
                 </Empty>
@@ -270,6 +283,8 @@ export function Component() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RecorderDialog open={recorderOpen} onOpenChange={setRecorderOpen} />
     </div>
   )
 }

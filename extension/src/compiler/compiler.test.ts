@@ -259,6 +259,43 @@ describe('titling, overrides and sources', () => {
   });
 });
 
+describe('sandbox replicas', () => {
+  it('attaches a captured replica to the step its event produced', () => {
+    const { steps } = compile([
+      click('a', { sandboxKey: 'public/w/a.json' }),
+      click('b', { sandboxKey: 'public/w/b.json' }),
+    ]);
+    expect(steps.map((s) => s.sandbox_key)).toEqual(['public/w/a.json', 'public/w/b.json']);
+  });
+
+  it('leaves sandbox_key unset when nothing was captured', () => {
+    const { steps } = compile([click('a')]);
+    expect(steps[0]?.sandbox_key ?? null).toBeNull();
+  });
+
+  it('carries the replica through a coalesced typing burst', () => {
+    // Only the first keystroke of a burst carries a replica; the fill step it
+    // compiles into must still find it via its own source events.
+    const { steps } = compile([
+      { ...typed('email', 'a'), sandboxKey: 'public/w/form.json' } as RawEvent,
+      typed('email', 'ada@example.com'),
+    ]);
+    expect(steps).toHaveLength(1);
+    expect(steps[0]?.sandbox_key).toBe('public/w/form.json');
+  });
+
+  it('survives a hover fold, inheriting the folded step’s replica', () => {
+    // hover then click the SAME element: the hover collapses into the click,
+    // handing over its sources — and with them its replica.
+    const { steps } = compile([
+      { ...hover('save'), sandboxKey: 'public/w/hover.json' } as RawEvent,
+      click('save'),
+    ]);
+    expect(steps).toHaveLength(1);
+    expect(steps[0]?.sandbox_key).toBe('public/w/hover.json');
+  });
+});
+
 describe('elementKey', () => {
   it('prefers the fingerprint hash, then the primary selector', () => {
     expect(elementKey(target('x'))).toBe('h-x');
