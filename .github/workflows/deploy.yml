@@ -24,8 +24,13 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  API_IMAGE_NAME: ${{ github.repository_owner }}/stept-api
-  WEB_IMAGE_NAME: ${{ github.repository_owner }}/stept-web
+  # Nested under the repository path on purpose. GITHUB_TOKEN can only create a
+  # GHCR package that belongs to this repo; `ghcr.io/<owner>/stept-api` is a
+  # separate top-level package in the owner's namespace and the push is rejected
+  # with `denied: permission_denied: write_package`. `<owner>/<repo>/<image>` is
+  # the documented multi-image layout and needs no personal access token.
+  API_IMAGE_NAME: ${{ github.repository }}/api
+  WEB_IMAGE_NAME: ${{ github.repository }}/web
 
 jobs:
   # The gate. Deploy depends on this, so a red test suite cannot reach the server.
@@ -217,12 +222,21 @@ jobs:
       # still holds the last release that passed its live checks — which is
       # exactly what a rollback should target.
 
+      - name: Authenticate the host to GHCR for this run
+        run: |
+          # The repo is private, so its packages are too. Log in with this run's
+          # short-lived token into a throwaway docker config rather than writing a
+          # long-lived credential to /root/.docker (and rather than clobbering the
+          # one already there, which other stacks on this box may rely on).
+          ssh production 'umask 077 && mkdir -p /tmp/stept-ghcr'
+          ssh production "docker --config /tmp/stept-ghcr login ghcr.io -u ${{ github.actor }} --password-stdin" <<< "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Pull, migrate, and start
         run: |
           ssh production 'set -eu
             cd /opt/stept
             docker compose config -q
-            docker compose pull --quiet
+            docker --config /tmp/stept-ghcr compose pull --quiet
             # Migrations run in a throwaway container before anything serves
             # traffic, so a failing migration fails the deploy instead of leaving
             # half the workers talking to a schema that moved.
@@ -303,3 +317,7 @@ jobs:
           ssh production 'cd /opt/stept && docker compose ps' || true
           echo "api: ${{ needs.build.outputs.api_image }}"
           echo "web: ${{ needs.build.outputs.web_image }}"
+
+      - name: Discard the throwaway registry credential
+        if: always()
+        run: ssh production 'rm -rf /tmp/stept-ghcr' || true
