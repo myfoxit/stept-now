@@ -9,6 +9,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Pinned explicitly. The repository's default workflow permission is `write`,
+# which GHCR requires for deploy.yml to push images with GITHUB_TOKEN; without
+# this block CI would silently inherit that write token even though it only ever
+# reads the checkout.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend (lint, types, tests)
