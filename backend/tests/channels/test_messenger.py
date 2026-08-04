@@ -30,15 +30,20 @@ def sign(secret: str, body: bytes) -> str:
     return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-async def _messenger_inbox(*, app_secret: str | None = APP_SECRET) -> tuple[str, str]:
+async def _messenger_inbox(
+    *, app_secret: str | None = APP_SECRET, allow_unsigned: bool = False
+) -> tuple[str, str]:
     workspace_id = await make_workspace()
     secrets = {"page_access_token": PAGE_TOKEN}
     if app_secret is not None:
         secrets["app_secret"] = app_secret
+    config: dict = {"page_id": PAGE_ID, "webhook_verify_token": VERIFY_TOKEN}
+    if allow_unsigned:
+        config["allow_unsigned"] = True
     inbox_id = await make_inbox(
         workspace_id,
         channel_type="messenger",
-        config={"page_id": PAGE_ID, "webhook_verify_token": VERIFY_TOKEN},
+        config=config,
         secrets=secrets,
         name="Messenger",
     )
@@ -128,8 +133,16 @@ async def test_webhook_invalid_signature_401(client: httpx.AsyncClient):
     assert response.status_code == 401
 
 
-async def test_webhook_accepted_without_app_secret(client: httpx.AsyncClient):
+async def test_webhook_rejected_without_app_secret(client: httpx.AsyncClient):
+    """Fail closed — an unsigned body on a public endpoint is a spoofed message."""
     _workspace_id, inbox_id = await _messenger_inbox(app_secret=None)
+    response = await _post(client, inbox_id, _text_message(), secret=None)
+    assert response.status_code == 401, response.text
+    assert await _contact_inbox_count(inbox_id) == 0
+
+
+async def test_webhook_accepted_unsigned_only_when_inbox_opts_in(client: httpx.AsyncClient):
+    _workspace_id, inbox_id = await _messenger_inbox(app_secret=None, allow_unsigned=True)
     response = await _post(client, inbox_id, _text_message(), secret=None)
     assert response.status_code == 200, response.text
     assert await _contact_inbox_count(inbox_id) == 1

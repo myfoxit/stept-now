@@ -13,6 +13,12 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_SECRET_KEY = "dev-secret-key-change-me"
+# Values that must never reach prod: our own default plus the one .env.example
+# suggests, which is exactly what a hurried operator copies verbatim.
+INSECURE_SECRET_KEYS = frozenset({DEFAULT_SECRET_KEY, "change-me-in-prod", "changeme", "secret"})
+MIN_SECRET_KEY_LENGTH = 32
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -23,7 +29,7 @@ class Settings(BaseSettings):
     )
 
     env: Literal["dev", "test", "prod"] = "dev"
-    secret_key: str = "dev-secret-key-change-me"
+    secret_key: str = DEFAULT_SECRET_KEY
 
     backend_port: int = 8600
     public_base_url: str = "http://localhost:8600"
@@ -58,6 +64,13 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 30
     invitation_ttl_days: int = 7
     rate_limit_enabled: bool = True
+    # How many reverse proxies append to X-Forwarded-For before the request
+    # reaches us. 0 (default) = we are the edge, so the header is untrusted.
+    trusted_proxy_hops: int = 0
+
+    # Swagger UI + the OpenAPI document. Handy in dev, an inventory of the whole
+    # attack surface in prod — off there unless deliberately re-enabled.
+    expose_api_docs: bool | None = None
 
     @property
     def is_sqlite(self) -> bool:
@@ -66,6 +79,39 @@ class Settings(BaseSettings):
     @property
     def upload_limit_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def docs_enabled(self) -> bool:
+        return self.env != "prod" if self.expose_api_docs is None else self.expose_api_docs
+
+    def assert_production_ready(self) -> None:
+        """Refuse to serve prod traffic on a config that cannot keep a secret.
+
+        ``secret_key`` signs every JWT (access, refresh, widget, extension) and
+        derives the Fernet key for stored provider credentials. Booting prod with
+        the shipped default means anyone who has read the source can mint an
+        access token for any user and decrypt every workspace's API keys, so this
+        is a startup failure rather than a warning someone scrolls past.
+        """
+        if self.env != "prod":
+            return
+        problems: list[str] = []
+        if self.secret_key in INSECURE_SECRET_KEYS:
+            problems.append(
+                "STEPT_SECRET_KEY is still the built-in default — generate one with "
+                "`python -c 'import secrets; print(secrets.token_urlsafe(48))'`"
+            )
+        elif len(self.secret_key) < MIN_SECRET_KEY_LENGTH:
+            problems.append(
+                f"STEPT_SECRET_KEY is {len(self.secret_key)} chars; "
+                f"HMAC-SHA256 wants at least {MIN_SECRET_KEY_LENGTH}"
+            )
+        if self.public_base_url.startswith("http://") and "localhost" not in self.public_base_url:
+            problems.append("STEPT_PUBLIC_BASE_URL must be https in prod")
+        if self.app_base_url.startswith("http://") and "localhost" not in self.app_base_url:
+            problems.append("STEPT_APP_BASE_URL must be https in prod")
+        if problems:
+            raise RuntimeError("Refusing to start with env=prod:\n  - " + "\n  - ".join(problems))
 
 
 @lru_cache

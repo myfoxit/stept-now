@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -19,6 +19,7 @@ from app.api.widget.deps import resolve_inbox
 from app.core.db import utcnow, uuid7
 from app.core.deps import Db
 from app.core.errors import ForbiddenError
+from app.core.ratelimit import RateLimit
 from app.core.security import create_widget_token, verify_identity_hash
 from app.models.article import Article
 from app.models.contact import Contact
@@ -78,7 +79,13 @@ async def _help_center_enabled(session: Db, workspace_id: str) -> bool:
     return row is not None
 
 
-@router.post("/boot", response_model=None)
+@router.post(
+    "/boot",
+    response_model=None,
+    # Unauthenticated and row-creating (Contact + ContactInbox per new
+    # visitor), so it needs a ceiling of its own.
+    dependencies=[Depends(RateLimit("widget_boot", times=30, seconds=60))],
+)
 async def boot(body: BootRequest, session: Db) -> BootResponse | RequireIdentityResponse:
     inbox = await resolve_inbox(session, body.widget_key)
     workspace = await session.get(Workspace, inbox.workspace_id)

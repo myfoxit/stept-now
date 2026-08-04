@@ -29,15 +29,20 @@ MESSENGER_SEND_URL = "https://graph.facebook.com/v19.0/me/messages"
 INSTAGRAM_SEND_URL = "https://graph.instagram.com/v22.0/me/messages"
 
 
-def verify_meta_signature(raw: bytes, header: str | None, app_secret: str | None) -> bool:
+def verify_meta_signature(
+    raw: bytes, header: str | None, app_secret: str | None, *, allow_unsigned: bool = False
+) -> bool:
     """Meta webhook scheme: ``X-Hub-Signature-256`` = ``sha256=`` + HMAC-SHA256 of
     the raw request body keyed by the app secret (constant-time compare).
 
-    Without a stored app secret the check is skipped (360dialog-style setups
-    that relay webhooks without a Meta app secret).
+    Fails **closed**: with no stored app secret the request is rejected, because
+    this endpoint is public and an accepted unsigned body is a spoofed inbound
+    message. Relay setups that genuinely have no Meta app secret (360dialog and
+    friends) opt in per inbox with ``config.allow_unsigned = true``, which is an
+    explicit, auditable choice rather than the default.
     """
     if not app_secret:
-        return True
+        return allow_unsigned
     if not header:
         return False
     digest = hmac.new(app_secret.encode(), raw, hashlib.sha256).hexdigest()

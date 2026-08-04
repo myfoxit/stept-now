@@ -35,15 +35,20 @@ def sign(secret: str, body: bytes) -> str:
     return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-async def _whatsapp_inbox(*, app_secret: str | None = APP_SECRET) -> tuple[str, str]:
+async def _whatsapp_inbox(
+    *, app_secret: str | None = APP_SECRET, allow_unsigned: bool = False
+) -> tuple[str, str]:
     workspace_id = await make_workspace()
     secrets = {"api_key": API_KEY}
     if app_secret is not None:
         secrets["app_secret"] = app_secret
+    config: dict = {"phone_number_id": PHONE_NUMBER_ID, "webhook_verify_token": VERIFY_TOKEN}
+    if allow_unsigned:
+        config["allow_unsigned"] = True
     inbox_id = await make_inbox(
         workspace_id,
         channel_type="whatsapp",
-        config={"phone_number_id": PHONE_NUMBER_ID, "webhook_verify_token": VERIFY_TOKEN},
+        config=config,
         secrets=secrets,
         name="WhatsApp",
     )
@@ -178,8 +183,26 @@ async def test_webhook_missing_signature_401(client: httpx.AsyncClient):
     assert response.status_code == 401
 
 
-async def test_webhook_accepted_without_app_secret(client: httpx.AsyncClient):
+async def test_webhook_rejected_without_app_secret(client: httpx.AsyncClient):
+    """Fail closed: no stored app secret means unsigned bodies are spoofable, so
+    they are refused and nothing is ingested."""
     _workspace_id, inbox_id = await _whatsapp_inbox(app_secret=None)
+    response = await _post(client, inbox_id, _inbound(), secret=None)
+    assert response.status_code == 401, response.text
+    async with get_session_factory()() as session:
+        count = (
+            await session.execute(
+                select(func.count())
+                .select_from(ContactInbox)
+                .where(ContactInbox.inbox_id == inbox_id)
+            )
+        ).scalar_one()
+    assert count == 0
+
+
+async def test_webhook_accepted_unsigned_only_when_inbox_opts_in(client: httpx.AsyncClient):
+    """Relays with no Meta app secret (360dialog & co) opt in explicitly."""
+    _workspace_id, inbox_id = await _whatsapp_inbox(app_secret=None, allow_unsigned=True)
     response = await _post(client, inbox_id, _inbound(), secret=None)
     assert response.status_code == 200, response.text
     async with get_session_factory()() as session:
@@ -191,6 +214,14 @@ async def test_webhook_accepted_without_app_secret(client: httpx.AsyncClient):
             )
         ).scalar_one()
     assert count == 1
+
+
+async def test_webhook_opt_in_does_not_weaken_a_configured_secret(client: httpx.AsyncClient):
+    """allow_unsigned is an escape hatch for *missing* secrets, not a bypass."""
+    _workspace_id, inbox_id = await _whatsapp_inbox(allow_unsigned=True)
+    assert (await _post(client, inbox_id, _inbound(), secret=None)).status_code == 401
+    assert (await _post(client, inbox_id, _inbound(), secret="wrong-secret")).status_code == 401
+    assert (await _post(client, inbox_id, _inbound())).status_code == 200
 
 
 async def test_webhook_disabled_inbox_404(client: httpx.AsyncClient):

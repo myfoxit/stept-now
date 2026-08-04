@@ -16,7 +16,7 @@ from app.models.workspace import Workspace
 
 
 async def make_workspace(session: AsyncSession, name: str = "Analytics WS") -> Workspace:
-    workspace = Workspace(name=name, slug=f"ws-{uuid7()[:13]}", settings={})
+    workspace = Workspace(name=name, slug=f"ws-{uuid7()}", settings={})
     session.add(workspace)
     await session.flush()
     return workspace

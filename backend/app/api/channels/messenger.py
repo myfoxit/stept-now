@@ -7,8 +7,9 @@ and ``instagram_router`` (``/api/channels/instagram``, ``object=="instagram"``).
 delivers ``entry[].messaging[]`` events.
 
 Signature: ``X-Hub-Signature-256`` over the raw body is required and verified
-when the inbox stores an ``app_secret`` secret; without one, requests are
-accepted unsigned. Echoes of our own sends (``message.is_echo``) and
+against the inbox's stored ``app_secret``. With no stored app secret the request
+is **rejected**; relay setups without a Meta app secret opt in per inbox with
+``config.allow_unsigned = true``. Echoes of our own sends (``message.is_echo``) and
 delivery/read receipts are skipped. Contact names use a PSID/IGSID suffix
 placeholder — the optional Graph profile lookup is intentionally not performed
 here. Importing this module also registers the outbound messenger and
@@ -54,7 +55,12 @@ async def _verified_payload(request: Request, inbox: Inbox) -> dict[str, Any] | 
     """Check the Meta signature over the raw body, then parse it (None = no-op)."""
     raw = await request.body()
     app_secret = get_secrets(inbox).get("app_secret")
-    if not verify_meta_signature(raw, request.headers.get("X-Hub-Signature-256"), app_secret):
+    if not verify_meta_signature(
+        raw,
+        request.headers.get("X-Hub-Signature-256"),
+        app_secret,
+        allow_unsigned=bool(inbox.config.get("allow_unsigned")),
+    ):
         raise UnauthorizedError("Invalid Meta signature")
     try:
         payload = json.loads(raw or b"{}")

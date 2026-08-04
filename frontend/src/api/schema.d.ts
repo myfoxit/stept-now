@@ -1477,6 +1477,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/identity-secret': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Identity Secret
+     * @description The widget identity-verification key — kept out of `WorkspaceOut` because
+     *     it forges any visitor's identity, so reading it takes more than membership.
+     */
+    get: operations['get_identity_secret_api_v1_w__workspace_id__identity_secret_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/inboxes': {
     parameters: {
       query?: never
@@ -5188,6 +5209,14 @@ export interface components {
       status: string
       /** Version */
       version: string
+    }
+    /**
+     * IdentitySecretOut
+     * @description The widget identity-verification key, for the snippet the customer embeds.
+     */
+    IdentitySecretOut: {
+      /** Identity Secret */
+      identity_secret: string
     }
     /** InboundEmail */
     InboundEmail: {
@@ -11696,6 +11725,37 @@ export interface operations {
         }
         content: {
           'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_identity_secret_api_v1_w__workspace_id__identity_secret_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IdentitySecretOut']
         }
       }
       /** @description Validation Error */

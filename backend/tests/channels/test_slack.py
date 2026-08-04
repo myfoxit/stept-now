@@ -241,3 +241,93 @@ async def test_outbound_raises_when_not_ok(client: httpx.AsyncClient):
             inbox = await session.get(Inbox, inbox_id)
             message = await session.get(Message, message_id)
             await send(session, inbox, message)
+
+
+# --- tenant isolation -------------------------------------------------------
+
+
+async def test_unmatched_team_id_is_not_delivered_to_another_tenant(client: httpx.AsyncClient):
+    """Slack addresses us by team, not by tenant, so the match must be exact.
+
+    Two workspaces both run Slack. An event whose team_id claims neither must be
+    dropped — not funnelled into whichever workspace configured Slack first.
+    """
+    from app.models.conversation import Conversation
+
+    first_workspace_id, _first_inbox = await _slack_inbox()
+    second_workspace_id = await make_workspace()
+    await make_inbox(
+        second_workspace_id,
+        channel_type="slack",
+        config={"team_id": "T_OTHER"},
+        secrets={"signing_secret": SIGNING_SECRET, "bot_token": BOT_TOKEN},
+        name="Slack Two",
+    )
+
+    response = await _post_event(
+        client,
+        {
+            "type": "event_callback",
+            "team_id": "T_NOBODY",
+            "event": {
+                "type": "message",
+                "channel": "C9",
+                "ts": "1.1",
+                "user": "U9",
+                "text": "should not land anywhere",
+                "client_msg_id": "cross-tenant",
+            },
+        },
+    )
+    assert response.status_code == 404, response.text
+
+    async with get_session_factory()() as session:
+        for workspace_id in (first_workspace_id, second_workspace_id):
+            count = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Conversation)
+                    .where(Conversation.workspace_id == workspace_id)
+                )
+            ).scalar_one()
+            assert count == 0, workspace_id
+
+
+async def test_single_unclaimed_inbox_still_receives_events(client: httpx.AsyncClient):
+    """Self-hosters who never filled in team_id keep working (one inbox only)."""
+    from app.models.conversation import Conversation
+
+    workspace_id = await make_workspace()
+    await make_inbox(
+        workspace_id,
+        channel_type="slack",
+        config={},
+        secrets={"signing_secret": SIGNING_SECRET, "bot_token": BOT_TOKEN},
+        name="Slack Unclaimed",
+    )
+
+    response = await _post_event(
+        client,
+        {
+            "type": "event_callback",
+            "team_id": "T_WHATEVER",
+            "event": {
+                "type": "message",
+                "channel": "C1",
+                "ts": "2.2",
+                "user": "U1",
+                "text": "hello",
+                "client_msg_id": "unclaimed-1",
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    async with get_session_factory()() as session:
+        count = (
+            await session.execute(
+                select(func.count())
+                .select_from(Conversation)
+                .where(Conversation.workspace_id == workspace_id)
+            )
+        ).scalar_one()
+    assert count == 1

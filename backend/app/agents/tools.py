@@ -37,6 +37,7 @@ from app.agents import page_tools
 from app.agents.guides import search_guides
 from app.ai.base import ToolSpec
 from app.core.events import Actor
+from app.core.net import UnsafeUrlError, assert_public_url
 from app.core.security import decrypt_secret
 from app.models.agent import Agent, CustomAction
 from app.models.agent_run import AgentRun
@@ -612,6 +613,13 @@ async def execute_custom_action(
             ok=False,
             error=f"blocked: request host {target_host!r} is not the allowed host {allowed_host!r}",
         )
+    # The result body is handed back to the agent, so this must hold at request
+    # time and not only when the action was saved (DNS moves; rows predate the
+    # schema guard).
+    try:
+        assert_public_url(templated_url)
+    except UnsafeUrlError as exc:
+        return ActionResult(ok=False, error=f"blocked: {exc}")
 
     headers: dict[str, str] = {}
     for header, value in (action.headers or {}).items():

@@ -9,6 +9,7 @@ from app.core.permissions import Perm
 from app.models.workspace import Workspace
 from app.schemas.common import Msg
 from app.schemas.workspace import (
+    IdentitySecretOut,
     InvitationAccept,
     MyMembership,
     WorkspaceCreate,
@@ -30,6 +31,19 @@ async def create_workspace(body: WorkspaceCreate, user: CurrentUser, session: Db
 @router.get("/w/{workspace_id}", response_model=WorkspaceOut)
 async def get_workspace(principal: Member):
     return WorkspaceOut.model_validate(principal.workspace)
+
+
+@router.get(
+    "/w/{workspace_id}/identity-secret",
+    response_model=IdentitySecretOut,
+    dependencies=[Depends(require_perm(Perm.WORKSPACE_MANAGE))],
+)
+async def get_identity_secret(principal: Member):
+    """The widget identity-verification key — kept out of `WorkspaceOut` because
+    it forges any visitor's identity, so reading it takes more than membership."""
+    return IdentitySecretOut(
+        identity_secret=str(principal.workspace.settings.get("identity_secret") or "")
+    )
 
 
 @router.patch(

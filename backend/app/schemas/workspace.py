@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.common import ORMModel
 from app.schemas.user import UserOut
@@ -21,6 +21,19 @@ class WorkspaceUpdate(BaseModel):
     settings: dict[str, Any] | None = None
 
 
+# Settings keys that are credentials, not configuration. `settings` is returned
+# to every member (GET /w/{id} and, embedded, GET /me), and membership alone is
+# not the bar for reading a signing key: identity_secret is what proves a widget
+# visitor's external_id, so anyone holding it can impersonate any identified
+# end-user of the workspace. Read it from the WORKSPACE_MANAGE-gated
+# GET /w/{id}/identity-secret instead.
+REDACTED_SETTINGS_KEYS = frozenset({"identity_secret"})
+
+
+def redact_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in settings.items() if key not in REDACTED_SETTINGS_KEYS}
+
+
 class WorkspaceOut(ORMModel):
     id: str
     name: str
@@ -28,6 +41,17 @@ class WorkspaceOut(ORMModel):
     logo_url: str | None = None
     settings: dict[str, Any]
     created_at: datetime
+
+    @field_validator("settings", mode="after")
+    @classmethod
+    def _redact(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return redact_settings(value)
+
+
+class IdentitySecretOut(BaseModel):
+    """The widget identity-verification key, for the snippet the customer embeds."""
+
+    identity_secret: str
 
 
 class MembershipOut(ORMModel):

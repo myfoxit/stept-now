@@ -28,7 +28,7 @@ async def pg_session(monkeypatch):
 
     from app.models.workspace import Workspace
 
-    workspace = Workspace(name="PG Test", slug=f"pg-test-{uuid7()[:13]}")
+    workspace = Workspace(name="PG Test", slug=f"pg-test-{uuid7()}")
     async with get_session_factory()() as session:
         session.add(workspace)
         await session.commit()

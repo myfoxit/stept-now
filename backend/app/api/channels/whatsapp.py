@@ -6,12 +6,14 @@ verify challenge: ``hub.verify_token`` must match the inbox's configured
 receives message and delivery-status payloads (root =
 ``entry[].changes[].value``).
 
-Signature: when the inbox stores an ``app_secret`` secret, the
-``X-Hub-Signature-256`` header (``sha256=`` + HMAC-SHA256 of the raw body) is
-required and verified; without a stored app secret requests are accepted
-unsigned — 360dialog-style setups where no Meta app secret exists. Parseable
-payloads always answer 200 (Meta retries on non-2xx); unknown shapes no-op.
-Importing this module also registers the outbound WhatsApp sender.
+Signature: the ``X-Hub-Signature-256`` header (``sha256=`` + HMAC-SHA256 of the
+raw body) is required and verified against the inbox's stored ``app_secret``.
+With no stored app secret the request is **rejected** — this endpoint is public,
+so an accepted unsigned body is a spoofed inbound message. Relay setups that
+have no Meta app secret (360dialog and friends) opt in per inbox with
+``config.allow_unsigned = true``. Parseable payloads always answer 200 (Meta
+retries on non-2xx); unknown shapes no-op. Importing this module also registers
+the outbound WhatsApp sender.
 """
 
 from __future__ import annotations
@@ -68,7 +70,12 @@ async def whatsapp_webhook(inbox_id: str, request: Request, session: Db) -> dict
     inbox = await _get_whatsapp_inbox(session, inbox_id)
     raw = await request.body()
     app_secret = get_secrets(inbox).get("app_secret")
-    if not verify_meta_signature(raw, request.headers.get("X-Hub-Signature-256"), app_secret):
+    if not verify_meta_signature(
+        raw,
+        request.headers.get("X-Hub-Signature-256"),
+        app_secret,
+        allow_unsigned=bool(inbox.config.get("allow_unsigned")),
+    ):
         raise UnauthorizedError("Invalid Meta signature")
 
     try:

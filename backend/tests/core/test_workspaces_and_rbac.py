@@ -8,12 +8,56 @@ async def test_create_and_get_workspace(client, workspace_ctx):
     assert response.status_code == 200
     body = response.json()
     assert body["name"] == "Acme Support"
-    assert body["settings"].get("identity_secret")  # auto-generated
+    assert "identity_secret" not in body["settings"]  # credential, not configuration
 
     me = await client.get("/api/v1/me", headers=workspace_ctx.owner_headers)
     membership = me.json()["memberships"][0]
     assert membership["role"] == "owner"
     assert "workspace:delete" in membership["permissions"]
+
+
+async def test_identity_secret_needs_workspace_manage(client, workspace_ctx):
+    """It forges any visitor's identity, so membership alone must not reveal it."""
+    reveal = await client.get(
+        f"{workspace_ctx.base}/identity-secret", headers=workspace_ctx.owner_headers
+    )
+    assert reveal.status_code == 200
+    secret = reveal.json()["identity_secret"]
+    assert secret  # auto-generated at workspace creation
+
+    for role in ("viewer", "agent"):
+        headers = await workspace_ctx.add_member(f"{role}@example.com", role=role)
+        # Not in the workspace payload…
+        listed = await client.get(workspace_ctx.base, headers=headers)
+        assert "identity_secret" not in listed.json()["settings"]
+        # …nor in the membership payload embedded in /me…
+        me = await client.get("/api/v1/me", headers=headers)
+        for membership in me.json()["memberships"]:
+            assert "identity_secret" not in membership["workspace"]["settings"]
+        # …nor readable from the dedicated endpoint.
+        denied = await client.get(f"{workspace_ctx.base}/identity-secret", headers=headers)
+        assert denied.status_code == 403, role
+
+
+async def test_identity_secret_stays_unsettable_through_the_api(client, workspace_ctx):
+    before = (
+        await client.get(
+            f"{workspace_ctx.base}/identity-secret", headers=workspace_ctx.owner_headers
+        )
+    ).json()["identity_secret"]
+    patch = await client.patch(
+        workspace_ctx.base,
+        json={"settings": {"identity_secret": "attacker-chosen", "brand_color": "#fff"}},
+        headers=workspace_ctx.owner_headers,
+    )
+    assert patch.status_code == 200
+    after = (
+        await client.get(
+            f"{workspace_ctx.base}/identity-secret", headers=workspace_ctx.owner_headers
+        )
+    ).json()["identity_secret"]
+    assert after == before
+    assert patch.json()["settings"]["brand_color"] == "#fff"
 
 
 async def test_cross_workspace_access_forbidden(client, workspace_ctx):

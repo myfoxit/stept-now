@@ -35,7 +35,7 @@ async def create_widget_setup(
     async with get_session_factory()() as session:
         workspace = Workspace(
             name="Acme Support",
-            slug=f"acme-{uuid7()[:12]}",
+            slug=f"acme-{uuid7()}",
             settings={"identity_secret": identity_secret},
         )
         session.add(workspace)
