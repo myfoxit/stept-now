@@ -39,10 +39,24 @@ class GuardrailSettings(BaseModel):
     require_citations: bool = False
 
 
+class PageControlSettings(BaseModel):
+    """In-app guidance: may this agent see — and act on — the visitor's page?
+
+    Two switches rather than one, because the useful middle ground is real: plenty
+    of workspaces want "show me where to click" without ever letting an AI press
+    the button. `allow_actions` additionally requires the visitor's own consent in
+    that conversation before any click or keystroke happens.
+    """
+
+    enabled: bool = False
+    allow_actions: bool = False
+
+
 class AgentSettings(BaseModel):
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
     handoff_message: str = "Let me connect you with a teammate who can help."
     guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)
+    page_control: PageControlSettings = Field(default_factory=PageControlSettings)
 
 
 class AgentCreate(BaseModel):
@@ -249,3 +263,24 @@ class CopilotRequest(BaseModel):
 class CopilotResult(BaseModel):
     content: str
     citations: list[Citation]
+
+
+class WriteRequest(BaseModel):
+    """One inline-AI editor command (`app.agents.writer`)."""
+
+    command: Literal[
+        "draft", "improve", "shorten", "expand", "simplify", "fix", "translate", "title", "outline"
+    ]
+    #: What the author asked for (`draft`/`outline`), or an extra instruction.
+    prompt: str | None = Field(default=None, max_length=2000)
+    #: The selected text / surrounding document the command works on.
+    context: str | None = Field(default=None, max_length=20_000)
+    #: Target language for `translate`.
+    language: str | None = Field(default=None, max_length=60)
+    #: Ground a draft in the knowledge base (ignored by rewrite commands).
+    ground: bool = True
+
+
+class WriteResult(BaseModel):
+    content: str
+    citations: list[Citation] = Field(default_factory=list)

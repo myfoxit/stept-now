@@ -42,6 +42,13 @@ export type Screen =
 /** A message plus transient UI flags for optimistic sends. */
 export type UiMessage = WidgetMessage & { pending?: boolean; failed?: boolean }
 
+/** Where the visitor is in the host app, as reported by the loader. */
+export interface PageContext {
+  url: string
+  path: string
+  title: string
+}
+
 export interface AppState {
   screen: Screen
   config: WidgetConfig
@@ -58,6 +65,14 @@ export interface AppState {
   article: ArticleDetail | null
   loadingArticle: boolean
   csatDone: Record<string, boolean>
+  /** Current host page, from the loader's PAGE_CONTEXT messages. */
+  page: PageContext | null
+  /** True once the backend confirms this agent can see the page. */
+  pageControl: boolean
+  /** True once the visitor has allowed the assistant to act on the page. */
+  actionsAllowed: boolean
+  /** Set while a page op is being executed, so the thread can say so. */
+  workingOnPage: string | null
 }
 
 const INITIAL: AppState = {
@@ -76,6 +91,10 @@ const INITIAL: AppState = {
   article: null,
   loadingArticle: false,
   csatDone: {},
+  page: null,
+  pageControl: false,
+  actionsAllowed: false,
+  workingOnPage: null,
 }
 
 export class Controller {
@@ -89,6 +108,8 @@ export class Controller {
   private seenIds = new Set<string>()
   private typingTimer: ReturnType<typeof setTimeout> | null = null
   private agentTypingTimer: ReturnType<typeof setTimeout> | null = null
+  /** opId → the run waiting on it, while the loader executes the op. */
+  private pendingOps = new Map<string, { runId: string; op: string }>()
 
   constructor(params: BootParams) {
     this.params = params
@@ -175,8 +196,144 @@ export class Controller {
         if (typeof payload.campaignId === 'string' && payload.campaignId) {
           void this.onCampaignDue(payload.campaignId)
         }
+      } else if (env.type === MSG.PAGE_CONTEXT) {
+        this.onPageContext((env.payload || {}) as Record<string, unknown>)
+      } else if (env.type === MSG.COPILOT_RESULT) {
+        this.onCopilotResult((env.payload || {}) as Record<string, unknown>)
       }
     })
+  }
+
+  // --- in-app assistant ----------------------------------------------------
+
+  /**
+   * The loader reported the visitor's page (on boot and every SPA navigation).
+   *
+   * Kept in state for the UI and forwarded to the backend, which stores it on the
+   * conversation so the agent's next turn knows which screen "here" means.
+   */
+  private onPageContext(payload: Record<string, unknown>): void {
+    const url = typeof payload.url === 'string' ? payload.url : ''
+    if (!url) return
+    const page: PageContext = {
+      url,
+      path: typeof payload.path === 'string' ? payload.path : '',
+      title: typeof payload.title === 'string' ? payload.title : '',
+    }
+    this.set({ page })
+    void this.pushPageContext()
+  }
+
+  /** Send the current page (and optionally a consent decision) to the backend. */
+  private async pushPageContext(allowActions?: boolean): Promise<void> {
+    const { page, screen } = this.state
+    const conversationId = screen.name === 'thread' ? screen.conversationId : null
+    if (!page || !conversationId) return
+    try {
+      const ack = await this.api.setPageContext(conversationId, {
+        url: page.url,
+        title: page.title,
+        path: page.path,
+        allowActions,
+      })
+      this.set({ pageControl: ack.page_control, actionsAllowed: ack.allow_actions })
+    } catch {
+      /* page context is an enhancement — a failure just means less context */
+    }
+  }
+
+  /**
+   * Let the assistant act on the page (or take that permission back).
+   *
+   * Consent lives on the conversation server-side, so it survives a reload and
+   * is re-read by whichever worker runs the next turn.
+   */
+  async setActionsAllowed(allowed: boolean): Promise<void> {
+    this.set({ actionsAllowed: allowed })
+    await this.pushPageContext(allowed)
+  }
+
+  /**
+   * The agent asked the host page to do something.
+   *
+   * The op is forwarded over the bridge to the loader (only it can touch the host
+   * DOM) and the result is POSTed back to resume the parked run. A `guide` op is
+   * special-cased into the existing tour-start path so an AI-recommended tour
+   * plays with real telemetry against its tour row.
+   */
+  private onCopilotOp(data: Record<string, unknown>): void {
+    const runId = typeof data.run_id === 'string' ? data.run_id : ''
+    const opId = typeof data.op_id === 'string' ? data.op_id : ''
+    const op = typeof data.op === 'string' ? data.op : ''
+    if (!runId || !opId || !op) return
+    const args = (data.args || {}) as Record<string, unknown>
+    this.set({ workingOnPage: op })
+
+    if (op === 'guide') {
+      const tourId = typeof args.tour_id === 'string' ? args.tour_id : ''
+      bridge.post(MSG.TOUR_START, { tourId })
+      void this.finishOp(runId, opId, {
+        ok: Boolean(tourId),
+        ...(tourId ? { note: 'the guide is now playing on the page' } : { error: 'missing tour_id' }),
+      })
+      return
+    }
+    if (op === 'steps') {
+      bridge.post(MSG.GUIDE_START, { name: args.title, steps: args.steps })
+      void this.finishOp(runId, opId, {
+        ok: true,
+        note: 'the walkthrough is now showing on the page',
+      })
+      return
+    }
+
+    this.pendingOps.set(opId, { runId, op })
+    bridge.post(MSG.COPILOT_OP, { opId, op, args })
+  }
+
+  /** The loader answered a page op — pass the result back to the agent run. */
+  private onCopilotResult(payload: Record<string, unknown>): void {
+    const opId = typeof payload.opId === 'string' ? payload.opId : ''
+    const pending = opId ? this.pendingOps.get(opId) : undefined
+    if (!pending) return
+    this.pendingOps.delete(opId)
+    void this.finishOp(pending.runId, opId, (payload.result ?? {}) as Record<string, unknown>)
+  }
+
+  private async finishOp(runId: string, opId: string, result: unknown): Promise<void> {
+    const { screen } = this.state
+    const conversationId = screen.name === 'thread' ? screen.conversationId : null
+    this.set({ workingOnPage: null })
+    if (!conversationId) return
+    try {
+      await this.api.submitOpResult(conversationId, { run_id: runId, op_id: opId, result })
+    } catch {
+      // The run is left to the server-side sweep, which resumes it with a
+      // timeout error rather than stranding the conversation.
+    }
+  }
+
+  /**
+   * After (re)opening a thread, ask whether a page op is outstanding.
+   *
+   * A reload drops the websocket frame that carried it, so without this the run
+   * would sit parked until the sweep timed it out — the visitor would watch the
+   * assistant stall mid-walkthrough for no visible reason.
+   */
+  private async resumePendingOp(conversationId: string): Promise<void> {
+    try {
+      const pending = await this.api.getPendingOp(conversationId)
+      if (pending) {
+        this.onCopilotOp({
+          run_id: pending.run_id,
+          op_id: pending.op_id,
+          op: pending.op,
+          args: pending.args,
+        })
+      }
+    } catch {
+      /* nothing outstanding, or offline */
+    }
   }
 
   /**
@@ -256,6 +413,8 @@ export class Controller {
       this.set({ messages: items, nextCursor: page.next_cursor, loadingMessages: false })
       this.socket?.subscribe(id)
       void this.markRead(id)
+      void this.pushPageContext()
+      void this.resumePendingOp(id)
     } catch (err) {
       this.set({ loadingMessages: false, screen: { name: 'error', message: this.describe(err) } })
     }
@@ -303,6 +462,9 @@ export class Controller {
           conversations: [summary, ...this.state.conversations],
         })
         this.socket?.subscribe(summary.id)
+        // The agent's first turn happens now, so it needs to know which screen the
+        // visitor is on before it decides whether to guide or explain.
+        void this.pushPageContext()
         // Reload authoritative history (drops the temp, includes the real message).
         this.seenIds.clear()
         const page = await this.api.listMessages(summary.id)
@@ -366,6 +528,7 @@ export class Controller {
     if (msg.type === 'message.created') this.onMessageCreated(msg.data)
     else if (msg.type === 'typing') this.onTyping(msg.data)
     else if (msg.type === 'conversation.updated') this.onConversationUpdated(msg.data)
+    else if (msg.type === 'copilot.op') this.onCopilotOp(msg.data)
   }
 
   private onMessageCreated(data: Record<string, unknown>): void {

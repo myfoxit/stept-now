@@ -682,6 +682,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/ai/write': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Ai Write
+     * @description Inline AI for the editor: draft, rewrite, translate, outline.
+     *
+     *     `knowledge:write` rather than an AI permission — this is an authoring tool for
+     *     people who already edit articles and knowledge documents, and it writes
+     *     nothing on its own.
+     */
+    post: operations['ai_write_api_v1_w__workspace_id__ai_write_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/api-keys': {
     parameters: {
       query?: never
@@ -2639,6 +2663,50 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/widget/conversations/{conversation_id}/copilot/pending': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Pending Op
+     * @description The page op this conversation is waiting on, if any.
+     *
+     *     Polled once when the widget (re)connects: the realtime push is lost across a
+     *     reload, and re-fetching beats leaving the person with a silent thread until
+     *     the sweep times the run out.
+     */
+    get: operations['pending_op_api_widget_conversations__conversation_id__copilot_pending_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/conversations/{conversation_id}/copilot/result': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Submit Op Result
+     * @description Hand a page-op result back to the parked run so it can continue.
+     */
+    post: operations['submit_op_result_api_widget_conversations__conversation_id__copilot_result_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/widget/conversations/{conversation_id}/csat': {
     parameters: {
       query?: never
@@ -2688,6 +2756,30 @@ export interface paths {
     put?: never
     /** Submit Feedback */
     post: operations['submit_feedback_api_widget_conversations__conversation_id__messages__message_id__feedback_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/widget/conversations/{conversation_id}/page-context': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Set Page Context
+     * @description Record the visitor's current page and (optionally) their consent.
+     *
+     *     Stored on `conversation.attributes` rather than in memory so the next agent
+     *     run — possibly in another worker, after a reload — sees the same context and
+     *     the same consent decision.
+     */
+    post: operations['set_page_context_api_widget_conversations__conversation_id__page_context_post']
     delete?: never
     options?: never
     head?: never
@@ -3208,6 +3300,7 @@ export interface components {
        * @default Let me connect you with a teammate who can help.
        */
       handoff_message: string
+      page_control?: components['schemas']['PageControlSettings']
       retrieval?: components['schemas']['RetrievalSettings']
     }
     /** AgentStepOut */
@@ -4228,6 +4321,33 @@ export interface components {
       title: string
       /** Url */
       url?: string | null
+    }
+    /** ClientOpAck */
+    ClientOpAck: {
+      /**
+       * Ok
+       * @default true
+       */
+      ok: boolean
+      /**
+       * Status
+       * @default resumed
+       */
+      status: string
+    }
+    /**
+     * ClientOpResultIn
+     * @description The widget's answer to one deferred page op.
+     */
+    ClientOpResultIn: {
+      /** Op Id */
+      op_id: string
+      /** Result */
+      result?: {
+        [key: string]: unknown
+      }
+      /** Run Id */
+      run_id: string
     }
     /** CollectionCreate */
     CollectionCreate: {
@@ -5554,6 +5674,59 @@ export interface components {
       /** Total */
       total: number
     }
+    /**
+     * PageContextIn
+     * @description Where the visitor is, and what the assistant may do there.
+     */
+    PageContextIn: {
+      /** Allow Actions */
+      allow_actions?: boolean | null
+      /** Path */
+      path?: string | null
+      /** Title */
+      title?: string | null
+      /** Url */
+      url: string
+    }
+    /** PageContextOut */
+    PageContextOut: {
+      /**
+       * Allow Actions
+       * @default false
+       */
+      allow_actions: boolean
+      /**
+       * Ok
+       * @default true
+       */
+      ok: boolean
+      /**
+       * Page Control
+       * @default false
+       */
+      page_control: boolean
+    }
+    /**
+     * PageControlSettings
+     * @description In-app guidance: may this agent see — and act on — the visitor's page?
+     *
+     *     Two switches rather than one, because the useful middle ground is real: plenty
+     *     of workspaces want "show me where to click" without ever letting an AI press
+     *     the button. `allow_actions` additionally requires the visitor's own consent in
+     *     that conversation before any click or keystroke happens.
+     */
+    PageControlSettings: {
+      /**
+       * Allow Actions
+       * @default false
+       */
+      allow_actions: boolean
+      /**
+       * Enabled
+       * @default false
+       */
+      enabled: boolean
+    }
     /** PasswordResetConfirm */
     PasswordResetConfirm: {
       /** New Password */
@@ -5568,6 +5741,29 @@ export interface components {
        * Format: email
        */
       email: string
+    }
+    /**
+     * PendingOpOut
+     * @description A page op waiting on this conversation.
+     *
+     *     The realtime push is the normal delivery path; this exists for the reload
+     *     case — a visitor who refreshes mid-guide loses the websocket frame, and
+     *     without a way to ask "is anything waiting for me?" the run would sit until the
+     *     sweep timed it out.
+     */
+    PendingOpOut: {
+      /** Args */
+      args?: {
+        [key: string]: unknown
+      }
+      /** Op */
+      op: string
+      /** Op Id */
+      op_id: string
+      /** Run Id */
+      run_id: string
+      /** Tool */
+      tool: string
     }
     /** PermissionCatalogOut */
     PermissionCatalogOut: {
@@ -7309,6 +7505,44 @@ export interface components {
       settings?: {
         [key: string]: unknown
       } | null
+    }
+    /**
+     * WriteRequest
+     * @description One inline-AI editor command (`app.agents.writer`).
+     */
+    WriteRequest: {
+      /**
+       * Command
+       * @enum {string}
+       */
+      command:
+        | 'draft'
+        | 'improve'
+        | 'shorten'
+        | 'expand'
+        | 'simplify'
+        | 'fix'
+        | 'translate'
+        | 'title'
+        | 'outline'
+      /** Context */
+      context?: string | null
+      /**
+       * Ground
+       * @default true
+       */
+      ground: boolean
+      /** Language */
+      language?: string | null
+      /** Prompt */
+      prompt?: string | null
+    }
+    /** WriteResult */
+    WriteResult: {
+      /** Citations */
+      citations?: components['schemas']['Citation'][]
+      /** Content */
+      content: string
     }
     /** ZeroResultQuery */
     ZeroResultQuery: {
@@ -9067,6 +9301,41 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['AgentRunDetail']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  ai_write_api_v1_w__workspace_id__ai_write_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WriteRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WriteResult']
         }
       }
       /** @description Validation Error */
@@ -14691,6 +14960,76 @@ export interface operations {
       }
     }
   }
+  pending_op_api_widget_conversations__conversation_id__copilot_pending_get: {
+    parameters: {
+      query?: never
+      header?: {
+        'x-widget-token'?: string | null
+      }
+      path: {
+        conversation_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PendingOpOut'] | null
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  submit_op_result_api_widget_conversations__conversation_id__copilot_result_post: {
+    parameters: {
+      query?: never
+      header?: {
+        'x-widget-token'?: string | null
+      }
+      path: {
+        conversation_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ClientOpResultIn']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ClientOpAck']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   submit_csat_api_widget_conversations__conversation_id__csat_post: {
     parameters: {
       query?: never
@@ -14828,6 +15167,43 @@ export interface operations {
           'application/json': {
             [key: string]: unknown
           }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  set_page_context_api_widget_conversations__conversation_id__page_context_post: {
+    parameters: {
+      query?: never
+      header?: {
+        'x-widget-token'?: string | null
+      }
+      path: {
+        conversation_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PageContextIn']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PageContextOut']
         }
       }
       /** @description Validation Error */

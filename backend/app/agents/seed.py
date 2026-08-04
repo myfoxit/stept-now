@@ -36,6 +36,10 @@ SAGE_SETTINGS = {
     "retrieval": {"enabled": True, "k": 6, "source_ids": None},
     "handoff_message": "Let me bring in a teammate who can help with this.",
     "guardrails": {"max_tool_calls": 8, "require_citations": False},
+    # In-app guidance is on for the demo so the widget shows what it can do out of
+    # the box; acting on the page additionally needs the visitor's own consent in
+    # the conversation, so nothing is clicked without a person saying yes.
+    "page_control": {"enabled": True, "allow_actions": True},
 }
 
 # All other tools use their DEFAULT_POLICIES; close stays behind approval explicitly.

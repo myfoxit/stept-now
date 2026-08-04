@@ -49,6 +49,7 @@ import {
   type SteptCommandHandlers,
   type SteptFn,
 } from './loader-core'
+import { PageAgent, type PageOp } from './page-agent'
 import { envelope, MSG, type MessageType, parseEnvelope } from './protocol'
 import { selectFirstEligibleSurvey, SurveyWidget, surveySeenKey } from './survey-widget'
 import { selectFirstEligibleTour, TourPlayer, tourProgressKey } from './tour-player'
@@ -63,6 +64,7 @@ import type {
   Tour,
   TourEventMeta,
   TourEventName,
+  TourStep,
 } from './types'
 
 const currentScript = document.currentScript as HTMLScriptElement | null
@@ -135,6 +137,9 @@ class WidgetHost {
   private campaigns: Campaign[] | null = null
   private campaignTimer: number | null = null
   private lastCampaignUrl = ''
+
+  /** Host-page executor for AI copilot ops — built on first use. */
+  private pageAgent: PageAgent | null = null
 
   constructor(settings: SteptSettings) {
     this.settings = settings
@@ -339,6 +344,7 @@ class WidgetHost {
           this.applyPosition(payload.position)
         }
         this.setUnread(Number(payload.unread ?? 0))
+        this.pushPageContext()
         void this.checkExperiences(true)
         void this.checkCampaigns(true)
         break
@@ -359,7 +365,130 @@ class WidgetHost {
       case MSG.TOUR_START:
         void this.startTour(String(payload.tourId ?? ''))
         break
+      case MSG.COPILOT_OP:
+        void this.runCopilotOp(payload)
+        break
+      case MSG.GUIDE_START:
+        this.playAdHocGuide(payload)
+        break
     }
+  }
+
+  // --- AI copilot: host-page ops + ad-hoc guides ---------------------------
+
+  /**
+   * Execute one AI page op in the host DOM and answer with the result.
+   *
+   * The iframe app holds the visitor token and the conversation; only the loader
+   * can touch the host document, so every copilot action round-trips here. The
+   * result is posted back keyed by `opId` — never thrown, so a failed op becomes
+   * a tool error the model can read and adapt to.
+   */
+  private async runCopilotOp(payload: Record<string, unknown>): Promise<void> {
+    const opId = String(payload.opId ?? '')
+    if (!opId) return
+    const op = payload.op as PageOp['op'] | undefined
+    if (!op) {
+      this.post(MSG.COPILOT_RESULT, { opId, result: { ok: false, error: 'missing op' } })
+      return
+    }
+    const result = await this.agent().run({
+      op,
+      args: (payload.args as PageOp['args']) ?? {},
+    })
+    this.post(MSG.COPILOT_RESULT, { opId, result })
+  }
+
+  /**
+   * The host-page executor, built on first use.
+   *
+   * One instance for the page's lifetime: it carries the index → element binding
+   * from the last snapshot, which is what lets an action (or an AI-authored guide
+   * step) re-find its target after the page re-rendered.
+   */
+  private agent(): PageAgent {
+    if (!this.pageAgent) {
+      this.pageAgent = new PageAgent({ allowedOrigins: this.settings.aiAllowedOrigins })
+    }
+    return this.pageAgent
+  }
+
+  /**
+   * Play an AI-authored guide: the assistant's steps, the stored-tour overlay.
+   *
+   * Wrapped in a synthetic `Tour` so the coach-mark rendering, self-healing
+   * target resolution and progress persistence are literally the same code path
+   * a recorded tour uses. Telemetry stays local (`activeTourId` unset) because
+   * there is no tour row to attribute events to.
+   *
+   * The model addresses elements by the `[index]` it saw in a snapshot, which is
+   * only valid until the next one. Each index is resolved to a durable `Target`
+   * here, at start time, so the walkthrough survives the re-renders the visitor's
+   * own clicks cause as they step through it.
+   */
+  private playAdHocGuide(payload: Record<string, unknown>): void {
+    const steps = this.resolveGuideSteps(payload.steps)
+    if (!steps.length) return
+    this.survey?.close(false)
+    this.checklist?.closePanel()
+    this.activeTourId = null
+    this.tourPlayer?.start(
+      {
+        id: `ai-${Date.now()}`,
+        name: String(payload.name ?? 'How to do this'),
+        steps,
+        theme: { accent: this.accent },
+        version: 1,
+        settings: {
+          mode: 'guided',
+          backdrop: false,
+          show_progress: steps.length > 1,
+          dismissable: true,
+        },
+      },
+      { preview: true },
+    )
+  }
+
+  /**
+   * Turn the model's `{index?, title, body?}` steps into playable TourSteps.
+   *
+   * A step whose index no longer resolves becomes a centred instruction card
+   * rather than being dropped: losing step 2 of 4 would leave a walkthrough that
+   * silently skips the important click.
+   */
+  private resolveGuideSteps(raw: unknown): TourStep[] {
+    if (!Array.isArray(raw)) return []
+    const steps: TourStep[] = []
+    for (const [position, item] of raw.entries()) {
+      if (!item || typeof item !== 'object') continue
+      const entry = item as { index?: unknown; title?: unknown; body?: unknown }
+      const title = String(entry.title ?? '').trim()
+      if (!title) continue
+      const anchored =
+        typeof entry.index === 'number' ? this.agent().describe(entry.index) : null
+      steps.push({
+        id: `ai-step-${position}`,
+        type: anchored ? 'tooltip' : 'modal',
+        selector: anchored?.selector ?? '',
+        fallback_selectors: anchored?.fallback_selectors ?? [],
+        text_hint: anchored?.text_hint ?? '',
+        target: anchored?.target ?? null,
+        title,
+        body: String(entry.body ?? ''),
+        placement: 'auto',
+      })
+    }
+    return steps
+  }
+
+  /** Tell the app where the visitor is, so the assistant has page context. */
+  private pushPageContext(): void {
+    this.post(MSG.PAGE_CONTEXT, {
+      url: window.location.href,
+      path: window.location.pathname,
+      title: document.title,
+    })
   }
 
   private post(type: MessageType, payload: unknown): void {
@@ -384,6 +513,7 @@ class WidgetHost {
   private activeTourId: string | null = null
 
   private onLocationChange = (): void => {
+    this.pushPageContext()
     void this.checkExperiences(false)
     void this.checkCampaigns(false)
   }

@@ -51,6 +51,28 @@ export type { ResolveResult, ResolveVia } from './resolve';
 export { elementTextHint, serializeSelector, simpleProjection, textHintOf } from './projection';
 export type { SimpleProjection } from './projection';
 
+// ---- compact interactive view (what a driving AI "sees") ----
+export {
+  findByText,
+  formState,
+  INDEX_ATTR,
+  indexInteractive,
+  isOnScreen,
+  orderSnapshotElements,
+  OVERLAY_SELECTOR,
+  pageText,
+  serializeCompact,
+  stampIndex,
+  topmostOverlay,
+} from './compact';
+export type {
+  FoundElement,
+  IndexedElement,
+  IndexInteractiveOptions,
+  OverlayCandidate,
+  OverlayRef,
+} from './compact';
+
 // ---- sandbox snapshots (DOM replica capture + render) ----
 export {
   absolutizeCss,

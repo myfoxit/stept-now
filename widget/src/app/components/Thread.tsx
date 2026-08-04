@@ -5,6 +5,7 @@ import type { UiMessage } from '../controller'
 import { Composer } from './Composer'
 import { Csat } from './Csat'
 import { MessageBubble } from './MessageBubble'
+import { PageAssist } from './PageAssist'
 import { TypingDots } from './TypingDots'
 
 export function Thread({
@@ -16,11 +17,16 @@ export function Thread({
   csatDone,
   greeting,
   widgetKey,
+  pageControl,
+  pageTitle,
+  actionsAllowed,
+  workingOnPage,
   onSend,
   onTyping,
   onLoadMore,
   onCsat,
   onFeedback,
+  onAllowActions,
 }: {
   messages: UiMessage[]
   agentTyping: boolean
@@ -30,11 +36,17 @@ export function Thread({
   csatDone: boolean
   greeting: string
   widgetKey: string
+  /** The workspace's agent can see this page — show the assist row. */
+  pageControl: boolean
+  pageTitle: string
+  actionsAllowed: boolean
+  workingOnPage: string | null
   onSend: (text: string) => void
   onTyping: (isTyping: boolean) => void
   onLoadMore: () => void
   onCsat: (rating: number, feedback?: string) => void
   onFeedback: (messageId: string, rating: FeedbackRating) => void
+  onAllowActions: (allowed: boolean) => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
@@ -76,6 +88,14 @@ export function Thread({
           <Csat done={csatDone} onSubmit={onCsat} />
         )}
       </div>
+      {pageControl && !resolved && (
+        <PageAssist
+          pageTitle={pageTitle}
+          actionsAllowed={actionsAllowed}
+          working={workingOnPage}
+          onAllowChange={onAllowActions}
+        />
+      )}
       <Composer onSend={onSend} onTyping={onTyping} />
     </div>
   )

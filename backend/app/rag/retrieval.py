@@ -1,4 +1,4 @@
-"""Hybrid retrieval: dense + lexical → RRF fusion → boosts → neighbor expansion.
+"""Hybrid retrieval: dense + lexical (+ expansion legs) → RRF → boosts → neighbors.
 
 Mirrors Onyx's ranking distilled to Postgres/SQLite (docs/research/onyx.md):
 - dense top-50 (pgvector `<=>` on PG, python cosine on SQLite)
@@ -8,6 +8,19 @@ Mirrors Onyx's ranking distilled to Postgres/SQLite (docs/research/onyx.md):
 - multiplicative hooks after fusion: recency `max(1/(1+0.5*age_years), 0.75)`
   and per-source boost (source.config["boost"], clamped to [0.5, 2.0])
 - ±1 neighbor-chunk expansion at read time (chunks are stored overlap-free)
+
+Three additions ported from the old repo's `services/rag/` (see `app.rag.query`):
+
+- **multi-query expansion**: each alternative phrasing of the question becomes its
+  own dense leg, fused with the rest. A doc that only matches the user's *other*
+  wording ("set up SSO" vs "how do I configure single sign-on") is still found.
+- **title leg**: for navigational/procedural intents, documents whose TITLE
+  matches the query contribute a leg — people asking "where is billing" tend to
+  name the thing they want, and a title match is a strong signal a body match is
+  not.
+- **BM25 blend**: a length-normalised lexical score over the fused candidate set,
+  folded in multiplicatively. Free, deterministic, and it fixes the classic hybrid
+  failure where a long tangentially-related chunk outranks the short exact answer.
 
 Both dialects return the exact same `RetrievedChunk` shape.
 """
@@ -26,12 +39,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.embeddings import embed_texts
 from app.core.db import is_postgres, utcnow
 from app.models.knowledge import Chunk, Document, KnowledgeSource
+from app.rag.query import RewrittenQuery, classify_query, rewrite_query
 
 RRF_K = 60
 RETRIEVAL_DEPTH = 50  # per leg, before fusion
 RECENCY_DECAY_PER_YEAR = 0.5
 RECENCY_FLOOR = 0.75
 SOURCE_BOOST_MIN, SOURCE_BOOST_MAX = 0.5, 2.0
+#: Depth of an expansion / title leg. Narrower than the main legs: these are
+#: recall aids, and giving them equal depth would let a weak paraphrase outvote
+#: the user's actual question.
+EXPANSION_DEPTH = 20
+#: How much a perfect BM25 score can lift a chunk (1.0 → +35%). Small on purpose:
+#: it re-ranks near-ties, it does not overrule dense retrieval.
+BM25_WEIGHT = 0.35
+BM25_K1, BM25_B = 1.5, 0.75
+#: Multiplier for a chunk whose document TITLE matches the question.
+TITLE_MATCH_BOOST = 1.25
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _STOPWORDS = frozenset(
@@ -61,8 +85,16 @@ async def search_chunks(
     source_ids: list[str] | None = None,
     expand_neighbors: bool = True,
     rerank: bool = False,
+    expand_query: bool = True,
+    history: list[str] | None = None,
 ) -> list[RetrievedChunk]:
     """Workspace-scoped hybrid search returning the top-k fused chunks.
+
+    ``expand_query`` (default on) runs the query through `app.rag.query`: filler
+    is stripped, pronouns are resolved against ``history``, and each alternative
+    phrasing becomes an extra retrieval leg. It costs no model call. Pass
+    ``expand_query=False`` for a literal search (the admin search playground,
+    where the operator typed exactly what they meant).
 
     With ``rerank=True`` a wider fused candidate set is passed through the LLM
     rerank/selection pass (`app.rag.rerank`) before truncating to k — graceful
@@ -71,29 +103,55 @@ async def search_chunks(
     query = query.strip()
     if not query or k <= 0:
         return []
-    query_vector = (await embed_texts(session, workspace_id, [query]))[0]
 
+    intent = classify_query(query)
+    rewritten = (
+        rewrite_query(query, history)
+        if expand_query
+        else RewrittenQuery(original=query, rewritten=query)
+    )
+    primary = rewritten.rewritten or query
+    legs = [primary, *rewritten.alternatives]
+    vectors = await embed_texts(session, workspace_id, legs)
+
+    ranked_legs: list[list[str]] = []
     if is_postgres(session):
         dense_ids, sparse_ids = await _ranked_ids_pg(
-            session, workspace_id, query, query_vector, source_ids
+            session, workspace_id, primary, vectors[0], source_ids
         )
     else:
         dense_ids, sparse_ids = await _ranked_ids_python(
-            session, workspace_id, query, query_vector, source_ids
+            session, workspace_id, primary, vectors[0], source_ids
+        )
+    ranked_legs.append(dense_ids)
+    ranked_legs.append(sparse_ids)
+
+    for alternative, vector in zip(legs[1:], vectors[1:], strict=True):
+        ranked_legs.append(
+            await _expansion_leg(session, workspace_id, alternative, vector, source_ids)
         )
 
-    fused = _rrf_fuse([dense_ids, sparse_ids])
+    title_ids: set[str] = set()
+    if intent.prefers_title_match:
+        title_ids = await _title_leg(session, workspace_id, primary, source_ids)
+        if title_ids:
+            ranked_legs.append(sorted(title_ids))
+
+    fused = _rrf_fuse([leg for leg in ranked_legs if leg])
     if not fused:
         return []
 
     rows = await _load_candidates(session, workspace_id, list(fused))
     source_boosts = await _source_boosts(session, workspace_id)
+    bm25 = _bm25_scores(primary, [chunk for chunk, _title, _updated, _source in rows])
     now = utcnow()
     scored = [
         (
             fused[chunk.id]
             * _recency_boost(document_updated_at, now)
-            * source_boosts.get(document_source_id, 1.0),
+            * source_boosts.get(document_source_id, 1.0)
+            * (1.0 + BM25_WEIGHT * bm25.get(chunk.id, 0.0))
+            * (TITLE_MATCH_BOOST if chunk.id in title_ids else 1.0),
             chunk,
             document_title,
         )
@@ -244,6 +302,105 @@ async def _ranked_ids_pg(
         for value in (await session.execute(sparse_stmt, {**params, "q": query})).scalars()
     ]
     return dense_ids, sparse_ids
+
+
+# ---------------------------------------------------------------------------
+# expansion legs
+# ---------------------------------------------------------------------------
+
+
+async def _expansion_leg(
+    session: AsyncSession,
+    workspace_id: str,
+    query: str,
+    query_vector: list[float],
+    source_ids: list[str] | None,
+) -> list[str]:
+    """One dense leg for an alternative phrasing, capped at EXPANSION_DEPTH."""
+    if is_postgres(session):
+        dense_ids, _sparse = await _ranked_ids_pg(
+            session, workspace_id, query, query_vector, source_ids
+        )
+    else:
+        dense_ids, _sparse = await _ranked_ids_python(
+            session, workspace_id, query, query_vector, source_ids
+        )
+    return dense_ids[:EXPANSION_DEPTH]
+
+
+async def _title_leg(
+    session: AsyncSession,
+    workspace_id: str,
+    query: str,
+    source_ids: list[str] | None,
+) -> set[str]:
+    """Chunk ids of documents whose TITLE shares content words with the query.
+
+    Deliberately whole-word: substring matching on a title turns "add" into a hit
+    on "Additional settings", which is exactly the kind of near-miss that erodes
+    trust in a search box.
+    """
+    terms = set(_keywords(query))
+    if not terms:
+        return set()
+    stmt = select(Document.id, Document.title).where(Document.workspace_id == workspace_id)
+    if source_ids:
+        stmt = stmt.where(Document.source_id.in_(source_ids))
+    rows = (await session.execute(stmt)).all()
+    matched = [document_id for document_id, title in rows if terms & set(_keywords(title or ""))]
+    if not matched:
+        return set()
+    chunk_rows = await session.execute(
+        select(Chunk.id)
+        .where(Chunk.workspace_id == workspace_id, Chunk.document_id.in_(matched))
+        .order_by(Chunk.document_id, Chunk.ord)
+        .limit(EXPANSION_DEPTH)
+    )
+    return {str(value) for value in chunk_rows.scalars()}
+
+
+def _bm25_scores(query: str, chunks: list[Chunk]) -> dict[str, float]:
+    """BM25 over the candidate set, normalised to 0..1 (best candidate = 1).
+
+    Length normalisation is the point: without it a 2000-word chunk that mentions
+    the query words once beats the paragraph that answers the question. Scores are
+    relative to this candidate set only — they re-rank near-ties rather than
+    claiming any absolute meaning.
+    """
+    terms = _keywords(query)
+    if not terms or not chunks:
+        return {}
+    tokenized = {chunk.id: _keywords(chunk.content) for chunk in chunks}
+    doc_count = len(chunks)
+    avg_len = sum(len(tokens) for tokens in tokenized.values()) / max(doc_count, 1)
+
+    document_freq: Counter[str] = Counter()
+    for tokens in tokenized.values():
+        for term in set(tokens):
+            document_freq[term] += 1
+
+    idf = {}
+    for term in set(terms):
+        seen_in = document_freq.get(term, 0)
+        idf[term] = math.log(1.0 + (doc_count - seen_in + 0.5) / (seen_in + 0.5))
+
+    raw: dict[str, float] = {}
+    for chunk_id, tokens in tokenized.items():
+        counts = Counter(tokens)
+        length = len(tokens)
+        score = 0.0
+        for term in terms:
+            frequency = counts.get(term, 0)
+            if not frequency:
+                continue
+            denominator = frequency + BM25_K1 * (1 - BM25_B + BM25_B * length / max(avg_len, 1.0))
+            score += idf.get(term, 0.0) * frequency * (BM25_K1 + 1) / max(denominator, 1e-9)
+        raw[chunk_id] = score
+
+    best = max(raw.values(), default=0.0)
+    if best <= 0:
+        return {}
+    return {chunk_id: score / best for chunk_id, score in raw.items()}
 
 
 # ---------------------------------------------------------------------------

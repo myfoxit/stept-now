@@ -1,11 +1,15 @@
 """Tool registry + executors for the agent engine.
 
-Six builtin tools plus workspace `CustomAction` HTTP tools. Each tool has:
+Seven builtin tools, the client-executed page tools, plus workspace
+`CustomAction` HTTP tools. Each tool has:
 - a `ToolSpec` (name/description/JSON-schema) sent to the provider,
 - a default policy (auto | require_approval | disabled — the contract's
   DEFAULT_POLICIES), overridable per-agent,
 - a `control` signal (``none`` | ``handoff`` | ``close``) so terminal tools stop
   the loop.
+
+Tools in `ToolPlan.client` are NOT executed here: the engine defers them to the
+visitor's browser (see `app.agents.page_tools`) and resumes with the result.
 
 Custom actions template `{param}` placeholders into the URL/body, enforce that the
 final (and any redirect) host equals the configured URL host, decrypt header
@@ -29,6 +33,8 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents import page_tools
+from app.agents.guides import search_guides
 from app.ai.base import ToolSpec
 from app.core.events import Actor
 from app.core.security import decrypt_secret
@@ -37,6 +43,7 @@ from app.models.agent_run import AgentRun
 from app.models.contact import Contact
 from app.models.conversation import Conversation
 from app.models.tag import Tag
+from app.rag.context import DEFAULT_MAX_TOKENS, build_context
 from app.rag.retrieval import search_chunks
 from app.services import conversations as conversations_service
 from app.services.search_analytics import record_search
@@ -48,6 +55,9 @@ POLICY_REQUIRE_APPROVAL = "require_approval"
 POLICY_DISABLED = "disabled"
 
 ACTION_PREFIX = "action:"
+
+#: Turns handed to the query rewriter for pronoun resolution.
+_HISTORY_TURNS = 4
 
 
 # --- context & outcome ------------------------------------------------------
@@ -104,6 +114,9 @@ class ToolPlan:
     policy: dict[str, str]
     control: dict[str, str]
     action_ids: dict[str, str]
+    #: Tool names the engine must defer to the visitor's browser instead of
+    #: executing server-side (`app.agents.page_tools`).
+    client: set[str] = field(default_factory=set)
 
 
 # --- helpers ----------------------------------------------------------------
@@ -144,7 +157,15 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
         ctx.run.citations = []
         return ToolOutcome({"results": []})
     k, source_ids = _retrieval_settings(ctx.agent)
-    results = await search_chunks(ctx.session, ctx.workspace_id, query, k=k, source_ids=source_ids)
+    history = await _recent_turns(ctx)
+    results = await search_chunks(
+        ctx.session,
+        ctx.workspace_id,
+        query,
+        k=k,
+        source_ids=source_ids,
+        history=history,
+    )
     await record_search(
         ctx.session,
         ctx.workspace_id,
@@ -153,24 +174,81 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
         results_count=len(results),
         top_score=results[0].score if results else None,
     )
-    citations = [
-        {
-            "n": index + 1,
-            "title": chunk.title,
-            "url": chunk.url,
-            "document_id": chunk.document_id,
-            "content": chunk.content[:500],
-        }
-        for index, chunk in enumerate(results)
-    ]
-    ctx.run.citations = citations
+    # Budgeted assembly rather than a fixed slice per chunk: the best chunk gets
+    # the room it needs, and the citation numbering the model sees is the same
+    # numbering the widget renders under the reply.
+    context = build_context(results, query, max_tokens=_context_budget(ctx.agent))
+    ctx.run.citations = context.citation_dicts()
     payload = {
         "results": [
-            {"n": c["n"], "title": c["title"], "content": c["content"], "url": c["url"]}
-            for c in citations
+            {
+                "n": citation.n,
+                "title": citation.title,
+                "content": citation.content,
+                "url": citation.url,
+            }
+            for citation in context.citations
         ]
     }
     return ToolOutcome(payload)
+
+
+def _context_budget(agent: Agent) -> int:
+    settings = agent.settings if isinstance(agent.settings, dict) else {}
+    retrieval = settings.get("retrieval") or {}
+    try:
+        return max(200, int(retrieval.get("context_tokens") or DEFAULT_MAX_TOKENS))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_TOKENS
+
+
+async def _recent_turns(ctx: ToolContext) -> list[str]:
+    """The last few public turns, oldest first — pronoun resolution material.
+
+    "How do I cancel it?" is only answerable against the previous message, so the
+    rewriter gets the conversation, not just the tool argument.
+    """
+    if ctx.conversation is None:
+        return []
+    from app.models.message import Message
+
+    rows = (
+        (
+            await ctx.session.execute(
+                select(Message.content)
+                .where(
+                    Message.conversation_id == ctx.conversation.id,
+                    Message.visibility == "public",
+                )
+                .order_by(Message.created_at.desc(), Message.id.desc())
+                .limit(_HISTORY_TURNS)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(reversed([content for content in rows if content]))
+
+
+async def _exec_find_guide(ctx: ToolContext, tool_input: dict[str, Any]) -> ToolOutcome:
+    """Look for a published tour/checklist that teaches what the visitor asked.
+
+    Scoped to the page the visitor is on when the widget reported one, so the
+    same question on two screens can resolve to two different guides.
+    """
+    query = str(tool_input.get("query", "")).strip()
+    if not query:
+        return ToolOutcome({"guides": []})
+    attributes = (
+        ctx.conversation.attributes
+        if ctx.conversation is not None and isinstance(ctx.conversation.attributes, dict)
+        else {}
+    )
+    url = attributes.get("page_url")
+    matches = await search_guides(
+        ctx.session, ctx.workspace_id, query, url=url if isinstance(url, str) else None
+    )
+    return ToolOutcome({"guides": [match.to_tool_payload() for match in matches]})
 
 
 async def _exec_handoff(ctx: ToolContext, tool_input: dict[str, Any]) -> ToolOutcome:
@@ -307,6 +385,23 @@ BUILTIN_TOOLS: dict[str, BuiltinTool] = {
         executor=_exec_search_knowledge,
         default_policy=POLICY_AUTO,
     ),
+    "find_guide": BuiltinTool(
+        name="find_guide",
+        description=(
+            "Look for a product tour or checklist that walks the person through a task in this "
+            "app. Call it whenever they ask how to do something — a guide that shows them in the "
+            "real UI beats a written answer. Returns ids to pass to show_guide."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "The task, in the person's words."}
+            },
+            "required": ["query"],
+        },
+        executor=_exec_find_guide,
+        default_policy=POLICY_AUTO,
+    ),
     "handoff_to_human": BuiltinTool(
         name="handoff_to_human",
         description="Hand the conversation to a human teammate when you cannot help confidently.",
@@ -371,12 +466,23 @@ ACTION_DEFAULT_POLICY = POLICY_REQUIRE_APPROVAL
 # --- resolution & dispatch --------------------------------------------------
 
 
-async def resolve_agent_tools(session: AsyncSession, workspace_id: str, agent: Agent) -> ToolPlan:
+async def resolve_agent_tools(
+    session: AsyncSession,
+    workspace_id: str,
+    agent: Agent,
+    *,
+    conversation: Conversation | None = None,
+) -> ToolPlan:
     """Build the ToolSpec list + policy/control/action maps for one agent.
 
     All builtins are offered to the model (policy governs execution: a disabled
     tool call yields a denial-as-tool-result); custom actions are opt-in via
     ``action:<id>`` keys in ``agent.tools``.
+
+    In-app page tools are different in kind: they are only offered when the agent
+    enables page control AND the visitor consented in this conversation, because
+    they act inside someone else's session. Withholding the spec (rather than
+    refusing the call) means the model never proposes what it cannot do.
     """
     # Explicit per-tool policy from the agent config (None → apply the default).
     configured: dict[str, str | None] = {}
@@ -396,6 +502,17 @@ async def resolve_agent_tools(session: AsyncSession, workspace_id: str, agent: A
         )
         policy[name] = configured.get(name) or builtin.default_policy
         control[name] = builtin.control
+
+    client: set[str] = set()
+    offer_client, allow_mutating = page_tools.client_tools_available(
+        agent.settings, conversation.attributes if conversation is not None else None
+    )
+    if offer_client:
+        for client_spec in page_tools.client_tool_specs(allow_mutating=allow_mutating):
+            specs.append(client_spec)
+            policy[client_spec.name] = configured.get(client_spec.name) or POLICY_AUTO
+            control[client_spec.name] = "none"
+            client.add(client_spec.name)
 
     for key, pol in configured.items():
         if not key.startswith(ACTION_PREFIX):
@@ -417,7 +534,9 @@ async def resolve_agent_tools(session: AsyncSession, workspace_id: str, agent: A
         control[spec_name] = "none"
         action_ids[spec_name] = action_id
 
-    return ToolPlan(specs=specs, policy=policy, control=control, action_ids=action_ids)
+    return ToolPlan(
+        specs=specs, policy=policy, control=control, action_ids=action_ids, client=client
+    )
 
 
 async def execute_tool(ctx: ToolContext, name: str, tool_input: dict[str, Any]) -> ToolOutcome:
