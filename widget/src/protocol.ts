@@ -34,6 +34,27 @@ export const MSG = {
    * (payload `{checklistId, itemId}`) so the app can react to the context.
    */
   CHECKLIST_ACTION: 'stept:checklist:action',
+  /**
+   * app -> loader: run one AI page op in the host DOM
+   * (payload `{opId, op, args}` — see page-agent.ts). The app holds the visitor
+   * token and the conversation, the loader owns the host document, so every
+   * copilot action crosses this bridge.
+   */
+  COPILOT_OP: 'stept:copilot:op',
+  /** loader -> app: the result of a {@link MSG.COPILOT_OP} (payload `{opId, result}`). */
+  COPILOT_RESULT: 'stept:copilot:result',
+  /**
+   * app -> loader: play an ad-hoc, AI-authored guide in the host page
+   * (payload `{steps, name}`) — the same overlay a stored tour uses, without a
+   * stored tour behind it.
+   */
+  GUIDE_START: 'stept:guide:start',
+  /**
+   * loader -> app: where the visitor is right now (payload
+   * `{url, title, path}`), pushed on boot and on every SPA URL change so the
+   * assistant can answer "how do I do this *here*" without asking.
+   */
+  PAGE_CONTEXT: 'stept:page:context',
 } as const
 
 export type MessageType = (typeof MSG)[keyof typeof MSG]

@@ -12,6 +12,7 @@ from app.api.widget import (
     campaigns,
     checklists,
     conversations,
+    copilot,
     csat,
     dap,
     feedback,
@@ -23,6 +24,7 @@ from app.api.widget import (
 widget_router = APIRouter()
 widget_router.include_router(boot.router, tags=["widget"])
 widget_router.include_router(conversations.router, tags=["widget"])
+widget_router.include_router(copilot.router, tags=["widget-copilot"])
 widget_router.include_router(articles.router, tags=["widget"])
 widget_router.include_router(csat.router, tags=["widget"])
 widget_router.include_router(tours.router, tags=["widget"])

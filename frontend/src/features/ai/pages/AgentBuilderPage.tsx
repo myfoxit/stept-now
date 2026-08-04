@@ -50,6 +50,8 @@ export function Component() {
   const [maxToolCalls, setMaxToolCalls] = useState(8)
   const [requireCitations, setRequireCitations] = useState(false)
   const [handoffMessage, setHandoffMessage] = useState('')
+  const [pageControl, setPageControl] = useState(false)
+  const [allowPageActions, setAllowPageActions] = useState(false)
   const [policies, setPolicies] = useState<Record<string, ToolPolicy>>({})
 
   // Build the tool matrix rows (builtins + custom actions).
@@ -79,6 +81,8 @@ export function Component() {
     setMaxToolCalls(settings?.guardrails?.max_tool_calls ?? 8)
     setRequireCitations(settings?.guardrails?.require_citations ?? false)
     setHandoffMessage(settings?.handoff_message ?? '')
+    setPageControl(settings?.page_control?.enabled ?? false)
+    setAllowPageActions(settings?.page_control?.allow_actions ?? false)
     const tools = (agent.tools as ToolConfig[]) ?? []
     const map: Record<string, ToolPolicy> = {}
     for (const t of BUILTIN_TOOLS) {
@@ -109,6 +113,7 @@ export function Component() {
         retrieval: { enabled: retrievalEnabled, k: retrievalK, source_ids: sourceIds },
         handoff_message: handoffMessage,
         guardrails: { max_tool_calls: maxToolCalls, require_citations: requireCitations },
+        page_control: { enabled: pageControl, allow_actions: pageControl && allowPageActions },
       }
       const tools: ToolConfig[] = toolRows.map((row) => ({
         key: row.key,
@@ -367,6 +372,50 @@ export function Component() {
                       ) : null}
                     </div>
                   </div>
+                </CardContent>
+              ) : null}
+            </Card>
+
+            {/* In-app guidance */}
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-sm">In-app guidance</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Let this agent see the page the visitor is on, play a tour, or point at the
+                    right control.
+                  </p>
+                </div>
+                <Switch
+                  checked={pageControl}
+                  onCheckedChange={setPageControl}
+                  aria-label="Enable in-app guidance"
+                  disabled={!canManage}
+                />
+              </CardHeader>
+              {pageControl ? (
+                <CardContent className="grid gap-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="grid gap-1">
+                      <Label htmlFor="allow-page-actions">Let it act on the page</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Click, type and navigate on the visitor&rsquo;s behalf. Each visitor still
+                        has to allow it in their own conversation, and password fields are never
+                        touched.
+                      </p>
+                    </div>
+                    <Switch
+                      id="allow-page-actions"
+                      checked={allowPageActions}
+                      onCheckedChange={setAllowPageActions}
+                      aria-label="Allow page actions"
+                      disabled={!canManage}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Add <code>data-stept-no-ai</code> to any element on your site to fence it off
+                    from the assistant.
+                  </p>
                 </CardContent>
               ) : null}
             </Card>

@@ -130,9 +130,17 @@ async def ingest_document_task(ctx: TaskContext, *, document_id: str) -> None:
         document = await session.get(Document, document_id)
         if document is None:
             # The enqueuing request may not have committed yet — retry via the
-            # queue's backoff; a genuinely deleted document just logs and stops.
+            # queue's backoff. On the last attempt we cannot tell "deleted" from
+            # "still not committed", so say so instead of returning silently: a
+            # document that really did exist would otherwise sit at `pending`
+            # forever with nothing in the log to explain why it has no chunks.
             if ctx.attempt < MAX_ATTEMPTS:
                 raise RuntimeError(f"document {document_id} not visible yet")
+            logger.warning(
+                "giving up on document %s — never became visible (deleted, or its "
+                "transaction never committed); re-sync the source to index it",
+                document_id,
+            )
             return
         document.status = "processing"
         document.error = None

@@ -32,6 +32,8 @@ export interface AgentSettings {
   retrieval: { enabled: boolean; k: number; source_ids: string[] | null }
   handoff_message: string
   guardrails: { max_tool_calls: number; require_citations: boolean }
+  /** In-app guidance: see the visitor's page, and (optionally) act on it. */
+  page_control?: { enabled: boolean; allow_actions: boolean }
 }
 
 export const aiKeys = {

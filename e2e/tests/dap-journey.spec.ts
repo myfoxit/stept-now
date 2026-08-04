@@ -4,6 +4,7 @@ import {
   BACKEND,
   bearer,
   demoApiContext,
+  fillTourStep,
   getDemoWidgetKey,
   liveTourIds,
   loginAsDemoOwner,
@@ -76,13 +77,14 @@ test('a tour authored in the dashboard plays on a host page and its events land 
     await page.getByLabel('Priority').fill('50')
 
     await page.getByRole('button', { name: /add step/i }).click()
-    await page.locator('#selector-0').fill('[data-tour="knowledge"]')
-    await page.locator('#title-0').fill(stepOne)
-    await page.locator('#body-0').fill('Docs and articles your **AI agent** cites.')
+    await fillTourStep(page, 0, {
+      selector: '[data-tour="knowledge"]',
+      title: stepOne,
+      body: 'Docs and articles your **AI agent** cites.',
+    })
 
     await page.getByRole('button', { name: /add step/i }).click()
-    await page.locator('#selector-1').fill('[data-tour="ai"]')
-    await page.locator('#title-1').fill(stepTwo)
+    await fillTourStep(page, 1, { selector: '[data-tour="ai"]', title: stepTwo })
 
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByText('Tour saved')).toBeVisible()
@@ -312,8 +314,7 @@ test('a preview link plays an unpublished tour that a normal visit never sees', 
     await page.getByLabel('URL pattern').fill('*e2e-preview-stage*')
     await page.getByLabel('Priority').fill('50')
     await page.getByRole('button', { name: /add step/i }).click()
-    await page.locator('#selector-0').fill('[data-tour="knowledge"]')
-    await page.locator('#title-0').fill(stepTitle)
+    await fillTourStep(page, 0, { selector: '[data-tour="knowledge"]', title: stepTitle })
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByText('Tour saved')).toBeVisible()
     // Never published: the header still offers Publish, and the badge says draft.

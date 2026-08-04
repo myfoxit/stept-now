@@ -133,3 +133,21 @@ export async function markToursSeen(
     { key: widgetKey, ids: tourIds }
   )
 }
+
+/**
+ * Fill one step of the tour editor, opening its "Advanced" disclosure first.
+ *
+ * The CSS-selector field lives behind that disclosure (`StepEditor`), so a spec
+ * that fills `#selector-N` directly waits forever on a hidden input.
+ */
+export async function fillTourStep(
+  page: Page,
+  index: number,
+  { selector, title, body }: { selector: string; title: string; body?: string }
+): Promise<void> {
+  await page.locator('#title-' + index).fill(title)
+  if (body !== undefined) await page.locator('#body-' + index).fill(body)
+  const advanced = page.getByRole('button', { name: /^Advanced/ }).nth(index)
+  if ((await advanced.getAttribute('data-state')) !== 'open') await advanced.click()
+  await page.locator('#selector-' + index).fill(selector)
+}

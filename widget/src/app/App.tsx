@@ -86,6 +86,11 @@ export function App({ controller }: { controller: Controller }) {
           csatDone={screen.conversationId ? Boolean(state.csatDone[screen.conversationId]) : false}
           greeting={state.config.greeting || 'Hi there 👋'}
           widgetKey={controller.widgetKey}
+          pageControl={state.pageControl}
+          pageTitle={state.page?.title || state.page?.path || ''}
+          actionsAllowed={state.actionsAllowed}
+          workingOnPage={state.workingOnPage}
+          onAllowActions={(allowed) => void controller.setActionsAllowed(allowed)}
           onSend={(text) => void controller.send(text)}
           onTyping={(t) => controller.emitTyping(t)}
           onLoadMore={() => void controller.loadOlderMessages()}

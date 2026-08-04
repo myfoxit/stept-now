@@ -31,6 +31,8 @@ class AgentRunStatus(enum.StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     AWAITING_APPROVAL = "awaiting_approval"
+    #: Parked on an in-app page op the visitor's widget must execute.
+    AWAITING_CLIENT = "awaiting_client"
     COMPLETED = "completed"
     FAILED = "failed"
     HANDED_OFF = "handed_off"
@@ -41,6 +43,8 @@ class AgentStepKind(enum.StrEnum):
     LLM_CALL = "llm_call"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
+    #: An in-app page op was pushed to the visitor's browser (input = tool args).
+    CLIENT_REQUEST = "client_request"
     APPROVAL_REQUEST = "approval_request"
     APPROVAL_DECISION = "approval_decision"
     FINAL_REPLY = "final_reply"

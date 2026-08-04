@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents import copilot, engine
+from app.agents import copilot, engine, writer
 from app.agents import engine as _agent_engine  # noqa: F401 — registers @on triggers + task
 from app.agents.tools import execute_custom_action
 from app.core.deps import Db, Principal, require_perm
@@ -41,6 +41,8 @@ from app.schemas.agents import (
     CustomActionCreate,
     CustomActionOut,
     CustomActionUpdate,
+    WriteRequest,
+    WriteResult,
 )
 from app.schemas.common import Msg
 from app.services import audit
@@ -50,6 +52,7 @@ router = APIRouter()
 Reader = Annotated[Principal, Depends(require_perm(Perm.AI_READ))]
 Manager = Annotated[Principal, Depends(require_perm(Perm.AI_MANAGE))]
 Writer = Annotated[Principal, Depends(require_perm(Perm.CONVERSATIONS_WRITE))]
+Author = Annotated[Principal, Depends(require_perm(Perm.KNOWLEDGE_WRITE))]
 
 
 def _actor(principal: Principal) -> Actor:
@@ -375,4 +378,27 @@ async def copilot_suggest(body: CopilotRequest, principal: Writer, session: Db) 
     return CopilotResult(
         content=suggestion["content"],
         citations=[Citation(**c) for c in suggestion["citations"]],
+    )
+
+
+@router.post("/ai/write", response_model=WriteResult)
+async def ai_write(body: WriteRequest, principal: Author, session: Db) -> Any:
+    """Inline AI for the editor: draft, rewrite, translate, outline.
+
+    `knowledge:write` rather than an AI permission — this is an authoring tool for
+    people who already edit articles and knowledge documents, and it writes
+    nothing on its own.
+    """
+    result = await writer.write(
+        session,
+        principal.workspace.id,
+        command=body.command,
+        prompt=body.prompt,
+        context=body.context,
+        language=body.language,
+        ground=body.ground,
+    )
+    return WriteResult(
+        content=result.content,
+        citations=[Citation(**citation) for citation in result.citations],  # type: ignore[arg-type]
     )

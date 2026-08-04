@@ -18,11 +18,15 @@ from app.ai.base import ChatMessage, ChatRequest
 from app.ai.registry import resolve_chat
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.rag.context import build_context
 from app.rag.retrieval import search_chunks
 from app.services.search_analytics import record_search
 
 _RECENT_CONTACT_MESSAGES = 3
 _HISTORY_CAP = 20
+#: Room for sources in a draft-reply prompt. Smaller than the agent's budget:
+#: a human is going to read and edit this, so breadth beats depth.
+_COPILOT_CONTEXT_TOKENS = 1200
 
 
 async def suggest_reply(
@@ -50,7 +54,13 @@ async def suggest_reply(
     citations: list[dict[str, Any]] = []
     context_block = "No knowledge-base sources were found."
     if query:
-        results = await search_chunks(session, conversation.workspace_id, query, k=5)
+        results = await search_chunks(
+            session,
+            conversation.workspace_id,
+            query,
+            k=5,
+            history=[message.content for message in reversed(recent_contact) if message.content],
+        )
         await record_search(
             session,
             conversation.workspace_id,
@@ -59,20 +69,10 @@ async def suggest_reply(
             results_count=len(results),
             top_score=results[0].score if results else None,
         )
-        citations = [
-            {
-                "n": index + 1,
-                "title": chunk.title,
-                "url": chunk.url,
-                "document_id": chunk.document_id,
-            }
-            for index, chunk in enumerate(results)
-        ]
-        if results:
-            context_block = "Sources:\n" + "\n\n".join(
-                f"[{index + 1}] {chunk.title}\n{chunk.content[:500]}"
-                for index, chunk in enumerate(results)
-            )
+        context = build_context(results, query, max_tokens=_COPILOT_CONTEXT_TOKENS)
+        citations = context.citation_dicts()
+        if context.context_text:
+            context_block = f"Sources:\n{context.context_text}"
 
     system = (
         f"You are a support copilot drafting a reply on behalf of {member_name}. "

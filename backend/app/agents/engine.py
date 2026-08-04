@@ -6,7 +6,8 @@ State machine (docs/research/claude-agent-sdk.md §5.1):
                     │
                     ├─▶ handed_off          (handoff tool / loop-exhaustion / empty reply)
                     ├─▶ failed              (non-retryable provider error)
-                    └─▶ awaiting_approval ──(decision)──▶ running ─▶ …
+                    ├─▶ awaiting_approval ──(human decision)──▶ running ─▶ …
+                    └─▶ awaiting_client ────(widget result)───▶ running ─▶ …
 
 When a ``require_approval`` tool is reached the loop persists an
 ``ApprovalRequest`` + ``pending_tool_call`` + a serialized ``messages_snapshot``,
@@ -15,6 +16,13 @@ the gate survives a process restart. A human decision re-enqueues the run; the
 resume rehydrates the snapshot, executes (approve) or denies-as-tool-result
 (reject/expire — the model sees the denial and adapts, per docs/research/vercel-ai.md),
 then continues the loop.
+
+``awaiting_client`` is the same mechanism with a browser instead of a human on
+the other side: an in-app page tool (`app.agents.page_tools`) cannot run on the
+server, so the call is persisted, pushed to the visitor's widget over the
+conversation topic, and the widget POSTs the result back to resume. A visitor who
+closes the tab mid-guide leaves a run parked in ``awaiting_client``; the
+``sweep_stale_client_waits`` job hands those to a human instead of leaking them.
 
 A conversation is NEVER stranded: any provider failure, loop exhaustion, or empty
 reply falls back to a human (status ``open`` + activity note).
@@ -26,15 +34,20 @@ build. ``app.agents.tasks`` (imported at the bottom) registers the queue task.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import re
 import time
 from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import Any
 
+from sqlalchemy import event as event_
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents import page_tools
 from app.agents import tools as tool_registry
 from app.agents.tools import (
     ACTION_DEFAULT_POLICY,
@@ -51,19 +64,24 @@ from app.core.errors import ConflictError
 from app.core.events import Actor, Event, EventNames, emit, on
 from app.core.permissions import Perm, resolve_permissions
 from app.core.queue import enqueue
+from app.core.scheduler import scheduled
 from app.models.agent import Agent
 from app.models.agent_run import AgentRun, AgentStep, ApprovalRequest
 from app.models.conversation import Conversation
 from app.models.inbox import Inbox
 from app.models.message import Message
 from app.models.workspace import Membership, Workspace
-from app.realtime.manager import broadcast, workspace_topic
+from app.realtime.manager import broadcast, conversation_topic, workspace_topic
 from app.services import conversations as conversations_service
 from app.services.notifications import notify
 
 LEASE_SECONDS = 120
 APPROVAL_TTL_HOURS = 24
 HISTORY_CAP = 30
+#: How long a run may sit waiting for the visitor's browser before we give up on
+#: it. Generous enough for a slow page + a `page_wait`, short enough that a
+#: closed tab does not leave the person staring at a silent thread.
+CLIENT_OP_TIMEOUT_SECONDS = 90
 _TERMINAL_STATUSES = frozenset({"completed", "failed", "handed_off", "canceled"})
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 
@@ -171,7 +189,13 @@ def deserialize_messages(data: list | None) -> list[ChatMessage]:
 # ---------------------------------------------------------------------------
 
 
-def compose_system_prompt(agent: Agent, workspace_name: str) -> str:
+def compose_system_prompt(
+    agent: Agent,
+    workspace_name: str,
+    *,
+    conversation: Conversation | None = None,
+    plan: tool_registry.ToolPlan | None = None,
+) -> str:
     settings = agent.settings if isinstance(agent.settings, dict) else {}
     parts: list[str] = []
     base = (agent.system_prompt or "").strip()
@@ -194,7 +218,68 @@ def compose_system_prompt(agent: Agent, workspace_name: str) -> str:
             "Only state facts you can cite from a knowledge-base source; if you cannot, "
             "hand off to a human instead of guessing."
         )
+    parts.extend(_page_control_prompt(conversation, plan))
     return "\n\n".join(parts)
+
+
+def _page_control_prompt(
+    conversation: Conversation | None, plan: tool_registry.ToolPlan | None
+) -> list[str]:
+    """The in-app-guidance half of the prompt.
+
+    Only emitted when the page tools are actually in the plan — a model told it can
+    walk someone through the UI, that then has no such tool, produces confident
+    promises it cannot keep. The ladder (show a tour → show your own steps → do it)
+    is spelled out because the default failure mode is the opposite: a model that
+    explains in prose when it could point, and clicks when it should have asked.
+    """
+    if plan is None or not plan.client:
+        return []
+    parts: list[str] = []
+    where = _page_context_line(conversation)
+    if where:
+        parts.append(where)
+    ladder = [
+        "You are embedded IN the app the person is using, so you can show them things "
+        "rather than only describing them. When they ask how to do something:",
+        "1. call find_guide — if a published tour covers it, play it with show_guide and "
+        "say in one line what it will walk them through;",
+        "2. otherwise take a page_snapshot and walk them through the real screen with "
+        "show_steps, referencing elements by their [index];",
+        "3. answer in words only when neither fits, or when the question is about facts "
+        "rather than doing something (then search_knowledge and cite).",
+    ]
+    if plan.client & page_tools.MUTATING_TOOLS:
+        ladder.append(
+            "You may also do it FOR them with page_act / page_navigate — but only when they "
+            'clearly asked you to ("do it for me", "go ahead"), never on your own initiative, '
+            "and never for anything destructive, irreversible, or involving payment. Say what "
+            "you are about to do, do it, then confirm what happened by reading the page."
+        )
+    else:
+        ladder.append(
+            "You can look at the page and point at things, but you cannot click or type for "
+            "them. If they ask you to do it, explain that you can show them where instead."
+        )
+    ladder.append(
+        "Never type into a password field and never ask for a password. If a step needs "
+        "credentials or a payment, stop and hand that step to the person."
+    )
+    parts.append("\n".join(ladder))
+    return parts
+
+
+def _page_context_line(conversation: Conversation | None) -> str | None:
+    """Tell the model which screen the person is on, so it can answer "here"."""
+    if conversation is None or not isinstance(conversation.attributes, dict):
+        return None
+    url = conversation.attributes.get("page_url")
+    title = conversation.attributes.get("page_title")
+    if not isinstance(url, str) or not url:
+        return None
+    if isinstance(title, str) and title:
+        return f'The person is currently on the page "{title}" ({url}).'
+    return f"The person is currently on {url}."
 
 
 async def build_history(
@@ -319,7 +404,9 @@ async def execute_run(
     workspace = await session.get(Workspace, run.workspace_id)
     workspace_name = workspace.name if workspace is not None else "our team"
 
-    plan = await tool_registry.resolve_agent_tools(session, run.workspace_id, agent)
+    plan = await tool_registry.resolve_agent_tools(
+        session, run.workspace_id, agent, conversation=conversation
+    )
     ctx = _context(session, run, agent, conversation, actor, mode, plan.action_ids)
     start_ord = (0 if sandbox else await _max_ord(session, run.id)) + 1
     sink = _StepSink(session, run, mode, start_ord)
@@ -327,15 +414,24 @@ async def execute_run(
     # --- restore (resume) or build the provider message list ---
     if run.pending_tool_call:
         messages = deserialize_messages(run.messages_snapshot)
-        resume_outcome = await _apply_pending_decision(ctx, sink, messages)
-        run.pending_tool_call = None
-        run.messages_snapshot = None
-        if resume_outcome is not None and resume_outcome.control in ("handoff", "close"):
-            return await _finalize_control(ctx, sink, resume_outcome)
+        if run.pending_tool_call.get("client_op_id"):
+            await _apply_client_result(ctx, sink, messages)
+            run.pending_tool_call = None
+            run.messages_snapshot = None
+        else:
+            resume_outcome = await _apply_pending_decision(ctx, sink, messages)
+            run.pending_tool_call = None
+            run.messages_snapshot = None
+            if resume_outcome is not None and resume_outcome.control in ("handoff", "close"):
+                return await _finalize_control(ctx, sink, resume_outcome)
     elif initial_messages is not None:
         messages = list(initial_messages)
     else:
-        messages = [ChatMessage.system(compose_system_prompt(agent, workspace_name))]
+        messages = [
+            ChatMessage.system(
+                compose_system_prompt(agent, workspace_name, conversation=conversation, plan=plan)
+            )
+        ]
         messages.extend(await build_history(session, conversation))
 
     # --- main loop ---
@@ -426,6 +522,20 @@ async def execute_run(
         if policy == POLICY_REQUIRE_APPROVAL and not sandbox:
             return await _pause_for_approval(ctx, sink, messages, call)
 
+        if call.name in plan.client:
+            client_error = await _reject_client_call(ctx, sink, messages, call)
+            if client_error is not None:
+                continue
+            if sandbox:
+                # A dry run has no browser on the other end; report what WOULD
+                # have been asked of the page so the trace still reads honestly.
+                await sink.add("tool_call", name=call.name, input=call.input)
+                dry = {"dry_run": True, **page_tools.op_for(call.name, call.input)}
+                await sink.add("tool_result", name=call.name, output=dry)
+                messages.append(ChatMessage.tool_result(call.id, json.dumps(dry)))
+                continue
+            return await _pause_for_client(ctx, sink, messages, call)
+
         await sink.add("tool_call", name=call.name, input=call.input)
         outcome = await tool_registry.execute_tool(ctx, call.name, call.input)
         await sink.add("tool_result", name=call.name, output=outcome.result)
@@ -445,10 +555,20 @@ async def run_sandbox(
     message: str,
     history: list[tuple[str, str]] | None = None,
 ) -> ExecutionResult:
-    """Run the SAME loop against an ephemeral, non-persisted context (dry-run)."""
+    """Run the SAME loop against an ephemeral, non-persisted context (dry-run).
+
+    The sandbox conversation carries page-control consent so a dry run exercises
+    the in-app tools too: they answer `{"dry_run": true, …}` instead of reaching a
+    browser, which is what makes the guidance prompt testable without a visitor.
+    """
     workspace = await session.get(Workspace, agent.workspace_id)
     workspace_name = workspace.name if workspace is not None else "our team"
-    conversation = Conversation(id=uuid7(), workspace_id=agent.workspace_id, status="pending")
+    conversation = Conversation(
+        id=uuid7(),
+        workspace_id=agent.workspace_id,
+        status="pending",
+        attributes={"page_control_consent": True},
+    )
     run = AgentRun(
         id=uuid7(),
         workspace_id=agent.workspace_id,
@@ -459,7 +579,16 @@ async def run_sandbox(
         output_tokens=0,
         citations=[],
     )
-    messages: list[ChatMessage] = [ChatMessage.system(compose_system_prompt(agent, workspace_name))]
+    sandbox_plan = await tool_registry.resolve_agent_tools(
+        session, agent.workspace_id, agent, conversation=conversation
+    )
+    messages: list[ChatMessage] = [
+        ChatMessage.system(
+            compose_system_prompt(
+                agent, workspace_name, conversation=conversation, plan=sandbox_plan
+            )
+        )
+    ]
     for role, content in history or []:
         if role in ("user", "contact"):
             messages.append(ChatMessage.user(content))
@@ -608,6 +737,192 @@ async def _pause_for_approval(
         ),
     )
     return ExecutionResult("awaiting_approval", None, sink.sandbox_steps, _run_citations(ctx.run))
+
+
+async def _reject_client_call(
+    ctx: ToolContext, sink: _StepSink, messages: list[ChatMessage], call: ToolCall
+) -> str | None:
+    """Answer a malformed or over-budget page call locally; None means "send it".
+
+    Two guards, both cheaper than a browser round-trip: schema validation, and a
+    per-run cap on ops that change the visitor's app. The cap counts what already
+    happened in this run's trace, so it survives the pause/resume cycle that every
+    client op goes through.
+    """
+    error = page_tools.validate(call.name, call.input)
+    if error is None and call.name in page_tools.MUTATING_TOOLS:
+        used = await _client_ops_used(ctx.session, ctx.run.id)
+        if used >= page_tools.MAX_MUTATING_OPS:
+            error = (
+                f"you have already changed this page {used} times in one go — "
+                "stop and tell the person what you did and what is left"
+            )
+    if error is None:
+        return None
+    await sink.add("tool_call", name=call.name, input=call.input)
+    await sink.add("tool_result", name=call.name, output={"error": error})
+    messages.append(ChatMessage.tool_result(call.id, json.dumps({"error": error}), is_error=True))
+    return error
+
+
+async def _client_ops_used(session: AsyncSession, run_id: str) -> int:
+    """Mutating page ops already performed in this run (counted from the trace)."""
+    rows = (
+        (
+            await session.execute(
+                select(AgentStep.name).where(
+                    AgentStep.run_id == run_id,
+                    AgentStep.kind == "client_request",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return sum(1 for name in rows if name in page_tools.MUTATING_TOOLS)
+
+
+async def _pause_for_client(
+    ctx: ToolContext, sink: _StepSink, messages: list[ChatMessage], call: ToolCall
+) -> ExecutionResult:
+    """Hand a page op to the visitor's widget and park the run until it answers."""
+    op = page_tools.op_for(call.name, call.input)
+    op_id = uuid7()
+    ctx.run.pending_tool_call = {
+        "id": call.id,
+        "name": call.name,
+        "input": call.input,
+        "client_op_id": op_id,
+        "op": op["op"],
+    }
+    ctx.run.messages_snapshot = serialize_messages(messages)
+    ctx.run.status = "awaiting_client"
+    ctx.run.lease_expires_at = None
+    await sink.add(
+        "client_request", name=call.name, input=call.input, output={"op_id": op_id, **op}
+    )
+    await ctx.session.flush()
+
+    # AFTER COMMIT, not now. A flush is invisible to other sessions, and the widget
+    # is fast: it would execute the op and POST the result while this transaction
+    # was still open, hit a run row that still says "running", and have its result
+    # rejected as stale — the guide would then stall until the timeout sweep.
+    _broadcast_after_commit(
+        ctx.session,
+        conversation_topic(ctx.run.conversation_id),
+        "copilot.op",
+        {
+            "conversation_id": ctx.run.conversation_id,
+            "run_id": ctx.run.id,
+            "op_id": op_id,
+            "tool": call.name,
+            **op,
+        },
+    )
+    return ExecutionResult("awaiting_client", None, sink.sandbox_steps, _run_citations(ctx.run))
+
+
+def _broadcast_after_commit(
+    session: AsyncSession, topic: str, event: str, payload: dict[str, Any]
+) -> None:
+    """Publish `payload` once this session's transaction commits.
+
+    Registered as a one-shot `after_commit` listener on the underlying sync
+    session. If the transaction rolls back the listener never fires, which is
+    exactly right: an op nobody can see was never asked for.
+    """
+
+    fired = False
+
+    def _on_commit(_session: object) -> None:
+        # One-shot by flag, not by `event.remove`: removing a listener from inside
+        # its own dispatch is not supported, and the session is reused for the rest
+        # of the request/task anyway.
+        nonlocal fired
+        if fired:
+            return
+        fired = True
+        with contextlib.suppress(RuntimeError):
+            asyncio.get_running_loop().create_task(broadcast(topic, event, payload))
+
+    event_.listen(session.sync_session, "after_commit", _on_commit)
+
+
+async def submit_client_result(
+    session: AsyncSession, run: AgentRun, *, op_id: str, result: dict[str, Any]
+) -> None:
+    """Record the widget's answer to a deferred page op and resume the run.
+
+    Raises `ConflictError` when the run is not waiting, or when the op id does not
+    match the parked call — a stale widget (reconnected after a reload, replaying
+    an old op) must not be able to inject a result into a later step.
+    """
+    pending = run.pending_tool_call or {}
+    if run.status != "awaiting_client" or not pending.get("client_op_id"):
+        raise ConflictError("this run is not waiting for the page")
+    if pending.get("client_op_id") != op_id:
+        raise ConflictError("that page result is for a different step")
+    run.pending_tool_call = {**pending, "result": result}
+    await session.flush()
+    await enqueue("execute_agent_run", run_id=run.id)
+
+
+async def _apply_client_result(
+    ctx: ToolContext, sink: _StepSink, messages: list[ChatMessage]
+) -> None:
+    """Resume preamble for a page op: append the widget's result as the tool result.
+
+    A parked run with NO ``result`` key is not a failure — it is this worker
+    arriving before the widget answered (the op is broadcast from inside the
+    transaction that parks it, so a fast browser can round-trip before the commit
+    lands, and a duplicate queue delivery can re-enter here). Raising
+    ``_ResumeNotReady`` hands it back to the queue's backoff, the same way the
+    approval path handles an uncommitted decision. Genuine silence is handled by
+    `sweep_stale_client_waits`, which WRITES a timeout result — so a missing key
+    always means "too early", never "gave up".
+    """
+    pending = ctx.run.pending_tool_call or {}
+    if "result" not in pending:
+        raise _ResumeNotReady()
+    call_id = pending.get("id", "")
+    name = pending.get("name", "")
+    result = pending.get("result")
+    if not isinstance(result, dict):
+        result = {"error": "the page returned an unreadable result"}
+    is_error = bool(result.get("error")) or result.get("ok") is False
+    await sink.add("tool_result", name=name, output=result)
+    messages.append(ChatMessage.tool_result(call_id, json.dumps(result), is_error=is_error))
+
+
+async def sweep_stale_client_waits(session: AsyncSession) -> list[AgentRun]:
+    """Resume runs whose page op went unanswered, so none is stranded.
+
+    The run comes back with an error tool-result rather than being killed: the
+    model gets to say "I lost the page — here is what to do yourself", which is a
+    far better outcome for the person than silence.
+    """
+    cutoff = utcnow() - timedelta(seconds=CLIENT_OP_TIMEOUT_SECONDS)
+    stale = (
+        (
+            await session.execute(
+                select(AgentRun).where(
+                    AgentRun.status == "awaiting_client",
+                    AgentRun.updated_at <= cutoff,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for run in stale:
+        pending = run.pending_tool_call or {}
+        if "result" in pending:
+            continue  # a result landed; the queued resume will pick it up
+        run.pending_tool_call = {**pending, "result": {"error": "timed out waiting for the page"}}
+        await enqueue("execute_agent_run", run_id=run.id)
+    if stale:
+        await session.flush()
+    return list(stale)
 
 
 async def _final_reply(ctx: ToolContext, sink: _StepSink, content: str) -> ExecutionResult:
@@ -914,7 +1229,7 @@ async def _on_message_created(session: AsyncSession, event: Event) -> None:
             select(AgentRun.id)
             .where(
                 AgentRun.conversation_id == conversation.id,
-                AgentRun.status.in_(["queued", "running", "awaiting_approval"]),
+                AgentRun.status.in_(["queued", "running", "awaiting_approval", "awaiting_client"]),
             )
             .limit(1)
         )
@@ -931,6 +1246,15 @@ async def _on_message_created(session: AsyncSession, event: Event) -> None:
     session.add(run)
     await session.flush()
     await enqueue("execute_agent_run", run_id=run.id)
+
+
+@scheduled("agent_client_wait_sweep", every_seconds=30)
+async def _client_wait_sweep_job() -> None:
+    """Unstick runs whose in-app page op was never answered."""
+    from app.core.db import session_scope
+
+    async with session_scope() as session:
+        await sweep_stale_client_waits(session)
 
 
 # Registers the "execute_agent_run" queue task (kept in tasks.py per file ownership).

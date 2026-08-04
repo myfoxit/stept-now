@@ -13,6 +13,7 @@ import type {
   CampaignTriggerResult,
   ChecklistProgressAck,
   ConversationSummary,
+  CopilotOpAck,
   CsatOut,
   CursorPage,
   ArticleDetail,
@@ -20,6 +21,8 @@ import type {
   FeedbackRating,
   Identity,
   MessageFeedbackAck,
+  PageContextAck,
+  PendingPageOp,
   SurveyAck,
   SurveyAnswer,
   Tour,
@@ -154,6 +157,45 @@ export class WidgetApi {
     return this.authed(`/api/widget/conversations/${conversationId}/csat`, {
       method: 'POST',
       body: JSON.stringify({ rating, feedback: feedback ?? null }),
+    })
+  }
+
+  /**
+   * Tell the backend where the visitor is, and (when `allowActions` is given)
+   * whether the assistant may act on the page.
+   *
+   * `allowActions` is deliberately tri-state: omitted leaves an earlier answer
+   * untouched, which matters because this is re-sent on every SPA navigation and
+   * must not silently revoke consent the visitor already gave.
+   */
+  setPageContext(
+    conversationId: string,
+    context: { url: string; title?: string; path?: string; allowActions?: boolean },
+  ): Promise<PageContextAck> {
+    return this.authed(`/api/widget/conversations/${conversationId}/page-context`, {
+      method: 'POST',
+      body: JSON.stringify({
+        url: context.url,
+        title: context.title ?? null,
+        path: context.path ?? null,
+        ...(context.allowActions === undefined ? {} : { allow_actions: context.allowActions }),
+      }),
+    })
+  }
+
+  /** Any page op this conversation is waiting on — polled once after a reload. */
+  getPendingOp(conversationId: string): Promise<PendingPageOp | null> {
+    return this.authed(`/api/widget/conversations/${conversationId}/copilot/pending`)
+  }
+
+  /** Hand a page-op result back so the parked agent run can continue. */
+  submitOpResult(
+    conversationId: string,
+    body: { run_id: string; op_id: string; result: unknown },
+  ): Promise<CopilotOpAck> {
+    return this.authed(`/api/widget/conversations/${conversationId}/copilot/result`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     })
   }
 

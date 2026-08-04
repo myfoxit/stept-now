@@ -9,8 +9,45 @@
     <h1 data-tour="inbox">Stept widget host</h1>
     <p>This page exists so end-to-end tests (and manual QA) can embed the widget on a
       real host origin. Pass <code>?key=wk_…&amp;api=http://host:port</code>.</p>
+
+    <!--
+      A tiny stand-in for the customer's own app, so the in-app assistant has
+      something real to point at and act on: a button that reveals a form, and a
+      save that leaves visible evidence. Deliberately the FIRST interactive
+      elements on the page, so a snapshot's [0]/[1]/[2] indexes are stable for
+      the e2e specs that drive them.
+    -->
+    <section id="invoice-app" aria-label="Invoices">
+      <button type="button" id="new-invoice">New invoice</button>
+      <!--
+        `aria-label` rather than a <label> element: a label is itself interactive
+        (clicking it focuses the field), so it would take an index of its own and
+        shift the ones the specs script.
+      -->
+      <form id="invoice-form" hidden>
+        <input id="invoice-amount" name="amount" aria-label="Amount" />
+        <button type="submit" id="save-invoice">Save invoice</button>
+      </form>
+      <p id="invoice-result" hidden></p>
+    </section>
+
     <section data-tour="knowledge">Knowledge section anchor.</section>
     <section data-tour="ai">AI section anchor.</section>
+    <script>
+      // The mini app: reveal the form, then confirm what was saved.
+      const form = document.getElementById('invoice-form')
+      const result = document.getElementById('invoice-result')
+      document.getElementById('new-invoice').addEventListener('click', () => {
+        form.hidden = false
+        document.getElementById('invoice-amount').focus()
+      })
+      form.addEventListener('submit', (event) => {
+        event.preventDefault()
+        const amount = document.getElementById('invoice-amount').value
+        result.hidden = false
+        result.textContent = `Invoice saved for ${amount}`
+      })
+    </script>
     <script>
       const q = new URLSearchParams(location.search)
       const key = q.get('key') || 'wk_REPLACE_ME'

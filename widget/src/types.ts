@@ -24,6 +24,12 @@ export interface SteptSettings {
   /** API/asset origin. Defaults to the loader script's own origin. */
   apiBase?: string
   identity?: Identity
+  /**
+   * Extra origins the AI assistant may navigate to while doing something for the
+   * visitor. The host's own origin is always allowed; everything else is refused,
+   * so a prompt-injected "go to evil.example" cannot move the session off-site.
+   */
+  aiAllowedOrigins?: string[]
 }
 
 /** Public widget-inbox theming/config (inbox.config passed through boot). */
@@ -373,4 +379,34 @@ export interface MessageFeedbackAck {
 export interface RealtimeMessage {
   type: string
   data: Record<string, unknown>
+}
+
+// --- in-app assistant (schemas/copilot.py) ----------------------------------
+
+export interface PageContextAck {
+  ok: boolean
+  /** Is the assistant allowed to look at the page at all? */
+  page_control: boolean
+  /** May it click and type, or only point? */
+  allow_actions: boolean
+}
+
+/**
+ * A page op the agent is waiting on. Arrives over the realtime socket, and is
+ * re-fetchable after a reload (which loses the socket frame).
+ */
+export interface PendingPageOp {
+  run_id: string
+  op_id: string
+  /** The agent tool that produced it (`page_act`, `show_guide`, …). */
+  tool: string
+  /** The wire op the host page executes (`snapshot`, `act`, `guide`, `steps`). */
+  op: string
+  args: Record<string, unknown>
+}
+
+export interface CopilotOpAck {
+  ok: boolean
+  /** `resumed` when the run continued, `ignored` for a stale/duplicate op. */
+  status: string
 }

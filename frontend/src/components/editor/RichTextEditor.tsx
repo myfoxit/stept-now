@@ -45,6 +45,7 @@ import { Separator } from '@/components/ui/separator'
 import { Toggle } from '@/components/ui/toggle'
 import { cn } from '@/lib/utils'
 
+import { AiMenu } from './AiMenu'
 import { htmlToMarkdown, markdownToHtml } from './markdown-bridge'
 
 export type RichTextEditorVariant = 'full' | 'compact'
@@ -190,6 +191,13 @@ export function RichTextEditor({
       h4: instance.isActive('heading', { level: 4 }),
       canUndo: instance.can().undo(),
       canRedo: instance.can().redo(),
+      // Plain text of the selection: what the AI menu rewrites, and what decides
+      // whether it offers rewrite commands or a draft prompt.
+      selection: instance.state.doc.textBetween(
+        instance.state.selection.from,
+        instance.state.selection.to,
+        '\n'
+      ),
     }),
   })
 
@@ -329,6 +337,23 @@ export function RichTextEditor({
               icon={Redo2}
               disabled={disabled || !(active?.canRedo ?? false)}
               onClick={() => editor.chain().focus().redo().run()}
+            />
+            <Separator orientation="vertical" className="mx-1 !h-5" />
+            <AiMenu
+              disabled={disabled}
+              selection={active?.selection ?? ''}
+              document={value}
+              onReplaceSelection={(markdown) =>
+                editor
+                  .chain()
+                  .focus()
+                  .deleteSelection()
+                  .insertContent(markdownToHtml(markdown))
+                  .run()
+              }
+              onInsert={(markdown) =>
+                editor.chain().focus().insertContent(markdownToHtml(markdown)).run()
+              }
             />
           </>
         ) : null}

@@ -105,6 +105,50 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
   - Deferred to roadmap (see dap-competitors.md parking lot): goals/A-B, localization, global
     rate limits, no-code event trackers, inline embeds, announcement feed, condition debugger,
     mobile SDKs, flow branching, remote agentic driving.
+- [x] **W8 (in-app assistant)** — the embedded chat now answers *on the visitor's
+  screen*: it finds and plays a published tour, composes a walkthrough anchored to
+  the real UI, or (with the visitor's consent) clicks and types for them — while
+  still answering knowledge questions with citations. Contract:
+  `docs/IN-APP-ASSISTANT.md`. Ported engine-side from `/Users/ahoehne/repos/stept`
+  (`extension/src/drive-controller.ts`, `services/ai_tools/browser_*`,
+  `services/rag/*`, `routers/inline_ai.py`) with the driving surface turned inside
+  out: no extension to install, the widget already lives in the page.
+  - **Client-executed tools** (`app/agents/page_tools.py`): `page_snapshot/find/
+    read/act/navigate/scroll/wait` + `show_guide`/`show_steps`, deferred to the
+    browser through the engine's existing pause/resume machinery (new run status
+    `awaiting_client`, new step kind `client_request`, `sweep_stale_client_waits`
+    so a closed tab never strands a conversation).
+  - **Host-page runtime** (`widget/src/page-agent.ts` + `packages/dom-capture/src/
+    compact.ts`): overlay-first, viewport-first indexed element listing with live
+    form state, char-budgeted and pageable; index → durable `Target` conversion so
+    an AI-authored walkthrough survives re-renders.
+  - **Guardrails**: off by default; acting needs the agent's `allow_actions` AND
+    per-conversation visitor consent; the widget's own DOM and `data-stept-no-ai`
+    subtrees are invisible; password fields never typed into; same-origin
+    navigation; per-run cap on page changes; "no visible change after click"
+    advisory.
+  - **Retrieval** (`app/rag/{query,context}.py`): deterministic intent
+    classification, query rewriting (filler/abbreviations/pronouns-from-history),
+    multi-query expansion legs, a title leg, BM25 blend, and a token-budgeted
+    context builder with query-focused compression — wired into the agent tool and
+    the reply copilot.
+  - **Editor AI** (`app/agents/writer.py` + `frontend/src/components/editor/
+    AiMenu.tsx`): draft/outline grounded in the knowledge base with citations, plus
+    improve/shorten/expand/simplify/fix/translate/title over a selection.
+  - **Bugs found and fixed**: the widget-DOM exclusion list named surfaces that do
+    not exist (`stept-checklist` vs the real `stept-cl-*`), so the assistant could
+    see and offer to click the widget's own checklist button — now matched by class
+    prefix; broadcasting a page op inside the parking transaction let a fast
+    browser have its result rejected as stale (now `after_commit`); a resume that
+    beat the result commit fabricated a "page did not respond" error (now
+    `_ResumeNotReady` → queue retry); `ingest_document` abandoned a document
+    silently when it never became visible (now logged); two pre-existing e2e DAP
+    failures — the specs filled `#selector-N` while the tour editor keeps it behind
+    an "Advanced" disclosure.
+  - **Totals after W8:** **1731 tests** — backend 934 (+2 pg-only), frontend 383,
+    widget 186, extension 100, dom-capture 107, e2e 21. `make verify` green,
+    full e2e green.
+
 - [ ] Post-build notes for user: **no git origin configured** — merged to local master only, not pushed (user decides re GitHub; gh is authed as `myfoxit`). Old stept containers on 8000/80/5173 are a PRIOR build — untouched. A `build-postgres-1` container is up on 54329 (used for PG validation; `docker compose down` to stop). Use `docker compose` (v2) — the v1 `docker-compose` is broken by a pyenv SSL issue.
 
 ### Agent-orchestration lessons (for future waves / resets)
