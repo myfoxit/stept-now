@@ -63,12 +63,31 @@ class TaskQueue(Protocol):
 
 
 class InProcessQueue:
-    """Runs tasks as asyncio tasks in the API process, with retry + backoff."""
+    """Runs tasks as asyncio tasks in the API process, with retry + backoff.
+
+    Under ``env=test`` enqueueing only *records* the task; it runs when someone
+    calls :meth:`drain`. Firing immediately would let a task's session overlap
+    with the request that enqueued it — harmless against Postgres, where each
+    session gets its own pooled connection, but the test database is in-memory
+    SQLite behind a StaticPool, so *every* session shares one DBAPI connection
+    and two interleaved transactions clobber each other. That produced rare,
+    genuinely confusing failures: a document that was created with a 201 would
+    be missing from the next query, because a concurrent ingestion task's
+    rollback discarded the insert.
+    """
 
     def __init__(self) -> None:
         self._pending: set[asyncio.Task[None]] = set()
+        self._deferred: list[tuple[str, dict[str, Any]]] = []
+
+    @property
+    def _defer(self) -> bool:
+        return get_settings().env == "test"
 
     async def enqueue(self, name: str, **kwargs: Any) -> None:
+        if self._defer:
+            self._deferred.append((name, kwargs))
+            return
         t = asyncio.create_task(self._run_with_retry(name, kwargs), name=f"task:{name}")
         self._pending.add(t)
         t.add_done_callback(self._pending.discard)
@@ -87,9 +106,17 @@ class InProcessQueue:
                 await asyncio.sleep(delay)
 
     async def drain(self) -> None:
-        """Wait for all in-flight tasks (tests rely on this for determinism)."""
-        while self._pending:
-            await asyncio.gather(*list(self._pending), return_exceptions=True)
+        """Run/await every outstanding task (tests rely on this for determinism).
+
+        Deferred tasks run one at a time, and the loop repeats because a task may
+        enqueue more work (ingestion → embedding, sync → per-document ingest).
+        """
+        while self._deferred or self._pending:
+            while self._deferred:
+                name, kwargs = self._deferred.pop(0)
+                await self._run_with_retry(name, kwargs)
+            if self._pending:
+                await asyncio.gather(*list(self._pending), return_exceptions=True)
 
     async def close(self) -> None:
         """Cancel outstanding fire-and-forget tasks rather than draining them.
@@ -102,6 +129,7 @@ class InProcessQueue:
         while the queue is live. Tasks are idempotent and at-least-once, so
         cancellation at shutdown is safe.
         """
+        self._deferred.clear()
         pending = list(self._pending)
         for task_ in pending:
             task_.cancel()
