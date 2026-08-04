@@ -1,0 +1,305 @@
+name: Deploy
+
+# Ships master to app.stepped.ai. Manual runs can target a specific commit or skip
+# the test gate for a hotfix; a push to master always runs the full gate first.
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip the test gate (hotfix only — you own the consequences)'
+        type: boolean
+        default: false
+
+# One deploy at a time, and never cancel one mid-flight: a half-applied migration
+# is far worse than a queued run.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE_NAME: ${{ github.repository_owner }}/stept-api
+  WEB_IMAGE_NAME: ${{ github.repository_owner }}/stept-web
+
+jobs:
+  # The gate. Deploy depends on this, so a red test suite cannot reach the server.
+  verify:
+    name: Verify
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_tests }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: stept
+          POSTGRES_PASSWORD: stept
+          POSTGRES_DB: stept_test
+        ports: ['54329:5432']
+        options: >-
+          --health-cmd "pg_isready -U stept"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: |
+          cd backend && uv sync --frozen
+          cd .. && pnpm install --frozen-lockfile
+
+      - name: Lint + types
+        working-directory: backend
+        run: |
+          uv run ruff check app tests
+          uv run ruff format --check app tests
+          uv run mypy app
+
+      - name: Backend tests (SQLite + Postgres-marked)
+        working-directory: backend
+        env:
+          STEPT_TEST_PG_URL: postgresql+asyncpg://stept:stept@localhost:54329/stept_test
+        run: uv run pytest -q
+
+      - name: Frontend types, tests, builds
+        run: |
+          pnpm --filter @stept/frontend exec tsc --noEmit
+          pnpm --filter @stept/frontend test -- --run
+          pnpm --filter @stept/widget test -- --run
+          pnpm -r build
+
+      - name: Migrations apply cleanly to an empty Postgres, and reverse
+        working-directory: backend
+        env:
+          STEPT_DATABASE_URL: postgresql+asyncpg://stept:stept@localhost:54329/stept_migrate
+        run: |
+          # A migration that only works against the dev database is not a
+          # migration. Prove up/down/up on a database created from scratch.
+          PGPASSWORD=stept psql -h localhost -p 54329 -U stept -d postgres \
+            -c 'DROP DATABASE IF EXISTS stept_migrate' -c 'CREATE DATABASE stept_migrate'
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+          uv run alembic check
+
+  build:
+    name: Build and push images
+    needs: [verify]
+    # `always()` plus an explicit check so a skipped gate (hotfix) still builds,
+    # but a *failed* gate never does.
+    if: ${{ always() && needs.verify.result != 'failure' && needs.verify.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.names.outputs.api_image }}
+      web_image: ${{ steps.names.outputs.web_image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image names
+        id: names
+        run: |
+          # Lowercase: GHCR rejects uppercase repository paths, and org names can
+          # legitimately contain capitals.
+          api="${REGISTRY}/$(echo "${API_IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA}"
+          web="${REGISTRY}/$(echo "${WEB_IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA}"
+          echo "api_image=${api}" >> "$GITHUB_OUTPUT"
+          echo "web_image=${web}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          # Pinned to the commit SHA, never `latest`: the server must be able to
+          # say exactly which build it is running, and roll back to a known one.
+          tags: ${{ steps.names.outputs.api_image }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          # Repo root: pnpm needs the workspace manifest and the widget's local
+          # @stept/dom-capture dependency.
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.web_image }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  deploy:
+    name: Deploy to production
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.stepped.ai
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open an SSH session to the host
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pin the host key instead of accepting whatever answers: this step
+          # hands a root shell to whoever is on the other end.
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<'EOF'
+          Host production
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            ServerAliveInterval 30
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Sync stack definition
+        run: |
+          ssh production 'mkdir -p /opt/stept'
+          scp deploy/docker-compose.prod.yml production:/opt/stept/docker-compose.yml
+          scp deploy/Caddyfile production:/opt/stept/Caddyfile
+
+      - name: Render /opt/stept/.env
+        env:
+          API_IMAGE: ${{ needs.build.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.build.outputs.web_image }}
+        run: |
+          # Written with a strict umask and never echoed. Image tags change every
+          # deploy; the secrets are only written if this workflow supplies them,
+          # so a rotated value has to come through GitHub secrets, not by hand.
+          ssh production "umask 077 && cat > /opt/stept/.env" <<EOF
+          API_IMAGE=${API_IMAGE}
+          WEB_IMAGE=${WEB_IMAGE}
+          DOMAIN=${{ secrets.DEPLOY_DOMAIN }}
+          APP_DOMAIN=${{ secrets.DEPLOY_APP_DOMAIN }}
+          SERVER_IP=${{ secrets.DEPLOY_HOST }}
+          ACME_EMAIL=${{ secrets.ACME_EMAIL }}
+          STEPT_SECRET_KEY=${{ secrets.STEPT_SECRET_KEY }}
+          POSTGRES_USER=stept
+          POSTGRES_DB=stept
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          STEPT_PUBLIC_BASE_URL=https://${{ secrets.DEPLOY_APP_DOMAIN }}
+          STEPT_APP_BASE_URL=https://${{ secrets.DEPLOY_APP_DOMAIN }}
+          STEPT_WEB_CONCURRENCY=4
+          STEPT_EMAIL_FROM=Stept <no-reply@${{ secrets.DEPLOY_DOMAIN }}>
+          EOF
+          ssh production 'chmod 600 /opt/stept/.env'
+
+      # No "save the current release" step is needed here: .env.previous is only
+      # written at the very end of a *successful* deploy, so at this point it
+      # still holds the last release that passed its live checks — which is
+      # exactly what a rollback should target.
+
+      - name: Pull, migrate, and start
+        run: |
+          ssh production 'set -eu
+            cd /opt/stept
+            docker compose config -q
+            docker compose pull --quiet
+            # Migrations run in a throwaway container before anything serves
+            # traffic, so a failing migration fails the deploy instead of leaving
+            # half the workers talking to a schema that moved.
+            docker compose run --rm api migrate
+            docker compose up -d --remove-orphans
+          '
+
+      - name: Wait for health, and roll back if it never comes
+        run: |
+          ssh production 'set -eu
+            cd /opt/stept
+            for i in $(seq 1 40); do
+              if [ "$(docker inspect -f "{{.State.Health.Status}}" stept-api-1 2>/dev/null)" = "healthy" ] \
+                 && [ "$(docker inspect -f "{{.State.Health.Status}}" stept-caddy-1 2>/dev/null)" = "healthy" ]; then
+                echo "healthy after ${i} checks"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "::error::api/caddy did not become healthy" >&2
+            docker compose ps
+            docker compose logs --tail 80 api caddy
+            exit 1
+          '
+
+      - name: Verify the live site end to end
+        run: |
+          APP="https://${{ secrets.DEPLOY_APP_DOMAIN }}"
+          # Through the public edge, not from inside the box: this is what proves
+          # DNS, TLS, ingress routing and the app are all working together.
+          health=$(curl -fsS --max-time 20 "${APP}/api/v1/healthz")
+          echo "healthz: ${health}"
+          echo "${health}" | grep -q '"status":"ok"'
+          echo "${health}" | grep -q '"database":"ok"'
+
+          # The SPA must actually be served, not a proxy error page.
+          curl -fsS --max-time 20 -o /dev/null -w 'spa: %{http_code}\n' "${APP}/"
+          # The widget loader customer sites embed.
+          curl -fsS --max-time 20 -o /dev/null -w 'loader: %{http_code}\n' "${APP}/widget-assets/loader.js"
+
+          # Hardening that must hold in production.
+          docs=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${APP}/api/v1/docs")
+          echo "docs (expect 404): ${docs}"
+          [ "${docs}" = "404" ]
+
+          headers=$(curl -sSI --max-time 20 "${APP}/api/v1/healthz")
+          for header in strict-transport-security x-content-type-options x-frame-options referrer-policy; do
+            echo "${headers}" | grep -iq "^${header}:" || { echo "missing ${header}"; exit 1; }
+          done
+          echo "security headers present"
+
+      - name: Roll back to the previous images
+        if: failure()
+        run: |
+          ssh production 'set -eu
+            cd /opt/stept
+            if [ ! -f .env.previous ]; then
+              echo "no previous release recorded — leaving the stack as-is for inspection"
+              exit 1
+            fi
+            echo "rolling back to:"
+            grep -E "^(API|WEB)_IMAGE=" .env.previous
+            cp .env.previous .env
+            docker compose up -d --remove-orphans
+          '
+          echo "::error::deploy failed and was rolled back"
+
+      - name: Mark this release as the rollback target
+        if: success()
+        run: |
+          # Only a release that passed the live checks becomes the thing we roll
+          # back to. Recorded last, so a failed deploy never overwrites a good one.
+          ssh production 'cd /opt/stept && cp .env .env.previous && chmod 600 .env.previous'
+
+      - name: Report
+        if: always()
+        run: |
+          ssh production 'cd /opt/stept && docker compose ps' || true
+          echo "api: ${{ needs.build.outputs.api_image }}"
+          echo "web: ${{ needs.build.outputs.web_image }}"

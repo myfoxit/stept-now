@@ -1,0 +1,87 @@
+# Stept production ingress — the box's single public entry point.
+#
+# Topology:
+#   {$APP_DOMAIN}   app.stepped.ai   → the product: SPA from web, API from api
+#   {$DOMAIN}       stepped.ai       → the same app, plus /poki/* handed to the
+#                                      separately-deployed poki stack
+#   www.{$DOMAIN}                    → redirect to the apex
+#   https://{IP}                     → the app on a self-signed cert, so the box
+#                                      stays reachable if DNS is broken
+#
+# ACME is HTTP-01, so Cloudflare records for these names must stay DNS-only
+# (grey cloud) or Caddy cannot complete the challenge.
+{
+	email {$ACME_EMAIL}
+	# A request to the raw IP over TLS gets a cert instead of an error.
+	default_sni {$SERVER_IP}
+}
+
+# Transport-level headers only. The app sets nosniff, framing, referrer and
+# permissions per response — it knows which paths are meant to be embedded in a
+# customer's site (the widget iframe, the help-center portal) and must not be
+# sent a blanket framing ban from out here.
+(transport_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+
+# Everything the API owns. Kept in one snippet so the apex and the app domain
+# cannot drift apart — a route that exists on one but not the other is how the
+# widget ends up half-broken.
+(stept_app) {
+	# WebSockets: dashboard realtime + widget realtime.
+	@ws path /ws /ws/*
+	handle @ws {
+		reverse_proxy api:8600
+	}
+
+	# REST API, public help-center portal, recorder-extension downloads.
+	@api path /api/* /portal/* /extension-assets/*
+	handle @api {
+		reverse_proxy api:8600 {
+			# Uploads and knowledge ingestion can take a while.
+			transport http {
+				read_timeout 300s
+			}
+		}
+	}
+
+	# Dashboard SPA + the widget bundle customer sites load.
+	handle {
+		reverse_proxy web:80
+	}
+}
+
+# ---- the app ----------------------------------------------------------------
+{$APP_DOMAIN} {
+	import transport_headers
+	import stept_app
+}
+
+# ---- apex: the app, plus poki ------------------------------------------------
+{$DOMAIN} {
+	import transport_headers
+
+	# poki lives in its own compose project on the shared `stepped_stepped`
+	# network and serves the whole /poki/ prefix itself (static Flutter build,
+	# plus its own /poki/pb and /poki/tts backends), so pass the path through
+	# unrewritten.
+	handle /poki* {
+		reverse_proxy poki-web:80
+	}
+
+	import stept_app
+}
+
+# ---- www convenience redirect ------------------------------------------------
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+# ---- bare IP: reachable before/without DNS, self-signed cert -----------------
+https://{$SERVER_IP} {
+	tls internal
+	import stept_app
+}

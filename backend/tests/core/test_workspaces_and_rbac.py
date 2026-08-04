@@ -184,3 +184,32 @@ async def test_workspace_delete_owner_only(client, workspace_ctx):
     assert allowed.status_code == 200
     gone = await client.get(workspace_ctx.base, headers=workspace_ctx.owner_headers)
     assert gone.status_code == 403
+
+
+async def test_workspace_and_owner_membership_survive_foreign_keys(client):
+    """Regression: the owner Membership must not be inserted before its Workspace.
+
+    Membership carries only a raw workspace_id FK — no relationship() to Workspace
+    — so SQLAlchemy's unit of work has no ordering edge and a single combined
+    flush was free to write memberships first. Postgres rejects that; SQLite used
+    to accept it, so signup worked in every test and failed in production.
+    """
+    from sqlalchemy import select
+
+    from app.core.db import get_session_factory
+    from app.models.workspace import Membership, Workspace
+
+    auth = await signup(client, "fk-order@example.com", name="FK Order")
+    created = await client.post(
+        "/api/v1/workspaces", json={"name": "FK Order Co"}, headers=bearer(auth)
+    )
+    assert created.status_code == 201, created.text
+    workspace_id = created.json()["id"]
+
+    async with get_session_factory()() as session:
+        workspace = await session.get(Workspace, workspace_id)
+        assert workspace is not None
+        membership = (
+            await session.execute(select(Membership).where(Membership.workspace_id == workspace_id))
+        ).scalar_one()
+        assert membership.role == "owner"

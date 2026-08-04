@@ -40,6 +40,13 @@ async def create_workspace(session: AsyncSession, user: User, *, name: str) -> W
         },
     )
     session.add(workspace)
+    # Flush the workspace on its own before anything references it. Membership
+    # has no relationship() to Workspace — only a raw workspace_id FK — and the
+    # unit of work orders inserts from mapper relationships, not from column
+    # ForeignKeys, so a single combined flush is free to write memberships first.
+    # Postgres then rejects it; SQLite does not enforce FKs by default and lets
+    # it pass, which is why this only ever failed in production.
+    await session.flush()
     session.add(Membership(workspace_id=workspace.id, user_id=user.id, role="owner"))
     await session.flush()
     await emit(
