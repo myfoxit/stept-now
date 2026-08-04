@@ -17,6 +17,9 @@ uploads/
 *.local
 openapi.json
 *.db
+*.db-journal
+*.db.bak
+*.sql.gz
 data/
 e2e-uploads/
 .claude/
