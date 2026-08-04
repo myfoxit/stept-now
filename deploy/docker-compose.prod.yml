@@ -68,10 +68,14 @@ services:
       STEPT_REDIS_URL: redis://redis:6379/0
       # One scheduler process owns periodic work — see the scheduler service.
       STEPT_SCHEDULER_ENABLED: 'false'
-      # Caddy is the only thing that talks to us, and it appends exactly one hop
-      # to X-Forwarded-For. Anything higher would let clients forge their own
-      # rate-limit identity.
-      STEPT_TRUSTED_PROXY_HOPS: '1'
+      # How many proxies append to X-Forwarded-For before we see it. Two for this
+      # deployment: Cloudflare appends the visitor's address, then Caddy appends
+      # Cloudflare's. Setting it to 1 makes every request through Cloudflare share
+      # a bucket keyed on a Cloudflare edge IP, which spreads a flood across
+      # hundreds of buckets and quietly disables the public rate limits. Setting
+      # it too high is the opposite failure — clients could forge their own
+      # identity — so it has to match the real chain length.
+      STEPT_TRUSTED_PROXY_HOPS: ${STEPT_TRUSTED_PROXY_HOPS:-2}
       STEPT_WEB_CONCURRENCY: ${STEPT_WEB_CONCURRENCY:-4}
     expose: ['8600']
     volumes:
