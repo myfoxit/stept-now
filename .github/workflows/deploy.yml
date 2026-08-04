@@ -213,6 +213,7 @@ jobs:
           STEPT_PUBLIC_BASE_URL=https://${{ secrets.DEPLOY_APP_DOMAIN }}
           STEPT_APP_BASE_URL=https://${{ secrets.DEPLOY_APP_DOMAIN }}
           STEPT_WEB_CONCURRENCY=4
+          STEPT_TRUSTED_PROXY_HOPS=${{ vars.STEPT_TRUSTED_PROXY_HOPS || '2' }}
           STEPT_EMAIL_FROM=Stept <no-reply@${{ secrets.DEPLOY_DOMAIN }}>
           EOF
           ssh production 'chmod 600 /opt/stept/.env'
