@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import CHAR, JSON, DateTime, MetaData, TypeDecorator, text
+from sqlalchemy import CHAR, JSON, DateTime, MetaData, TypeDecorator, event, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Dialect
 from sqlalchemy.ext.asyncio import (
@@ -182,7 +182,29 @@ def build_engine(url: str | None = None) -> AsyncEngine:
         kwargs["pool_size"] = int(os.environ.get("STEPT_DB_POOL_SIZE", "10"))
         kwargs["max_overflow"] = 10
         kwargs["pool_pre_ping"] = True
-    return create_async_engine(url, **kwargs)
+    engine = create_async_engine(url, **kwargs)
+    if url.startswith("sqlite"):
+        _enforce_sqlite_foreign_keys(engine)
+    return engine
+
+
+def _enforce_sqlite_foreign_keys(engine: AsyncEngine) -> None:
+    """Turn on SQLite's foreign-key enforcement, which is off by default.
+
+    Without this the zero-dependency dev/test database silently accepts rows
+    Postgres would reject — insert ordering, missing parents, cascade behaviour —
+    so a whole class of bug can only ever be discovered in production. It cost us
+    exactly that once: workspace creation inserted `memberships` before
+    `workspaces` and passed every SQLite test.
+    """
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_pragma(dbapi_connection: Any, _record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 
 
 _engine: AsyncEngine | None = None

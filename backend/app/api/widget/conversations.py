@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +28,7 @@ from app.core.deps import Db
 from app.core.errors import NotFoundError
 from app.core.events import Actor
 from app.core.pagination import CursorPage
+from app.core.ratelimit import RateLimit
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import AuthorType, Message, MessageDirection, MessageVisibility
 from app.realtime.manager import broadcast, conversation_topic
@@ -245,7 +246,14 @@ async def list_conversations(principal: WidgetAuth, session: Db) -> list[Convers
     )
 
 
-@router.post("/conversations", response_model=ConversationSummary, status_code=201)
+@router.post(
+    "/conversations",
+    response_model=ConversationSummary,
+    status_code=201,
+    # Opening a conversation can start a paid agent run — the cheapest thing
+    # an unauthenticated visitor can do to us that costs real money.
+    dependencies=[Depends(RateLimit("widget_conversation", times=10, seconds=60))],
+)
 async def create_conversation(
     body: WidgetMessageCreate, principal: WidgetAuth, session: Db
 ) -> ConversationSummary:
@@ -282,6 +290,7 @@ async def list_messages(
     "/conversations/{conversation_id}/messages",
     response_model=WidgetMessageOut,
     status_code=201,
+    dependencies=[Depends(RateLimit("widget_message", times=40, seconds=60))],
 )
 async def create_message(
     conversation_id: str, body: WidgetReplyCreate, principal: WidgetAuth, session: Db

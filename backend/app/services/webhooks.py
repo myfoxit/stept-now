@@ -23,6 +23,7 @@ from app.core.db import session_scope, utcnow
 from app.core.errors import NotFoundError
 from app.core.events import Actor, Event
 from app.core.logging import log
+from app.core.net import UnsafeUrlError, assert_public_url
 from app.core.queue import MAX_ATTEMPTS, TaskContext, enqueue, task
 from app.core.security import new_token
 from app.models.webhook import Webhook, WebhookDelivery
@@ -279,6 +280,12 @@ async def _post(
     url: str, body: bytes, headers: dict[str, str]
 ) -> tuple[bool, int | None, str | None]:
     """Returns (success, response_code, error). Success is a 2xx response."""
+    # Re-checked at delivery time, not just at save time: a subscriber's DNS can
+    # start pointing at our own network long after the webhook was created.
+    try:
+        assert_public_url(url)
+    except UnsafeUrlError as exc:
+        return False, None, f"blocked: {exc}"
     try:
         async with httpx.AsyncClient(timeout=DELIVERY_TIMEOUT_SECONDS) as client:
             response = await client.post(url, content=body, headers=headers)

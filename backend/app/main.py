@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 
 import app as app_pkg
@@ -22,6 +22,7 @@ from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging, log
 from app.core.pubsub import get_pubsub, reset_pubsub
 from app.core.queue import get_queue, reset_queue
+from app.core.ratelimit import RateLimit
 from app.core.scheduler import Scheduler
 from app.realtime.app_ws import router as app_ws_router
 from app.realtime.manager import manager as ws_manager
@@ -31,6 +32,21 @@ logger = log("main")
 
 # Paths embeddable third-party pages may call (open CORS, no credentials).
 OPEN_CORS_PREFIXES = ("/api/widget", "/portal", "/widget-assets", "/extension-assets")
+
+# The widget iframe app and the help-center portal are *meant* to be framed by
+# customer sites, so they are the one place we must not send a framing ban.
+FRAMEABLE_PREFIXES = ("/widget-assets", "/portal")
+
+# Sent on every response. No CSP here: the dashboard is a Vite SPA served by the
+# edge (which owns its policy), and the responses this app returns that could
+# carry active content set their own policy at the route — see
+# app/api/v1/files.py and app/api/widget/media.py.
+BASE_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
 
 
 class PathAwareCORS:
@@ -64,9 +80,19 @@ class PathAwareCORS:
         return {}
 
 
+def security_headers_for(path: str, *, https: bool) -> dict[str, str]:
+    headers = dict(BASE_SECURITY_HEADERS)
+    if not path.startswith(FRAMEABLE_PREFIXES):
+        headers["X-Frame-Options"] = "DENY"
+    if https:
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return headers
+
+
 def create_app() -> FastAPI:
     configure_logging()
     settings = get_settings()
+    settings.assert_production_ready()
 
     scheduler = (
         Scheduler(settings.scheduler_tick_seconds)
@@ -96,12 +122,13 @@ def create_app() -> FastAPI:
         await reset_pubsub()
         await dispose_engine()
 
+    docs = settings.docs_enabled
     application = FastAPI(
         title="Stept API",
         version=app_pkg.__version__,
         lifespan=lifespan,
-        openapi_url="/api/v1/openapi.json",
-        docs_url="/api/v1/docs",
+        openapi_url="/api/v1/openapi.json" if docs else None,
+        docs_url="/api/v1/docs" if docs else None,
         redoc_url=None,
     )
 
@@ -113,10 +140,21 @@ def create_app() -> FastAPI:
     async def cors_and_timing(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        # Behind the edge proxy the scheme arrives in X-Forwarded-Proto; only
+        # advertise HSTS on a connection that actually was TLS.
+        https = (
+            request.headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip()
+            == "https"
+        )
+        secure_headers = security_headers_for(request.url.path, https=https)
         if request.method == "OPTIONS" and request.headers.get("origin"):
-            return Response(status_code=204, headers=cors.headers_for(request))
+            return Response(
+                status_code=204, headers={**secure_headers, **cors.headers_for(request)}
+            )
         started = time.perf_counter()
         response = await call_next(request)
+        for key, value in secure_headers.items():
+            response.headers.setdefault(key, value)
         for key, value in cors.headers_for(request).items():
             response.headers.setdefault(key, value)
         if settings.env == "dev":
@@ -132,8 +170,20 @@ def create_app() -> FastAPI:
 
     application.include_router(api_router, prefix="/api/v1")
     application.include_router(widget_router, prefix="/api/widget")
-    application.include_router(channels_router, prefix="/api/channels")
-    application.include_router(portal_router, prefix="/portal")
+    # Backstops for the two unauthenticated router trees. Deliberately far above
+    # real traffic — provider webhook bursts and help-center crawls must pass —
+    # so these cap floods without shaping normal use. The per-endpoint limits on
+    # the expensive widget writes do the precise work.
+    application.include_router(
+        channels_router,
+        prefix="/api/channels",
+        dependencies=[Depends(RateLimit("channels_inbound", times=600, seconds=60))],
+    )
+    application.include_router(
+        portal_router,
+        prefix="/portal",
+        dependencies=[Depends(RateLimit("portal", times=240, seconds=60))],
+    )
     application.include_router(extension_assets_router, prefix="/extension-assets")
     application.include_router(app_ws_router)
     application.include_router(widget_ws_router)

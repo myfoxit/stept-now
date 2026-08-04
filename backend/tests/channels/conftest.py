@@ -16,7 +16,7 @@ from app.services import inboxes as inboxes_service
 
 async def make_workspace() -> str:
     async with get_session_factory()() as session:
-        workspace = Workspace(name="Acme", slug=f"acme-{uuid7()[:12]}", settings={})
+        workspace = Workspace(name="Acme", slug=f"acme-{uuid7()}", settings={})
         session.add(workspace)
         await session.commit()
         return workspace.id

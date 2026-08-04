@@ -1,0 +1,203 @@
+# Stept — production stack. Lives in /opt/stept on the server.
+#
+#   cd /opt/stept && docker compose pull && docker compose up -d
+#
+# Images are prebuilt and pushed to GHCR by .github/workflows/deploy.yml; nothing
+# is built on the box. All configuration comes from ./.env (see env.example).
+#
+# Process split, and why it is not just "uvicorn with more workers":
+#   api        N uvicorn workers, scheduler OFF
+#   worker     ARQ, drains the Redis task queue (AI runs, webhook delivery, RAG)
+#   scheduler  exactly ONE loop for periodic jobs — running it inside each api
+#              worker would duplicate every campaign send and SLA breach event
+#   web        nginx: dashboard SPA + widget bundle
+#   caddy      sole public entry point, terminates TLS
+#
+# Caddy also joins the pre-existing `stepped_stepped` network so it can reach the
+# separately-managed poki stack by container name and keep serving /poki.
+name: stept
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stept}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-stept}
+      # Deterministic collation so index ordering does not depend on the host.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-stept} -d ${POSTGRES_DB:-stept}']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    networks: [stept]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Queue jobs must survive a restart, so persist rather than run cache-only.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    networks: [stept]
+
+  api:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    env_file: [.env]
+    environment:
+      STEPT_ENV: prod
+      STEPT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stept}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-stept}
+      STEPT_REDIS_URL: redis://redis:6379/0
+      # One scheduler process owns periodic work — see the scheduler service.
+      STEPT_SCHEDULER_ENABLED: 'false'
+      # Caddy is the only thing that talks to us, and it appends exactly one hop
+      # to X-Forwarded-For. Anything higher would let clients forge their own
+      # rate-limit identity.
+      STEPT_TRUSTED_PROXY_HOPS: '1'
+      STEPT_WEB_CONCURRENCY: ${STEPT_WEB_CONCURRENCY:-4}
+    expose: ['8600']
+    volumes:
+      - uploads:/data/uploads
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 2g
+    pids_limit: 512
+    networks: [stept]
+
+  worker:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      api: {condition: service_started}
+    command: ['arq', 'app.workers.arq.WorkerSettings']
+    env_file: [.env]
+    environment:
+      STEPT_ENV: prod
+      STEPT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stept}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-stept}
+      STEPT_REDIS_URL: redis://redis:6379/0
+      STEPT_SCHEDULER_ENABLED: 'false'
+    # The image's healthcheck curls the API port; this process serves no HTTP, so
+    # inheriting it would mark a healthy worker unhealthy forever. PID 1 *is* arq
+    # here, so "process alive" is already covered by restart: unless-stopped —
+    # what a check can still add is "arq can still reach the queue it drains".
+    healthcheck:
+      test: ['CMD-SHELL', 'python -c "import socket,sys; s=socket.create_connection((''redis'',6379),3); s.close()"']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    volumes:
+      # Shared with the api: ingestion reads the files an upload wrote.
+      - uploads:/data/uploads
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 1g
+    pids_limit: 256
+    networks: [stept]
+
+  scheduler:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      api: {condition: service_started}
+    command: ['python', '-m', 'app.workers.scheduler']
+    env_file: [.env]
+    environment:
+      STEPT_ENV: prod
+      STEPT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stept}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-stept}
+      STEPT_REDIS_URL: redis://redis:6379/0
+      STEPT_SCHEDULER_ENABLED: 'true'
+    # Same reasoning as the worker; the scheduler's job is to enqueue, so its
+    # meaningful dependency is Redis too.
+    healthcheck:
+      test: ['CMD-SHELL', 'python -c "import socket,sys; s=socket.create_connection((''redis'',6379),3); s.close()"']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # Never scale this past 1 — that is the whole reason it exists.
+    deploy:
+      replicas: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 512m
+    pids_limit: 128
+    networks: [stept]
+
+  web:
+    image: ${WEB_IMAGE:?WEB_IMAGE is required}
+    restart: unless-stopped
+    expose: ['80']
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 128
+    networks: [stept]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_started}
+      web: {condition: service_started}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+      # Spelled out rather than defaulted to app.${DOMAIN}: a nested default
+      # inside a default leaks a literal "}" on some compose versions, and the
+      # only symptom is a cert request for "app.example.com}".
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required}
+      SERVER_IP: ${SERVER_IP:?SERVER_IP is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    # Proves Caddy is up AND can reach the API through the network.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://api:8600/api/v1/healthz >/dev/null || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    mem_limit: 256m
+    networks: [stept, poki]
+
+networks:
+  stept:
+  # Pre-existing network the independently-deployed poki stack attaches to.
+  # External on purpose: this compose project must never own or remove it.
+  poki:
+    external: true
+    name: stepped_stepped
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  caddy-data:
+  caddy-config:

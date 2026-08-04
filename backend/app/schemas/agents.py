@@ -10,7 +10,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
+
+from app.core.net import UnsafeUrlError, assert_public_url
 
 ToolPolicyLiteral = Literal["auto", "require_approval", "disabled"]
 AgentStatusLiteral = Literal["draft", "live", "off"]
@@ -109,6 +112,20 @@ class AgentOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _validate_action_url(value: str) -> str:
+    """Actions return the response body to the agent, so an unguarded URL is a
+    readable window onto our own network. Same egress policy as webhooks and
+    knowledge fetches; re-checked at execution time in `app.agents.tools`."""
+    value = value.strip()
+    try:
+        assert_public_url(value, require_resolvable=False)
+    except UnsafeUrlError as exc:
+        raise PydanticCustomError(
+            "private_url", "url must point at a public host: {reason}", {"reason": str(exc)}
+        ) from exc
+    return value
+
+
 class CustomActionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80, pattern=r"^[a-zA-Z0-9_-]+$")
     description: str = ""
@@ -118,6 +135,11 @@ class CustomActionCreate(BaseModel):
     body_template: str | None = None
     params_schema: dict[str, Any] = Field(default_factory=dict)
     timeout_s: int = Field(default=10, ge=1, le=60)
+
+    @field_validator("url")
+    @classmethod
+    def _public_url(cls, value: str) -> str:
+        return _validate_action_url(value)
 
 
 class CustomActionUpdate(BaseModel):
@@ -129,6 +151,11 @@ class CustomActionUpdate(BaseModel):
     body_template: str | None = None
     params_schema: dict[str, Any] | None = None
     timeout_s: int | None = Field(default=None, ge=1, le=60)
+
+    @field_validator("url")
+    @classmethod
+    def _public_url(cls, value: str | None) -> str | None:
+        return None if value is None else _validate_action_url(value)
 
 
 class CustomActionOut(BaseModel):

@@ -29,6 +29,14 @@ _IGNORED_SUBTYPES = {"message_changed", "message_deleted", "bot_message"}
 
 
 async def _find_slack_inbox(session: AsyncSession, team_id: str | None) -> Inbox | None:
+    """Route an event to the inbox that claims its ``team_id``.
+
+    This is the one lookup in the app that cannot filter by workspace_id — Slack
+    addresses us by team, not by tenant — so the match has to be exact. The only
+    fallback is a single unclaimed inbox (a self-hoster who never filled in
+    ``team_id``); with several Slack inboxes across tenants, an unmatched event is
+    dropped rather than delivered into whichever workspace happens to be oldest.
+    """
     inboxes = (
         (
             await session.execute(
@@ -44,8 +52,8 @@ async def _find_slack_inbox(session: AsyncSession, team_id: str | None) -> Inbox
         for inbox in inboxes:
             if inbox.config.get("team_id") == team_id:
                 return inbox
-    # Fall back to the workspace's single Slack inbox.
-    return inboxes[0] if inboxes else None
+    unclaimed = [inbox for inbox in inboxes if not inbox.config.get("team_id")]
+    return unclaimed[0] if len(unclaimed) == 1 else None
 
 
 @router.post("/events")

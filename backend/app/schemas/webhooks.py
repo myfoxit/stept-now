@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
 from app.core.events import EventNames
+from app.core.net import UnsafeUrlError, assert_public_url
 
 # Every declared domain event, plus the "*" wildcard.
 ALL_EVENT_NAMES: frozenset[str] = frozenset(
@@ -23,6 +24,15 @@ def _validate_url(value: str) -> str:
     value = value.strip()
     if not value.startswith(("http://", "https://")):
         raise PydanticCustomError("invalid_url", "url must be an http(s) URL")
+    # Same egress policy the delivery task enforces — rejected here so the
+    # operator sees why instead of watching every delivery fail.
+    try:
+        # Save-time feedback only; delivery re-checks with DNS required.
+        assert_public_url(value, require_resolvable=False)
+    except UnsafeUrlError as exc:
+        raise PydanticCustomError(
+            "private_url", "url must point at a public host: {reason}", {"reason": str(exc)}
+        ) from exc
     return value
 
 

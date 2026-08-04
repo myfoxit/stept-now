@@ -17,9 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import ipaddress
 import re
-import socket
 from collections import deque
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
@@ -29,7 +27,7 @@ from xml.etree import ElementTree
 
 import httpx
 
-from app.core.config import get_settings
+from app.core.net import UnsafeUrlError, assert_public_url
 from app.rag import parsers
 from app.rag.parsers import ParseError
 from app.rag.tasks import URL_FETCH_TIMEOUT_SECONDS, FetchError, fetch_html_bytes
@@ -94,34 +92,14 @@ class SitemapEntry:
 def check_public_url(url: str) -> None:
     """SSRF guard for user-supplied fetch targets (urls/sitemap/crawl syncs).
 
-    Only http(s) URLs whose hostname resolves exclusively to global (public)
-    addresses pass. The resolution check is skipped for the ASGI "testserver"
-    host and under env=test, because tests fetch respx-mocked hostnames that
-    must never hit real DNS — the scheme check still applies there.
+    Thin adapter over :func:`app.core.net.assert_public_url` — the one egress
+    policy shared with outbound webhooks and custom agent actions — re-raised as
+    the :class:`FetchError` every sync path already handles.
     """
-    parts = urlsplit(url)
-    if parts.scheme not in ("http", "https"):
-        raise FetchError(f"Unsupported URL scheme: {url}")
-    hostname = parts.hostname
-    if not hostname:
-        raise FetchError(f"Invalid URL: {url}")
-    if hostname == "testserver" or get_settings().env == "test":
-        return
     try:
-        port = parts.port or (443 if parts.scheme == "https" else 80)
-        infos = socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)
-    except (socket.gaierror, ValueError) as exc:
-        raise FetchError(f"Could not resolve host: {hostname}") from exc
-    if not infos:
-        raise FetchError(f"Could not resolve host: {hostname}")
-    for info in infos:
-        address = str(info[4][0]).split("%")[0]  # strip IPv6 zone id
-        try:
-            resolved = ipaddress.ip_address(address)
-        except ValueError as exc:
-            raise FetchError(f"{hostname} resolves to an invalid address") from exc
-        if not resolved.is_global:
-            raise FetchError(f"{hostname} resolves to a non-public address")
+        assert_public_url(url)
+    except UnsafeUrlError as exc:
+        raise FetchError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
