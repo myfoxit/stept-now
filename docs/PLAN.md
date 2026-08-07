@@ -177,8 +177,9 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     (polyfilled in `src/test/setup.ts` — this had silently blocked select-driven UI tests).
   - Migration `e133372bfc35`, PG-validated up/down/up with `alembic check` clean (needed
     `server_default` + an explicit drop so the DB matches the model).
-  - **Totals after W9:** **2004 tests** — backend 1131 (+2 pg-only), frontend 416, widget 186,
-    extension 100, dom-capture 107, e2e 21. `make verify` green.
+  - **Measured after W9:** backend **1131** passed (+2 pg-only), frontend **424**, widget **187**
+    — up from 934 / 383 / 186 at W8. The extension, dom-capture and e2e suites were unchanged by
+    this wave and ran green as part of `make verify`, which passed end to end.
 
 - [ ] Post-build notes for user: **no git origin configured** — merged to local master only, not pushed (user decides re GitHub; gh is authed as `myfoxit`). Old stept containers on 8000/80/5173 are a PRIOR build — untouched. A `build-postgres-1` container is up on 54329 (used for PG validation; `docker compose down` to stop). Use `docker compose` (v2) — the v1 `docker-compose` is broken by a pyenv SSL issue.
 
