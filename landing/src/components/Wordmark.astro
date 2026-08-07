@@ -1,0 +1,51 @@
+---
+/*
+ * The Stept wordmark — identical construction to the app's AuthCard brand mark:
+ * a rounded indigo square holding a bold "S", next to the semibold wordmark.
+ */
+interface Props {
+  size?: 'sm' | 'md'
+}
+const { size = 'md' } = Astro.props
+---
+
+<span class:list={['wordmark', size]}>
+  <span class="glyph" aria-hidden="true">S</span>
+  <span class="name">Stept</span>
+</span>
+
+<style>
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .glyph {
+    display: grid;
+    place-items: center;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 700;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  .md .glyph {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1.125rem;
+  }
+  .md .name {
+    font-size: 1.25rem;
+  }
+  .sm .glyph {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9rem;
+    border-radius: calc(var(--radius) - 2px);
+  }
+  .sm .name {
+    font-size: 1.05rem;
+  }
+</style>

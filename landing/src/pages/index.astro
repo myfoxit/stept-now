@@ -1,0 +1,918 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Wordmark from '../components/Wordmark.astro'
+import Icon from '../components/Icon.astro'
+
+const APP = 'https://app.stepped.ai'
+const GITHUB = 'https://github.com/myfoxit/stept-now'
+
+const features = [
+  {
+    icon: 'inbox',
+    title: 'One shared inbox',
+    body: 'Every conversation in one place — assign, snooze, tag, note and resolve, with SLAs and realtime collaboration across your team.',
+  },
+  {
+    icon: 'sparkles',
+    title: 'Your own AI agent',
+    body: 'An agent that answers from your knowledge base with citations, guardrails and human-in-the-loop approval gates. Bring your own model — OpenAI, Anthropic, Google, Ollama or any OpenAI-compatible.',
+  },
+  {
+    icon: 'book',
+    title: 'Knowledge & RAG',
+    body: 'Crawl your site, sync Confluence, Notion, Google Drive or Zendesk, or upload files. Hybrid retrieval powers both the agent and a public help center.',
+  },
+  {
+    icon: 'messages',
+    title: 'Every channel',
+    body: 'Web widget, email, Slack, Telegram, WhatsApp, Messenger, Instagram, SMS and a public API — one conversation model behind them all.',
+  },
+  {
+    icon: 'map',
+    title: 'Product tours',
+    body: 'Record interactive product tours with a Chrome extension and play them in your app. Digital adoption, without a second vendor.',
+  },
+  {
+    icon: 'route',
+    title: 'Automation & reports',
+    body: 'Rules, macros, campaigns, SLAs and webhooks — plus analytics on volume, resolution rate and CSAT.',
+  },
+]
+
+const integrations = [
+  'Gmail',
+  'Microsoft 365',
+  'Slack',
+  'Notion',
+  'Confluence',
+  'Zendesk',
+  'Amazon SES',
+  'Resend',
+  'Postmark',
+  'SendGrid',
+  'Mailgun',
+  'Telegram',
+]
+
+const plans = [
+  {
+    name: 'Self-hosted',
+    price: 'Free',
+    unit: 'AGPL · forever',
+    highlight: false,
+    cta: { label: 'Get the source', href: GITHUB },
+    tagline: 'Run the whole thing yourself.',
+    features: [
+      'All channels, unlimited seats',
+      'AI agent with your own model key',
+      'Knowledge base, RAG & help center',
+      'Product tours & automation',
+      'Deploy with one Docker command',
+    ],
+  },
+  {
+    name: 'Cloud',
+    price: '$19',
+    unit: 'per seat / month',
+    highlight: true,
+    cta: { label: 'Start free', href: `${APP}/signup` },
+    tagline: 'We host and update it for you.',
+    features: [
+      'Everything in self-hosted',
+      '500 AI resolutions / month included',
+      'Managed Postgres & backups',
+      'Automatic updates',
+      'Email & chat support',
+    ],
+  },
+  {
+    name: 'Business',
+    price: '$49',
+    unit: 'per seat / month',
+    highlight: false,
+    cta: { label: 'Talk to us', href: `${APP}/signup` },
+    tagline: 'For teams with compliance needs.',
+    features: [
+      'SSO / SAML & audit logs',
+      'Custom roles & white-label widget',
+      'SLA management',
+      '2,000 AI resolutions / month',
+      'Priority support',
+    ],
+  },
+]
+const year = new Date().getFullYear()
+---
+
+<Layout>
+  <!-- ===== nav ===== -->
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href="/" aria-label="Stept home"><Wordmark /></a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Product</a>
+        <a href="#integrations">Integrations</a>
+        <a href="#pricing">Pricing</a>
+        <a href={GITHUB}>GitHub</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn btn-ghost btn-sm nav-signin" href={`${APP}/login`}>Sign in</a>
+        <a class="btn btn-primary btn-sm" href={`${APP}/signup`}>Start free</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== hero ===== -->
+    <section class="section hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">
+            <Icon name="sparkles" size={16} /> Open source · self-hostable
+          </span>
+          <h1>Customer support that resolves itself.</h1>
+          <p class="lead">
+            Stept is the open-source Intercom&nbsp;+&nbsp;Fin alternative: a shared inbox across
+            every channel, an AI agent grounded in your own knowledge base, a help center, product
+            tours and automation. Self-host it free — bring your own model key — or let us run it.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href={`${APP}/signup`}>
+              Start free <Icon name="arrow" size={18} />
+            </a>
+            <a class="btn btn-ghost" href={GITHUB}>
+              <Icon name="github" size={18} /> Star on GitHub
+            </a>
+          </div>
+          <p class="hero-note">AGPL-licensed · Postgres or SQLite · one Docker command to deploy</p>
+        </div>
+
+        <!-- product mock: the Stept inbox, drawn in CSS (no real data) -->
+        <div class="mock card" aria-hidden="true">
+          <div class="mock-rail">
+            <div class="mock-brand"><span class="mock-glyph">S</span></div>
+            <span class="mock-ico on"></span>
+            <span class="mock-ico"></span>
+            <span class="mock-ico"></span>
+            <span class="mock-ico"></span>
+          </div>
+          <div class="mock-list">
+            <div class="mock-list-head"></div>
+            <div class="mock-row active">
+              <span class="mock-avatar"></span>
+              <span class="mock-lines"><i></i><i class="short"></i></span>
+            </div>
+            <div class="mock-row">
+              <span class="mock-avatar"></span>
+              <span class="mock-lines"><i></i><i class="short"></i></span>
+            </div>
+            <div class="mock-row">
+              <span class="mock-avatar"></span>
+              <span class="mock-lines"><i></i><i class="short"></i></span>
+            </div>
+          </div>
+          <div class="mock-thread">
+            <div class="bubble in"></div>
+            <div class="bubble in short"></div>
+            <div class="ai">
+              <div class="ai-head"><span class="ai-badge"><Icon name="sparkles" size={12} /> Fin</span><span class="ai-conf"></span></div>
+              <div class="ai-line"></div>
+              <div class="ai-line"></div>
+              <div class="ai-line short"></div>
+              <div class="ai-cite"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== channels strip ===== -->
+    <section class="strip">
+      <div class="container">
+        <p class="strip-label">One conversation model behind every channel</p>
+        <div class="strip-items">
+          {
+            ['Web widget', 'Email', 'Slack', 'Telegram', 'WhatsApp', 'Messenger', 'Instagram', 'SMS', 'API'].map(
+              (c) => <span class="chip">{c}</span>,
+            )
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== features ===== -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><Icon name="inbox" size={16} /> The platform</span>
+          <h2>Everything a modern support team needs — in one place.</h2>
+          <p class="lead">
+            Intercom bundles the inbox, the AI agent, the help center and product tours, then
+            charges for each. Stept ships all of it in one open-source platform.
+          </p>
+        </div>
+        <div class="feature-grid">
+          {
+            features.map((f) => (
+              <article class="card feature">
+                <span class="feature-ico"><Icon name={f.icon} size={22} /></span>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== self-host / BYO Fin band ===== -->
+    <section class="section band-wrap">
+      <div class="container">
+        <div class="band card">
+          <div class="band-copy">
+            <span class="eyebrow"><Icon name="shield" size={16} /> Own your stack</span>
+            <h2>Run your own Fin — for free.</h2>
+            <p class="lead">
+              Most AI-support tools bill per resolution or lock the agent behind an enterprise
+              plan. Stept ships the agent in the open-source core. Point it at your own model key
+              and self-host the whole platform — inbox, knowledge base, tours and all — at no cost.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href={GITHUB}>
+                Read the quickstart <Icon name="arrow" size={18} />
+              </a>
+            </div>
+          </div>
+          <ul class="band-list">
+            <li><Icon name="check" size={18} /> Bring your own model — no per-resolution fee</li>
+            <li><Icon name="check" size={18} /> Your data stays in your database</li>
+            <li><Icon name="check" size={18} /> Postgres in prod, SQLite for a trial</li>
+            <li><Icon name="check" size={18} /> No seat caps when you self-host</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== integrations ===== -->
+    <section class="section" id="integrations">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><Icon name="plug" size={16} /> Integrations</span>
+          <h2>Connect your tools in one click.</h2>
+          <p class="lead">
+            OAuth into Gmail, Microsoft 365, Slack, Notion, Confluence and Zendesk — or bring your
+            own app. Send email through SES, Resend, Postmark, SendGrid, Mailgun or plain SMTP.
+          </p>
+        </div>
+        <div class="integ-grid">
+          {
+            integrations.map((name) => (
+              <div class="integ">
+                <span class="integ-dot" />
+                {name}
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== pricing ===== -->
+    <section class="section" id="pricing">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><Icon name="zap" size={16} /> Pricing</span>
+          <h2>Free to self-host. Fair when we host it.</h2>
+          <p class="lead">
+            The whole platform is open source. Pay only when you want us to run it — and undercut
+            the incumbents while you do.
+          </p>
+        </div>
+        <div class="price-grid">
+          {
+            plans.map((p) => (
+              <article class:list={['card plan', { featured: p.highlight }]}>
+                {p.highlight && <span class="plan-badge">Most popular</span>}
+                <h3 class="plan-name">{p.name}</h3>
+                <div class="plan-price">
+                  <span class="amount">{p.price}</span>
+                  <span class="unit">{p.unit}</span>
+                </div>
+                <p class="plan-tagline">{p.tagline}</p>
+                <a
+                  class:list={['btn', p.highlight ? 'btn-primary' : 'btn-ghost', 'plan-cta']}
+                  href={p.cta.href}
+                >
+                  {p.cta.label}
+                </a>
+                <ul class="plan-features">
+                  {p.features.map((f) => (
+                    <li>
+                      <Icon name="check" size={16} /> {f}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))
+          }
+        </div>
+        <p class="price-foot">
+          AI resolutions beyond your plan bill at about <strong>$0.30 each</strong> — roughly a
+          third of Intercom Fin. A 5-seat team pays about <strong>$95/mo</strong> on Stept Cloud;
+          the same team on Intercom&nbsp;+&nbsp;Fin runs <strong>$1,000–1,500/mo</strong>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== final CTA ===== -->
+    <section class="section">
+      <div class="container">
+        <div class="cta card">
+          <h2>Own your support stack.</h2>
+          <p class="lead">Deploy it yourself in minutes, or start free on our cloud.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href={`${APP}/signup`}>Start free <Icon name="arrow" size={18} /></a>
+            <a class="btn btn-ghost" href={GITHUB}><Icon name="github" size={18} /> Self-host it</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== footer ===== -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <Wordmark size="sm" />
+        <p>The open-source Intercom + Fin alternative.</p>
+      </div>
+      <nav class="footer-col" aria-label="Product">
+        <span class="footer-h">Product</span>
+        <a href="#features">Features</a>
+        <a href="#integrations">Integrations</a>
+        <a href="#pricing">Pricing</a>
+      </nav>
+      <nav class="footer-col" aria-label="Resources">
+        <span class="footer-h">Resources</span>
+        <a href={GITHUB}>GitHub</a>
+        <a href={`${APP}/login`}>Sign in</a>
+        <a href={`${APP}/signup`}>Start free</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <span class="footer-h">Project</span>
+        <a href={GITHUB}>Source (AGPL)</a>
+        <a href={`${GITHUB}/blob/master/docs/INTEGRATIONS-SETUP.md`}>Self-host docs</a>
+      </nav>
+    </div>
+    <div class="container footer-base">
+      <span>© {year} Stept</span>
+      <span>Open source, AGPL-3.0</span>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  /* ---- nav ---- */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in oklch, var(--background) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 4rem;
+    gap: 1rem;
+  }
+  .nav-links {
+    display: none;
+    gap: 1.75rem;
+    font-size: 0.9375rem;
+    color: var(--muted-foreground);
+  }
+  .nav-links a:hover {
+    color: var(--foreground);
+  }
+  .nav-cta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .nav-signin {
+    display: none;
+  }
+  @media (min-width: 820px) {
+    .nav-links {
+      display: flex;
+    }
+    .nav-signin {
+      display: inline-flex;
+    }
+  }
+
+  /* ---- hero ---- */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding-top: clamp(3rem, 6vw, 5rem);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: -30% 0 auto 0;
+    height: 70%;
+    background: radial-gradient(60% 60% at 70% 0%, var(--primary-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-grid {
+    position: relative;
+    display: grid;
+    gap: clamp(2.5rem, 5vw, 4rem);
+    align-items: center;
+  }
+  @media (min-width: 960px) {
+    .hero-grid {
+      grid-template-columns: 1.05fr 1fr;
+    }
+  }
+  .hero-copy h1 {
+    font-size: clamp(2.4rem, 5.5vw, 3.6rem);
+    margin-top: 1rem;
+  }
+  .hero-copy .lead {
+    margin-top: 1.15rem;
+    max-width: 46ch;
+  }
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+  }
+  .hero-note {
+    margin-top: 1.1rem;
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+  }
+
+  /* ---- product mock ---- */
+  .mock {
+    display: grid;
+    grid-template-columns: 3.25rem 1.1fr 1.4fr;
+    height: 340px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    padding: 0;
+  }
+  .mock-rail {
+    background: var(--muted);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 0;
+  }
+  .mock-brand {
+    margin-bottom: 0.4rem;
+  }
+  .mock-glyph {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+  .mock-ico {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--muted-foreground) 22%, transparent);
+  }
+  .mock-ico.on {
+    background: var(--primary);
+    opacity: 0.85;
+  }
+  .mock-list {
+    border-right: 1px solid var(--border);
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  .mock-list-head {
+    height: 0.8rem;
+    width: 55%;
+    border-radius: 5px;
+    background: color-mix(in oklch, var(--muted-foreground) 28%, transparent);
+  }
+  .mock-row {
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 8px;
+  }
+  .mock-row.active {
+    background: var(--primary-soft);
+  }
+  .mock-avatar {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: color-mix(in oklch, var(--muted-foreground) 30%, transparent);
+    flex: none;
+  }
+  .mock-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+    flex: 1;
+  }
+  .mock-lines i {
+    height: 0.5rem;
+    border-radius: 4px;
+    background: color-mix(in oklch, var(--muted-foreground) 24%, transparent);
+  }
+  .mock-lines i.short {
+    width: 60%;
+  }
+  .mock-thread {
+    padding: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .bubble {
+    height: 1.4rem;
+    width: 70%;
+    border-radius: 10px;
+    background: var(--muted);
+  }
+  .bubble.short {
+    width: 45%;
+  }
+  .ai {
+    margin-top: auto;
+    border: 1px solid var(--primary-ring);
+    background: var(--primary-soft);
+    border-radius: 12px;
+    padding: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .ai-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 14%, transparent);
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+  }
+  .ai-conf {
+    width: 3rem;
+    height: 0.4rem;
+    border-radius: 4px;
+    background: color-mix(in oklch, var(--primary) 40%, transparent);
+  }
+  .ai-line {
+    height: 0.5rem;
+    border-radius: 4px;
+    background: color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+  .ai-line.short {
+    width: 55%;
+  }
+  .ai-cite {
+    margin-top: 0.15rem;
+    height: 0.9rem;
+    width: 40%;
+    border-radius: 5px;
+    background: color-mix(in oklch, var(--primary) 18%, transparent);
+  }
+
+  /* ---- channels strip ---- */
+  .strip {
+    border-block: 1px solid var(--border);
+    background: var(--muted);
+    padding-block: 1.75rem;
+  }
+  .strip-label {
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    margin-bottom: 0.9rem;
+  }
+  .strip-items {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .chip {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--foreground);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+  }
+
+  /* ---- section head ---- */
+  .section-head {
+    max-width: 640px;
+    margin-bottom: 2.5rem;
+  }
+  .section-head h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+    margin-top: 0.75rem;
+  }
+  .section-head .lead {
+    margin-top: 0.9rem;
+    max-width: 56ch;
+  }
+
+  /* ---- features ---- */
+  .feature-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(1, 1fr);
+  }
+  @media (min-width: 620px) {
+    .feature-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 960px) {
+    .feature-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .feature {
+    padding: 1.5rem;
+  }
+  .feature-ico {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--radius);
+    background: var(--primary-soft);
+    color: var(--primary);
+    margin-bottom: 1rem;
+  }
+  .feature h3 {
+    font-size: 1.1rem;
+  }
+  .feature p {
+    margin-top: 0.5rem;
+    color: var(--muted-foreground);
+    font-size: 0.95rem;
+  }
+
+  /* ---- self-host band ---- */
+  .band {
+    padding: clamp(1.75rem, 4vw, 3rem);
+    display: grid;
+    gap: 2rem;
+    background:
+      radial-gradient(80% 120% at 100% 0%, var(--primary-soft), transparent 60%), var(--card);
+  }
+  @media (min-width: 900px) {
+    .band {
+      grid-template-columns: 1.3fr 1fr;
+      align-items: center;
+    }
+  }
+  .band-copy h2 {
+    font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+    margin-top: 0.75rem;
+  }
+  .band-copy .lead {
+    margin-top: 0.9rem;
+  }
+  .band-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.85rem;
+  }
+  .band-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 500;
+  }
+  .band-list :global(svg) {
+    color: var(--primary);
+    flex: none;
+  }
+
+  /* ---- integrations ---- */
+  .integ-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  @media (min-width: 620px) {
+    .integ-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  @media (min-width: 900px) {
+    .integ-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .integ {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  .integ-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--primary);
+    flex: none;
+  }
+
+  /* ---- pricing ---- */
+  .price-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .price-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .plan {
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .plan.featured {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary), var(--shadow-md);
+  }
+  .plan-badge {
+    position: absolute;
+    top: -0.7rem;
+    right: 1.25rem;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+  }
+  .plan-name {
+    font-size: 1.05rem;
+  }
+  .plan-price {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  .plan-price .amount {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  .plan-price .unit {
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+  }
+  .plan-tagline {
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    margin-top: 0.6rem;
+  }
+  .plan-cta {
+    width: 100%;
+    margin-top: 1.25rem;
+  }
+  .plan-features {
+    list-style: none;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.7rem;
+  }
+  .plan-features li {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.9rem;
+    color: var(--card-foreground);
+  }
+  .plan-features :global(svg) {
+    color: var(--primary);
+    flex: none;
+  }
+  .price-foot {
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    max-width: 60ch;
+    margin: 2rem auto 0;
+  }
+  .price-foot strong {
+    color: var(--foreground);
+  }
+
+  /* ---- final CTA ---- */
+  .cta {
+    text-align: center;
+    padding: clamp(2.5rem, 6vw, 4rem);
+    background:
+      radial-gradient(80% 140% at 50% 0%, var(--primary-soft), transparent 65%), var(--card);
+  }
+  .cta h2 {
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+  }
+  .cta .lead {
+    margin: 0.9rem auto 0;
+  }
+  .cta .hero-actions {
+    justify-content: center;
+  }
+
+  /* ---- footer ---- */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding-block: 3rem 2rem;
+    margin-top: 2rem;
+  }
+  .footer-inner {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 720px) {
+    .footer-inner {
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+    }
+  }
+  .footer-brand p {
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    margin-top: 0.75rem;
+    max-width: 30ch;
+  }
+  .footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+  }
+  .footer-col a:hover {
+    color: var(--foreground);
+  }
+  .footer-h {
+    color: var(--foreground);
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+  .footer-base {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+  }
+</style>

@@ -1,0 +1,16 @@
+{
+  "name": "stept-landing",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Marketing landing page for Stept — the open-source Intercom + Fin alternative.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "^5.7.0"
+  }
+}
