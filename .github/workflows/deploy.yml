@@ -243,6 +243,9 @@ jobs:
             # half the workers talking to a schema that moved.
             docker compose run --rm api migrate
             docker compose up -d --remove-orphans
+            # compose does not restart caddy when only its bind-mounted config
+            # changed; a graceful reload is free when nothing changed.
+            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           '
 
       - name: Wait for health, and roll back if it never comes
