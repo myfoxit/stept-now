@@ -27,6 +27,7 @@ from app.core.errors import BlockedContactError, NotFoundError, ValidationFailur
 from app.core.events import Actor, Event, EventNames, emit
 from app.core.pagination import clamp_limit, decode_cursor, encode_cursor
 from app.core.queue import enqueue
+from app.models.agent import Agent
 from app.models.contact import Contact
 from app.models.conversation import (
     Conversation,
@@ -600,7 +601,23 @@ async def add_message(
             conversation.waiting_since = now
         if conversation.status in (ConversationStatus.RESOLVED, ConversationStatus.SNOOZED):
             # "pending" stays pending — the AI agent keeps ownership.
-            conversation.status = ConversationStatus.OPEN
+            # A fresh question on a *resolved* thread goes back to the live
+            # bound agent (pending) instead of the human queue — otherwise one
+            # resolve permanently mutes the AI for that visitor. Snoozed is a
+            # deliberate human parking decision, so it always reopens to open.
+            reopened_status = ConversationStatus.OPEN
+            if conversation.status == ConversationStatus.RESOLVED:
+                agent_id = conversation.ai_agent_id or (inbox.config or {}).get("ai_agent_id")
+                if agent_id:
+                    bound_agent = await session.get(Agent, agent_id)
+                    if (
+                        bound_agent is not None
+                        and bound_agent.workspace_id == conversation.workspace_id
+                        and bound_agent.status == "live"
+                    ):
+                        conversation.ai_agent_id = bound_agent.id
+                        reopened_status = ConversationStatus.PENDING
+            conversation.status = reopened_status
             conversation.snoozed_until = None
     elif is_outbound_reply:
         if conversation.first_reply_at is None:
@@ -1006,11 +1023,25 @@ def _apply_filters(
         query = query.where(Conversation.priority == priority)
     if q:
         pattern = f"%{q}%"
+        # Widget conversations have no subject, so a subject-only match would
+        # return nothing for exactly the threads support searches most. Public
+        # message bodies count; notes stay out of search results shown around
+        # contacts.
+        message_match = (
+            select(Message.id)
+            .where(
+                Message.conversation_id == Conversation.id,
+                Message.visibility == MessageVisibility.PUBLIC,
+                Message.content.ilike(pattern),
+            )
+            .exists()
+        )
         query = query.where(
             or_(
                 Conversation.subject.ilike(pattern),
                 Contact.name.ilike(pattern),
                 Contact.email.ilike(pattern),
+                message_match,
             )
         )
     return query

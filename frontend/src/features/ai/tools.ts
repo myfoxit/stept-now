@@ -21,6 +21,12 @@ export const BUILTIN_TOOLS: BuiltinTool[] = [
     defaultPolicy: 'auto',
   },
   {
+    key: 'find_guide',
+    label: 'Find guide',
+    description: 'Find a published tour or checklist that answers the question, so it can be played.',
+    defaultPolicy: 'auto',
+  },
+  {
     key: 'handoff_to_human',
     label: 'Hand off to human',
     description: 'Escalate the conversation to a teammate.',

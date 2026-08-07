@@ -1,0 +1,54 @@
+import { defineConfig } from 'astro/config'
+import starlight from '@astrojs/starlight'
+
+// Documentation site, served at docs.stepped.ai. Isolated from the pnpm
+// workspace like landing/ (own lockfile, pnpm install --ignore-workspace).
+export default defineConfig({
+  site: 'https://docs.stepped.ai',
+  integrations: [
+    starlight({
+      title: 'Stept Docs',
+      description:
+        'Documentation for Stept — the open-source Intercom + Fin alternative: shared inbox, AI agent, knowledge base, product tours.',
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/myfoxit/stept-now' }],
+      editLink: {
+        baseUrl: 'https://github.com/myfoxit/stept-now/edit/master/docs-site/',
+      },
+      sidebar: [
+        {
+          label: 'Getting started',
+          items: [
+            { label: 'What is Stept?', slug: 'index' },
+            { label: 'Quickstart (cloud)', slug: 'getting-started/quickstart' },
+            { label: 'Self-hosting', slug: 'getting-started/self-hosting' },
+          ],
+        },
+        {
+          label: 'Product',
+          items: [
+            { label: 'Inbox & conversations', slug: 'product/inbox' },
+            { label: 'Chat widget', slug: 'product/widget' },
+            { label: 'Knowledge base & crawling', slug: 'product/knowledge' },
+            { label: 'AI agent', slug: 'product/ai-agent' },
+            { label: 'Product tours', slug: 'product/tours' },
+            { label: 'Help center', slug: 'product/help-center' },
+          ],
+        },
+        {
+          label: 'Integrations',
+          items: [
+            { label: 'Overview', slug: 'integrations/overview' },
+            { label: 'MCP (AI clients)', slug: 'integrations/mcp' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'Configuration', slug: 'reference/configuration' },
+            { label: 'REST API', slug: 'reference/api' },
+          ],
+        },
+      ],
+    }),
+  ],
+})

@@ -266,3 +266,69 @@ async def _activity_messages(conversation_id: str):
             .all()
         )
         return list(rows)
+
+
+async def test_handoff_sends_configured_message_to_visitor(actx):
+    """The handoff must reach the visitor, not just the inbox — control="handoff"
+    ends the run without a model reply, so the configured message is the only
+    thing between the customer and silence."""
+    agent_id = await make_agent(actx)
+    conversation_id, _ = await conversation_with_message(
+        actx, 'I want a person [[tool:handoff_to_human {"reason": "wants a human"}]]'
+    )
+    await run_now(actx, agent_id, conversation_id)
+
+    outbound = [m.content for m in await public_messages(conversation_id) if m.direction == "out"]
+    assert "Let me connect you with a teammate." in outbound
+
+
+async def test_resolved_conversation_reengages_live_agent(actx):
+    """A fresh question on a resolved thread goes back to the bound live agent
+    (pending), instead of permanently muting the AI after one resolve."""
+    from app.models.inbox import Inbox
+    from tests.agents.conftest import add_contact_message
+
+    agent_id = await make_agent(actx)
+    async with session_scope() as session:
+        inbox = await session.get(Inbox, actx.inbox_id)
+        assert inbox is not None
+        inbox.config = {**(inbox.config or {}), "ai_agent_id": agent_id}
+        await session.commit()
+
+    conversation_id, _ = await conversation_with_message(actx, "first question")
+    async with session_scope() as session:
+        conversation = await get_conversation(conversation_id)
+        conversation = await session.merge(conversation)
+        conversation.status = "resolved"
+        conversation.ai_agent_id = None
+        await session.commit()
+
+    await add_contact_message(actx, conversation_id, "one more thing")
+    conversation = await get_conversation(conversation_id)
+    assert conversation.status == "pending"
+    assert conversation.ai_agent_id == agent_id
+
+
+async def test_open_conversation_stays_with_humans(actx):
+    """After a handoff (status=open) the agent must NOT reclaim the thread on
+    the next visitor message."""
+    from app.models.inbox import Inbox
+    from tests.agents.conftest import add_contact_message
+
+    agent_id = await make_agent(actx)
+    async with session_scope() as session:
+        inbox = await session.get(Inbox, actx.inbox_id)
+        assert inbox is not None
+        inbox.config = {**(inbox.config or {}), "ai_agent_id": agent_id}
+        await session.commit()
+
+    conversation_id, _ = await conversation_with_message(actx, "hello")
+    async with session_scope() as session:
+        conversation = await get_conversation(conversation_id)
+        conversation = await session.merge(conversation)
+        conversation.status = "open"
+        await session.commit()
+
+    await add_contact_message(actx, conversation_id, "still here")
+    conversation = await get_conversation(conversation_id)
+    assert conversation.status == "open"

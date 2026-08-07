@@ -4,7 +4,6 @@ import { timeAgo } from '../format'
 /** Home screen: greeting, recent conversations, new-message + help CTAs. */
 export function Home({
   config,
-  workspaceName,
   conversations,
   helpCenter,
   onOpenConversation,
@@ -12,7 +11,6 @@ export function Home({
   onOpenHelp,
 }: {
   config: WidgetConfig
-  workspaceName: string
   conversations: ConversationSummary[]
   helpCenter: boolean
   onOpenConversation: (id: string) => void
@@ -20,6 +18,7 @@ export function Home({
   onOpenHelp: () => void
 }) {
   const greeting = config.greeting || 'Hi there 👋'
+  const aiEnabled = Boolean(config.ai_agent_id)
 
   return (
     <div class="sw-home">
@@ -32,7 +31,11 @@ export function Home({
         <button type="button" class="sw-card sw-card-action" onClick={onNewConversation}>
           <div>
             <div class="sw-card-title">Send us a message</div>
-            <div class="sw-card-sub">We typically reply within a few minutes.</div>
+            <div class="sw-card-sub">
+              {aiEnabled
+                ? 'Ask us anything — our AI answers instantly.'
+                : 'We typically reply within a few minutes.'}
+            </div>
           </div>
           <span class="sw-card-arrow" aria-hidden="true">
             →
@@ -77,7 +80,11 @@ export function Home({
         )}
       </div>
 
-      <div class="sw-branding">Powered by {workspaceName || 'Stept'}</div>
+      <div class="sw-branding">
+        <a href="https://stepped.ai" target="_blank" rel="noopener noreferrer">
+          Powered by Stept
+        </a>
+      </div>
     </div>
   )
 }

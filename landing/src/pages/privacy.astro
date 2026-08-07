@@ -1,0 +1,131 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Wordmark from '../components/Wordmark.astro'
+---
+
+<Layout
+  title="Privacy — Stept"
+  description="How Stept handles your data: what we collect, where it lives, and your rights."
+>
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href="/" aria-label="Stept home"><Wordmark /></a>
+      <a class="btn btn-ghost btn-sm" href="/">← Back</a>
+    </div>
+  </header>
+  <main class="container legal">
+    <h1>Privacy policy</h1>
+    <p class="muted">Last updated: August 2026</p>
+
+    <h2>Who we are</h2>
+    <p>
+      Stept ("we") provides an open-source customer-support platform, available self-hosted and
+      as a hosted service at <a href="https://app.stepped.ai">app.stepped.ai</a> ("Stept Cloud").
+      Contact: <a href="mailto:hello@stepped.ai">hello@stepped.ai</a>.
+    </p>
+
+    <h2>Self-hosted installs</h2>
+    <p>
+      If you self-host Stept, we collect nothing. All data stays in your own infrastructure and
+      your own database. The software makes no calls home — the only outbound requests are the
+      ones you configure (your AI provider, your email transport, your integrations).
+    </p>
+
+    <h2>Stept Cloud — what we store</h2>
+    <ul>
+      <li><strong>Account data:</strong> your email address, name and password hash.</li>
+      <li>
+        <strong>Workspace content:</strong> conversations, contacts, knowledge documents,
+        articles, tours and settings your team creates — processed solely to provide the
+        service to you.
+      </li>
+      <li>
+        <strong>Provider credentials:</strong> AI model keys and channel tokens you connect are
+        encrypted at rest.
+      </li>
+      <li>
+        <strong>Technical logs:</strong> IP addresses and request metadata, kept short-term for
+        security and rate limiting.
+      </li>
+    </ul>
+
+    <h2>Where it lives</h2>
+    <p>
+      Stept Cloud runs on EU infrastructure (Hetzner). Traffic is served through Cloudflare for
+      TLS and DDoS protection.
+    </p>
+
+    <h2>AI processing</h2>
+    <p>
+      When your workspace uses an AI feature, the relevant conversation and knowledge excerpts
+      are sent to the model provider <em>you</em> configured with <em>your</em> key. We do not
+      train models on your data and we add no hidden providers.
+    </p>
+
+    <h2>Your rights</h2>
+    <p>
+      You can export or delete your workspace data at any time — email
+      <a href="mailto:hello@stepped.ai">hello@stepped.ai</a> for GDPR requests (access,
+      rectification, erasure, portability).
+    </p>
+
+    <h2>Sub-processors</h2>
+    <p>Hetzner Online GmbH (hosting, EU) · Cloudflare, Inc. (network/TLS) · the AI and email
+      providers you explicitly connect.</p>
+  </main>
+  <footer class="footer">
+    <div class="container footer-base">
+      <span>© {new Date().getFullYear()} Stept</span>
+      <a href="/">stepped.ai</a>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  .nav {
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 4rem;
+  }
+  .legal {
+    max-width: 760px;
+    padding-block: 3rem 5rem;
+  }
+  .legal h1 {
+    font-size: 2.2rem;
+  }
+  .legal h2 {
+    font-size: 1.25rem;
+    margin-top: 2.25rem;
+  }
+  .legal p,
+  .legal li {
+    color: var(--muted-foreground);
+    margin-top: 0.75rem;
+    line-height: 1.65;
+  }
+  .legal ul {
+    padding-left: 1.25rem;
+  }
+  .legal a {
+    color: var(--primary);
+    text-decoration: underline;
+  }
+  .muted {
+    font-size: 0.9rem;
+  }
+  .footer {
+    border-top: 1px solid var(--border);
+    padding-block: 1.5rem;
+  }
+  .footer-base {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+  }
+</style>

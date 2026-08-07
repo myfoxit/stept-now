@@ -31,6 +31,8 @@ env:
   # the documented multi-image layout and needs no personal access token.
   API_IMAGE_NAME: ${{ github.repository }}/api
   WEB_IMAGE_NAME: ${{ github.repository }}/web
+  LANDING_IMAGE_NAME: ${{ github.repository }}/landing
+  DOCS_IMAGE_NAME: ${{ github.repository }}/docs
 
 jobs:
   # The gate. Deploy depends on this, so a red test suite cannot reach the server.
@@ -112,6 +114,8 @@ jobs:
     outputs:
       api_image: ${{ steps.names.outputs.api_image }}
       web_image: ${{ steps.names.outputs.web_image }}
+      landing_image: ${{ steps.names.outputs.landing_image }}
+      docs_image: ${{ steps.names.outputs.docs_image }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -129,8 +133,12 @@ jobs:
           # legitimately contain capitals.
           api="${REGISTRY}/$(echo "${API_IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA}"
           web="${REGISTRY}/$(echo "${WEB_IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA}"
+          landing="${REGISTRY}/$(echo "${LANDING_IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA}"
+          docs="${REGISTRY}/$(echo "${DOCS_IMAGE_NAME}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA}"
           echo "api_image=${api}" >> "$GITHUB_OUTPUT"
           echo "web_image=${web}" >> "$GITHUB_OUTPUT"
+          echo "landing_image=${landing}" >> "$GITHUB_OUTPUT"
+          echo "docs_image=${docs}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push API
         uses: docker/build-push-action@v6
@@ -155,6 +163,28 @@ jobs:
           tags: ${{ steps.names.outputs.web_image }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
+
+      - name: Build and push landing
+        uses: docker/build-push-action@v6
+        with:
+          # Repo root so deploy/nginx-static.conf is in context; the landing is
+          # otherwise self-contained with its own lockfile.
+          context: .
+          file: landing/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.landing_image }}
+          cache-from: type=gha,scope=landing
+          cache-to: type=gha,scope=landing,mode=max
+
+      - name: Build and push docs
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docs-site/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.docs_image }}
+          cache-from: type=gha,scope=docs
+          cache-to: type=gha,scope=docs,mode=max
 
   deploy:
     name: Deploy to production
@@ -195,6 +225,8 @@ jobs:
         env:
           API_IMAGE: ${{ needs.build.outputs.api_image }}
           WEB_IMAGE: ${{ needs.build.outputs.web_image }}
+          LANDING_IMAGE: ${{ needs.build.outputs.landing_image }}
+          DOCS_IMAGE: ${{ needs.build.outputs.docs_image }}
         run: |
           # Written with a strict umask and never echoed. Image tags change every
           # deploy; the secrets are only written if this workflow supplies them,
@@ -202,6 +234,8 @@ jobs:
           ssh production "umask 077 && cat > /opt/stept/.env" <<EOF
           API_IMAGE=${API_IMAGE}
           WEB_IMAGE=${WEB_IMAGE}
+          LANDING_IMAGE=${LANDING_IMAGE}
+          DOCS_IMAGE=${DOCS_IMAGE}
           DOMAIN=${{ secrets.DEPLOY_DOMAIN }}
           APP_DOMAIN=${{ secrets.DEPLOY_APP_DOMAIN }}
           SERVER_IP=${{ secrets.DEPLOY_HOST }}
@@ -280,6 +314,19 @@ jobs:
           curl -fsS --max-time 20 -o /dev/null -w 'spa: %{http_code}\n' "${APP}/"
           # The widget loader customer sites embed.
           curl -fsS --max-time 20 -o /dev/null -w 'loader: %{http_code}\n' "${APP}/widget-assets/loader.js"
+
+          # The apex must serve the marketing site, not the app or an error.
+          APEX="https://${{ secrets.DEPLOY_DOMAIN }}"
+          curl -fsS --max-time 20 "${APEX}/" | grep -qi '<html'
+          curl -fsS --max-time 20 -o /dev/null -w 'landing: %{http_code}\n' "${APEX}/"
+
+          # Docs: soft check until the docs DNS record + first cert are
+          # confirmed — a missing record must not roll back an app deploy.
+          if curl -fsS --max-time 20 -o /dev/null "https://docs.${{ secrets.DEPLOY_DOMAIN }}/"; then
+            echo "docs: ok"
+          else
+            echo "::warning::docs.${{ secrets.DEPLOY_DOMAIN }} is not serving yet (DNS/cert pending?)"
+          fi
 
           # Hardening that must hold in production.
           docs=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${APP}/api/v1/docs")

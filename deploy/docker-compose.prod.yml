@@ -159,12 +159,34 @@ services:
     pids_limit: 128
     networks: [stept]
 
+  # Static marketing site for the apex domain.
+  landing:
+    image: ${LANDING_IMAGE:?LANDING_IMAGE is required}
+    restart: unless-stopped
+    expose: ['80']
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64
+    networks: [stept]
+
+  # Static documentation site for docs.{DOMAIN}.
+  docs:
+    image: ${DOCS_IMAGE:?DOCS_IMAGE is required}
+    restart: unless-stopped
+    expose: ['80']
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64
+    networks: [stept]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
       api: {condition: service_started}
       web: {condition: service_started}
+      landing: {condition: service_started}
+      docs: {condition: service_started}
     ports:
       - '80:80'
       - '443:443'

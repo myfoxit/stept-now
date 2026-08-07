@@ -2,14 +2,18 @@
 #
 # Topology:
 #   {$APP_DOMAIN}   app.stepped.ai   → the product: SPA from web, API from api
-#   {$DOMAIN}       stepped.ai       → the same app, plus /poki/* handed to the
+#   {$DOMAIN}       stepped.ai       → the marketing landing, with the API-owned
+#                                      paths still proxied so old embed snippets
+#                                      keep working, plus /poki/* handed to the
 #                                      separately-deployed poki stack
+#   docs.{$DOMAIN}  docs.stepped.ai  → the documentation site
 #   www.{$DOMAIN}                    → redirect to the apex
 #   https://{IP}                     → the app on a self-signed cert, so the box
 #                                      stays reachable if DNS is broken
 #
-# ACME is HTTP-01, so Cloudflare records for these names must stay DNS-only
-# (grey cloud) or Caddy cannot complete the challenge.
+# ACME is HTTP-01; Cloudflare proxies these names but forwards port-80
+# challenges, so issuance works either way. If a cert ever fails to renew,
+# check that Cloudflare's "Always Use HTTPS" is off for /.well-known paths.
 {
 	email {$ACME_EMAIL}
 	# A request to the raw IP over TLS gets a cert instead of an error.
@@ -21,7 +25,7 @@
 # the path is meant to be embedded in a customer's site (the widget iframe, the
 # help-center portal) — a blanket framing ban from out here would break those.
 # API/portal responses: backend/app/main.py (security_headers_for).
-# SPA + static responses: deploy/nginx.conf (per-location, see note there).
+# SPA + static responses: deploy/nginx.conf + deploy/nginx-static.conf.
 (transport_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -29,10 +33,10 @@
 	}
 }
 
-# Everything the API owns. Kept in one snippet so the apex and the app domain
+# Every path the API owns. Kept in one snippet so the apex and the app domain
 # cannot drift apart — a route that exists on one but not the other is how the
 # widget ends up half-broken.
-(stept_app) {
+(stept_api_routes) {
 	# WebSockets: dashboard realtime + widget realtime.
 	@ws path /ws /ws/*
 	handle @ws {
@@ -63,8 +67,12 @@
 			}
 		}
 	}
+}
 
-	# Dashboard SPA + the widget bundle customer sites load.
+# The product: API routes, then the dashboard SPA + widget bundle.
+(stept_app) {
+	import stept_api_routes
+
 	handle {
 		reverse_proxy web:80
 	}
@@ -76,7 +84,7 @@
 	import stept_app
 }
 
-# ---- apex: the app, plus poki ------------------------------------------------
+# ---- apex: the landing, with the app's public routes intact ------------------
 {$DOMAIN} {
 	import transport_headers
 
@@ -88,7 +96,25 @@
 		reverse_proxy poki-web:80
 	}
 
-	import stept_app
+	import stept_api_routes
+
+	# The widget bundle stays fetchable from the apex so embed snippets that
+	# ever pointed here keep working.
+	@widget path /widget-assets/*
+	handle @widget {
+		reverse_proxy web:80
+	}
+
+	# Everything else is the marketing site.
+	handle {
+		reverse_proxy landing:80
+	}
+}
+
+# ---- docs --------------------------------------------------------------------
+docs.{$DOMAIN} {
+	import transport_headers
+	reverse_proxy docs:80
 }
 
 # ---- www convenience redirect ------------------------------------------------

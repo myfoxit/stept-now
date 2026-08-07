@@ -416,3 +416,34 @@ async def test_viewer_is_read_only_and_agent_can_manage(client, workspace_ctx):
         f"{base}/{conversation['id']}", json={"status": "resolved"}, headers=agent_headers
     )
     assert allowed.status_code == 200
+
+
+async def test_search_matches_public_message_content(client, workspace_ctx):
+    """Widget conversations have no subject — q must match public message
+    bodies, but never internal notes."""
+    contact = await create_contact_via_db(workspace_ctx.id, name="Nia", email="nia@example.com")
+    inbox = await create_inbox_via_api(client, workspace_ctx, name="Widget search")
+    headers = workspace_ctx.owner_headers
+
+    conversation = await start_conversation(
+        client, workspace_ctx, contact_id=contact, inbox_id=inbox["id"]
+    )
+    other = await start_conversation(
+        client, workspace_ctx, contact_id=contact, inbox_id=inbox["id"]
+    )
+    await _add_inbound(conversation["id"], content="my zebra parcel vanished")
+    note = await client.post(
+        f"{workspace_ctx.base}/conversations/{other['id']}/messages",
+        json={"content": "internal xylophone context", "visibility": "note"},
+        headers=headers,
+    )
+    assert note.status_code == 201, note.text
+
+    async def ids(url: str) -> set[str]:
+        response = await client.get(url, headers=headers)
+        assert response.status_code == 200, response.text
+        return {item["id"] for item in response.json()["items"]}
+
+    base = f"{workspace_ctx.base}/conversations"
+    assert await ids(f"{base}?q=zebra") == {conversation["id"]}
+    assert await ids(f"{base}?q=xylophone") == set()

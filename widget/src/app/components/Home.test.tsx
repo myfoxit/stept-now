@@ -32,7 +32,6 @@ describe('Home', () => {
     render(
       <Home
         config={{ greeting: 'Welcome to Acme 👋' }}
-        workspaceName="Acme"
         conversations={conversations}
         helpCenter
         onOpenConversation={(id) => (opened = id)}

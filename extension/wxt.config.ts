@@ -28,7 +28,7 @@ export default defineConfig({
     description: 'Record, edit, preview and drive Stept product tours.',
     version: '0.2.0',
     minimum_chrome_version: '116',
-    homepage_url: 'https://github.com/stept/stept',
+    homepage_url: 'https://stepped.ai',
     icons: { 16: 'icon/16.png', 48: 'icon/48.png', 128: 'icon/128.png' },
     permissions: [
       'storage',

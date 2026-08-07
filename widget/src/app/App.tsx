@@ -54,7 +54,6 @@ export function App({ controller }: { controller: Controller }) {
       body = (
         <Home
           config={state.config}
-          workspaceName={workspaceName}
           conversations={state.conversations}
           helpCenter={state.helpCenter}
           onOpenConversation={(id) => void controller.openConversation(id)}

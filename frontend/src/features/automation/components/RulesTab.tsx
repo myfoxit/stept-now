@@ -74,7 +74,7 @@ export function RulesTab() {
         </p>
         {canManage ? (
           <Button size="sm" onClick={openNew}>
-            <Plus className="size-4" /> New rule
+            <Plus className="size-4" /> <span data-tour="new-rule">New rule</span>
           </Button>
         ) : null}
       </div>

@@ -48,7 +48,7 @@ WELCOME_STEPS = [
 
 DRAFT_STEPS = [
     {
-        "selector": '[data-tour="automations"]',
+        "selector": '[data-tour="automation"]',
         "title": "Automate the busywork",
         "body": "Route, tag, and reply automatically with rules.",
         "placement": "right",
@@ -68,7 +68,7 @@ BANNER_STEPS: list[dict[str, Any]] = [
 DRIVEN_STEPS: list[dict[str, Any]] = [
     {
         "type": "action",
-        "selector": '[data-tour="automations"]',
+        "selector": '[data-tour="automation"]',
         "text_hint": "Automations",
         "title": "Opening automations",
         "action": {"kind": "click"},

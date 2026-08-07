@@ -82,7 +82,7 @@ async def _checklist_items(session: AsyncSession, workspace_id: str) -> list[dic
             "id": "connect-an-inbox",
             "title": "Connect an inbox",
             "body": "Bring email, chat, or Slack conversations into Stept.",
-            "action": {"type": "open_url", "url": "/settings/inboxes"},
+            "action": {"type": "open_url", "url": "/settings/channels"},
             "completion": {"type": "url_visited", "url_pattern": "*/settings*"},
         },
         {

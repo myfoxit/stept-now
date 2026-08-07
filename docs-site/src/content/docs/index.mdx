@@ -1,0 +1,50 @@
+---
+title: What is Stept?
+description: Stept is the open-source Intercom + Fin alternative — shared inbox, AI agent with real tools, knowledge base, and product tours in one self-hostable platform.
+template: splash
+hero:
+  tagline: The open-source Intercom + Fin alternative — shared inbox, an AI agent that can actually do things, knowledge base, and product tours. Self-host it or use Stept Cloud.
+  actions:
+    - text: Quickstart
+      link: /getting-started/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: Self-hosting guide
+      link: /getting-started/self-hosting/
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+## One platform, four jobs
+
+<CardGrid stagger>
+  <Card title="Shared inbox" icon="email">
+    Conversations from the chat widget, email, Slack, Telegram and the API land in one inbox —
+    with assignment, teams, notes, SLAs, automation rules and reporting.
+  </Card>
+  <Card title="AI agent with hands" icon="rocket">
+    The agent answers from your knowledge base with citations, hands off to humans with a
+    summary, and can take real actions through tools — every run has a full step-by-step trace,
+    and risky actions can require human approval.
+  </Card>
+  <Card title="Knowledge base" icon="open-book">
+    Crawl your website and docs, upload files, sync Notion, Confluence, Google Drive, Zendesk
+    or GitHub. Everything is chunked, embedded and retrievable — by the agent, the reply
+    copilot, semantic search and the help center.
+  </Card>
+  <Card title="Product tours" icon="star">
+    Record tours in your own product with the Chrome recorder extension, edit the steps, and
+    let users (or the AI agent) play them back — digital adoption without another vendor.
+  </Card>
+</CardGrid>
+
+## How it fits together
+
+A **Workspace** is your tenant. **Inboxes** are channel instances (widget, email, Slack,
+Telegram, API) that feed **Conversations** with your **Contacts**. **Knowledge sources**
+ingest content into documents and chunks for retrieval. The **AI agent** sits on an inbox,
+answers from knowledge, runs **tools**, and escalates to your team when needed. **Tours**
+guide users through your product, and the **MCP server** exposes the whole workspace to AI
+clients like Claude.

@@ -267,13 +267,36 @@ async def _exec_handoff(ctx: ToolContext, tool_input: dict[str, Any]) -> ToolOut
             control="handoff",
         )
     assert ctx.conversation is not None
+    # The visitor must hear the handoff, not just the inbox: control="handoff"
+    # ends the run without a model reply, so the configured message is the only
+    # thing standing between the customer and silence.
+    settings = ctx.agent.settings if isinstance(ctx.agent.settings, dict) else {}
+    handoff_note = str(settings.get("handoff_message") or "").strip()
+    if not handoff_note:
+        handoff_note = "Let me connect you with a teammate who can help."
+    reply_message_id: str | None = None
+    message = await conversations_service.add_message(
+        ctx.session,
+        ctx.conversation,
+        direction="out",
+        author_type="agent",
+        author_id=ctx.agent.id,
+        author_name=ctx.agent.name,
+        content=handoff_note,
+        actor=ctx.actor,
+    )
+    reply_message_id = message.id
     await conversations_service.update_status(
         ctx.session, ctx.conversation, "open", actor=ctx.actor
     )
     await _activity(
         ctx, f"Handed off to a teammate: {reason}" if reason else "Handed off to a teammate"
     )
-    return ToolOutcome({"ok": True, "note": "conversation handed to a human"}, control="handoff")
+    return ToolOutcome(
+        {"ok": True, "note": "conversation handed to a human"},
+        control="handoff",
+        reply_message_id=reply_message_id,
+    )
 
 
 async def _exec_close(ctx: ToolContext, tool_input: dict[str, Any]) -> ToolOutcome:

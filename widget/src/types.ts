@@ -38,6 +38,7 @@ export interface WidgetConfig {
   greeting?: string
   launcher_position?: 'left' | 'right'
   require_identity?: boolean
+  ai_agent_id?: string | null
   [key: string]: unknown
 }
 

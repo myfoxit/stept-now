@@ -5,6 +5,7 @@ import Icon from '../components/Icon.astro'
 
 const APP = 'https://app.stepped.ai'
 const GITHUB = 'https://github.com/myfoxit/stept-now'
+const DOCS = 'https://docs.stepped.ai'
 
 const features = [
   {
@@ -15,7 +16,7 @@ const features = [
   {
     icon: 'sparkles',
     title: 'Your own AI agent',
-    body: 'An agent that answers from your knowledge base with citations, guardrails and human-in-the-loop approval gates. Bring your own model — OpenAI, Anthropic, Google, Ollama or any OpenAI-compatible.',
+    body: 'An agent that answers from your knowledge base with citations, guardrails and human-in-the-loop approval gates — with a full tool-call trace for every run. Bring your own model — OpenAI, Anthropic, Google, Ollama or any OpenAI-compatible.',
   },
   {
     icon: 'book',
@@ -25,12 +26,12 @@ const features = [
   {
     icon: 'messages',
     title: 'Every channel',
-    body: 'Web widget, email, Slack, Telegram, WhatsApp, Messenger, Instagram, SMS and a public API — one conversation model behind them all.',
+    body: 'Web widget, email, Slack, Telegram, WhatsApp, Messenger, Instagram, LINE, SMS and a public API — one conversation model behind them all.',
   },
   {
     icon: 'map',
-    title: 'Product tours',
-    body: 'Record interactive product tours with a Chrome extension and play them in your app. Digital adoption, without a second vendor.',
+    title: 'Product adoption built in',
+    body: 'Record interactive product tours with a Chrome extension and play them in your app — plus checklists, surveys, banners and hotspots. Digital adoption, without a second vendor.',
   },
   {
     icon: 'route',
@@ -46,19 +47,23 @@ const integrations = [
   'Notion',
   'Confluence',
   'Zendesk',
+  'GitHub',
+  'Google Drive',
   'Amazon SES',
   'Resend',
   'Postmark',
   'SendGrid',
   'Mailgun',
   'Telegram',
+  'Claude (MCP)',
+  'Cursor (MCP)',
 ]
 
 const plans = [
   {
     name: 'Self-hosted',
     price: 'Free',
-    unit: 'AGPL · forever',
+    unit: 'MIT · forever',
     highlight: false,
     cta: { label: 'Get the source', href: GITHUB },
     tagline: 'Run the whole thing yourself.',
@@ -67,7 +72,7 @@ const plans = [
       'AI agent with your own model key',
       'Knowledge base, RAG & help center',
       'Product tours & automation',
-      'Deploy with one Docker command',
+      'Deploy with Docker Compose',
     ],
   },
   {
@@ -90,13 +95,13 @@ const plans = [
     price: '$49',
     unit: 'per seat / month',
     highlight: false,
-    cta: { label: 'Talk to us', href: `${APP}/signup` },
+    cta: { label: 'Talk to us', href: 'mailto:hello@stepped.ai' },
     tagline: 'For teams with compliance needs.',
     features: [
-      'SSO / SAML & audit logs',
-      'Custom roles & white-label widget',
-      'SLA management',
+      'Everything in Cloud',
       '2,000 AI resolutions / month',
+      'Custom roles & audit log',
+      'SLA management & working hours',
       'Priority support',
     ],
   },
@@ -111,13 +116,29 @@ const year = new Date().getFullYear()
       <a href="/" aria-label="Stept home"><Wordmark /></a>
       <nav class="nav-links" aria-label="Primary">
         <a href="#features">Product</a>
+        <a href="#agent">AI agent</a>
         <a href="#integrations">Integrations</a>
         <a href="#pricing">Pricing</a>
+        <a href={DOCS}>Docs</a>
         <a href={GITHUB}>GitHub</a>
       </nav>
       <div class="nav-cta">
         <a class="btn btn-ghost btn-sm nav-signin" href={`${APP}/login`}>Sign in</a>
         <a class="btn btn-primary btn-sm" href={`${APP}/signup`}>Start free</a>
+        <details class="nav-menu">
+          <summary aria-label="Open menu">
+            <span class="nav-burger" aria-hidden="true"><i></i><i></i><i></i></span>
+          </summary>
+          <nav class="nav-menu-panel" aria-label="Mobile">
+            <a href="#features">Product</a>
+            <a href="#agent">AI agent</a>
+            <a href="#integrations">Integrations</a>
+            <a href="#pricing">Pricing</a>
+            <a href={DOCS}>Docs</a>
+            <a href={GITHUB}>GitHub</a>
+            <a href={`${APP}/login`}>Sign in</a>
+          </nav>
+        </details>
       </div>
     </div>
   </header>
@@ -144,7 +165,7 @@ const year = new Date().getFullYear()
               <Icon name="github" size={18} /> Star on GitHub
             </a>
           </div>
-          <p class="hero-note">AGPL-licensed · Postgres or SQLite · one Docker command to deploy</p>
+          <p class="hero-note">MIT-licensed · Postgres or SQLite · deploys with Docker Compose</p>
         </div>
 
         <!-- product mock: the Stept inbox, drawn in CSS (no real data) -->
@@ -175,7 +196,7 @@ const year = new Date().getFullYear()
             <div class="bubble in"></div>
             <div class="bubble in short"></div>
             <div class="ai">
-              <div class="ai-head"><span class="ai-badge"><Icon name="sparkles" size={12} /> Fin</span><span class="ai-conf"></span></div>
+              <div class="ai-head"><span class="ai-badge"><Icon name="sparkles" size={12} /> AI agent</span><span class="ai-conf"></span></div>
               <div class="ai-line"></div>
               <div class="ai-line"></div>
               <div class="ai-line short"></div>
@@ -192,7 +213,7 @@ const year = new Date().getFullYear()
         <p class="strip-label">One conversation model behind every channel</p>
         <div class="strip-items">
           {
-            ['Web widget', 'Email', 'Slack', 'Telegram', 'WhatsApp', 'Messenger', 'Instagram', 'SMS', 'API'].map(
+            ['Web widget', 'Email', 'Slack', 'Telegram', 'WhatsApp', 'Messenger', 'Instagram', 'LINE', 'SMS', 'API'].map(
               (c) => <span class="chip">{c}</span>,
             )
           }
@@ -225,21 +246,66 @@ const year = new Date().getFullYear()
       </div>
     </section>
 
-    <!-- ===== self-host / BYO Fin band ===== -->
+    <!-- ===== the differentiator: agent with hands ===== -->
+    <section class="section" id="agent">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><Icon name="bot" size={16} /> The differentiator</span>
+          <h2>An agent with hands — not just answers.</h2>
+          <p class="lead">
+            Most support AI stops at text. Stept's agent can see the page your user is on, guide
+            them through it, and act on it — and your whole workspace is scriptable from the
+            outside.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="card feature">
+            <span class="feature-ico"><Icon name="map" size={22} /></span>
+            <h3>It shows, not tells</h3>
+            <p>
+              Instead of describing five steps, the agent finds the right product tour and plays
+              it — or composes an on-the-spot walkthrough with coach-marks on your real UI.
+            </p>
+          </article>
+          <article class="card feature">
+            <span class="feature-ico"><Icon name="zap" size={22} /></span>
+            <h3>It does things — with consent</h3>
+            <p>
+              With the user's explicit opt-in it clicks, fills and navigates for them. Risky tools
+              pause for human approval, password fields are never touched, and every run keeps a
+              full step-by-step trace.
+            </p>
+          </article>
+          <article class="card feature">
+            <span class="feature-ico"><Icon name="plug" size={22} /></span>
+            <h3>MCP built in</h3>
+            <p>
+              Claude, Cursor or any MCP client can search your knowledge, read conversations,
+              create docs and even run product tours in a real browser — through Stept's built-in
+              MCP server.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== self-host / BYO band ===== -->
     <section class="section band-wrap">
       <div class="container">
         <div class="band card">
           <div class="band-copy">
             <span class="eyebrow"><Icon name="shield" size={16} /> Own your stack</span>
-            <h2>Run your own Fin — for free.</h2>
+            <h2>Run your own Fin-class agent — free.</h2>
             <p class="lead">
               Most AI-support tools bill per resolution or lock the agent behind an enterprise
               plan. Stept ships the agent in the open-source core. Point it at your own model key
               and self-host the whole platform — inbox, knowledge base, tours and all — at no cost.
             </p>
+            <pre class="install"><code>git clone https://github.com/myfoxit/stept-now
+cd stept-now && make setup && make dev</code></pre>
             <div class="hero-actions">
-              <a class="btn btn-primary" href={GITHUB}>
-                Read the quickstart <Icon name="arrow" size={18} />
+              <a class="btn btn-primary" href={`${DOCS}/getting-started/self-hosting/`}>
+                Read the self-hosting guide <Icon name="arrow" size={18} />
               </a>
             </div>
           </div>
@@ -258,10 +324,11 @@ const year = new Date().getFullYear()
       <div class="container">
         <div class="section-head">
           <span class="eyebrow"><Icon name="plug" size={16} /> Integrations</span>
-          <h2>Connect your tools in one click.</h2>
+          <h2>Connect the tools you already use.</h2>
           <p class="lead">
-            OAuth into Gmail, Microsoft 365, Slack, Notion, Confluence and Zendesk — or bring your
-            own app. Send email through SES, Resend, Postmark, SendGrid, Mailgun or plain SMTP.
+            OAuth into Gmail, Microsoft 365, Slack, Notion and Confluence. Connect Zendesk,
+            Telegram and GitHub with a token. Send email through SES, Resend, Postmark, SendGrid,
+            Mailgun or plain SMTP — and plug any MCP client straight into your workspace.
           </p>
         </div>
         <div class="integ-grid">
@@ -286,6 +353,10 @@ const year = new Date().getFullYear()
           <p class="lead">
             The whole platform is open source. Pay only when you want us to run it — and undercut
             the incumbents while you do.
+          </p>
+          <p class="notice">
+            <Icon name="sparkles" size={14} /> Early access: Stept Cloud is free right now — the
+            plans below are the pricing that's coming.
           </p>
         </div>
         <div class="price-grid">
@@ -317,10 +388,72 @@ const year = new Date().getFullYear()
           }
         </div>
         <p class="price-foot">
-          AI resolutions beyond your plan bill at about <strong>$0.30 each</strong> — roughly a
-          third of Intercom Fin. A 5-seat team pays about <strong>$95/mo</strong> on Stept Cloud;
-          the same team on Intercom&nbsp;+&nbsp;Fin runs <strong>$1,000–1,500/mo</strong>.
+          AI resolutions beyond your plan will bill at about <strong>$0.30–0.49 each</strong> —
+          around half of Intercom Fin's $0.99. A 5-seat team pays about <strong>$95/mo</strong> on
+          Stept Cloud; the same team on Intercom&nbsp;+&nbsp;Fin typically runs
+          <strong>$1,000+/mo</strong>.
         </p>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section" id="faq">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><Icon name="messages" size={16} /> FAQ</span>
+          <h2>Questions, answered.</h2>
+        </div>
+        <div class="faq-list">
+          <details class="card faq">
+            <summary>Is it really open source?</summary>
+            <p>
+              Yes — the whole platform is MIT-licensed: inbox, AI agent, knowledge base, help
+              center, tours, automation. Self-host everything with your own model key. Cloud is
+              just us running the same code for you.
+            </p>
+          </details>
+          <details class="card faq">
+            <summary>Which AI models can I use?</summary>
+            <p>
+              OpenAI, Anthropic, Google, Ollama, or any OpenAI-compatible endpoint. Keys are
+              stored per workspace, encrypted at rest — and there's no markup on tokens: you pay
+              your provider directly.
+            </p>
+          </details>
+          <details class="card faq">
+            <summary>What counts as an "AI resolution"?</summary>
+            <p>
+              A conversation the agent resolves without a human stepping in. Self-hosted
+              installs meter nothing. On Cloud, plan quotas apply once pricing turns on — during
+              early access everything is free.
+            </p>
+          </details>
+          <details class="card faq">
+            <summary>Can the widget really control the page?</summary>
+            <p>
+              Only with the visitor's explicit per-conversation consent. Actions are capped per
+              run, password fields are off-limits, navigation is same-origin by default, and
+              sensitive tools can require a human approval before they execute.
+            </p>
+          </details>
+          <details class="card faq">
+            <summary>Where does my data live?</summary>
+            <p>
+              Self-hosted: in your own Postgres, full stop. On Stept Cloud your workspace runs on
+              EU infrastructure (Hetzner), model keys are encrypted at rest, and your
+              conversations are never used to train anything.
+            </p>
+          </details>
+          <details class="card faq">
+            <summary>Can I migrate from Intercom or Zendesk?</summary>
+            <p>
+              Import contacts via CSV, pull help-center content in with the website crawler or
+              the Zendesk connector, and keep your existing email address via forwarding. A
+              guided migration is on the roadmap — <a href="mailto:hello@stepped.ai">email us</a>
+              and we'll help.
+            </p>
+          </details>
+        </div>
       </div>
     </section>
 
@@ -329,10 +462,10 @@ const year = new Date().getFullYear()
       <div class="container">
         <div class="cta card">
           <h2>Own your support stack.</h2>
-          <p class="lead">Deploy it yourself in minutes, or start free on our cloud.</p>
+          <p class="lead">Deploy it yourself with Docker Compose, or start free on our cloud.</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href={`${APP}/signup`}>Start free <Icon name="arrow" size={18} /></a>
-            <a class="btn btn-ghost" href={GITHUB}><Icon name="github" size={18} /> Self-host it</a>
+            <a class="btn btn-ghost" href={`${DOCS}/getting-started/self-hosting/`}><Icon name="github" size={18} /> Self-host it</a>
           </div>
         </div>
       </div>
@@ -354,19 +487,22 @@ const year = new Date().getFullYear()
       </nav>
       <nav class="footer-col" aria-label="Resources">
         <span class="footer-h">Resources</span>
+        <a href={DOCS}>Docs</a>
         <a href={GITHUB}>GitHub</a>
         <a href={`${APP}/login`}>Sign in</a>
         <a href={`${APP}/signup`}>Start free</a>
       </nav>
       <nav class="footer-col" aria-label="Project">
         <span class="footer-h">Project</span>
-        <a href={GITHUB}>Source (AGPL)</a>
-        <a href={`${GITHUB}/blob/master/docs/INTEGRATIONS-SETUP.md`}>Self-host docs</a>
+        <a href={GITHUB}>Source (MIT)</a>
+        <a href={`${DOCS}/getting-started/self-hosting/`}>Self-host docs</a>
+        <a href="mailto:hello@stepped.ai">Contact</a>
+        <a href="/privacy">Privacy</a>
       </nav>
     </div>
     <div class="container footer-base">
       <span>© {year} Stept</span>
-      <span>Open source, AGPL-3.0</span>
+      <span>Open source · MIT</span>
     </div>
   </footer>
 </Layout>
@@ -411,6 +547,63 @@ const year = new Date().getFullYear()
     }
     .nav-signin {
       display: inline-flex;
+    }
+  }
+
+  /* ---- mobile menu (no-JS, details/summary) ---- */
+  .nav-menu {
+    position: relative;
+  }
+  .nav-menu summary {
+    list-style: none;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    cursor: pointer;
+    background: var(--card);
+  }
+  .nav-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .nav-burger {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-burger i {
+    width: 1rem;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--foreground);
+  }
+  .nav-menu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    min-width: 12rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+  }
+  .nav-menu-panel a {
+    padding: 0.5rem 0.75rem;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.9375rem;
+  }
+  .nav-menu-panel a:hover {
+    background: var(--muted);
+  }
+  @media (min-width: 820px) {
+    .nav-menu {
+      display: none;
     }
   }
 
@@ -725,6 +918,78 @@ const year = new Date().getFullYear()
   .band-list :global(svg) {
     color: var(--primary);
     flex: none;
+  }
+  .install {
+    margin-top: 1.25rem;
+    padding: 0.9rem 1.1rem;
+    background: color-mix(in oklch, var(--foreground) 5%, var(--background));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+  .install code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: var(--foreground);
+    white-space: pre;
+  }
+
+  /* ---- pricing notice ---- */
+  .notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 1rem;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--primary-ring);
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* ---- FAQ ---- */
+  .faq-list {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 760px;
+  }
+  .faq {
+    padding: 0;
+  }
+  .faq summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 1.1rem 1.25rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary::after {
+    content: '+';
+    color: var(--muted-foreground);
+    font-size: 1.2rem;
+    line-height: 1;
+    flex: none;
+  }
+  .faq[open] summary::after {
+    content: '–';
+  }
+  .faq p {
+    padding: 0 1.25rem 1.15rem;
+    color: var(--muted-foreground);
+    font-size: 0.95rem;
+    max-width: 70ch;
+  }
+  .faq a {
+    color: var(--primary);
+    text-decoration: underline;
   }
 
   /* ---- integrations ---- */
