@@ -1,0 +1,77 @@
+"""ASGI glue for the workspace MCP server (validated by prototype — see
+docs/MCP-CONTRACTS.md).
+
+The streamable-HTTP transport executes tools outside FastAPI's dependency
+graph, so the request's ``Authorization`` header is captured into a contextvar
+by an ASGI shim wrapping the ``/mcp`` mount. Tools read it via
+``current_authorization()``. Two hard-won constraints:
+
+- Modern Starlette strips the mount prefix via ``root_path`` — the shim must
+  forward the scope UNTOUCHED (rewriting ``path``/``root_path`` 404s the inner
+  router).
+- A bare ``POST /mcp`` gets a 307 from the outer ``Mount``; ``app/main.py``
+  rewrites it to ``/mcp/`` in middleware because MCP clients don't reliably
+  follow redirects.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import contextvars
+from collections.abc import AsyncIterator
+from typing import Any
+
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+_authorization: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "mcp_authorization", default=None
+)
+
+
+def current_authorization() -> str | None:
+    """The raw ``Authorization`` header of the MCP request being served."""
+    return _authorization.get()
+
+
+class McpAuthShim:
+    """Capture the Authorization header, then forward the scope untouched."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") == "http":
+            auth = next(
+                (
+                    value.decode("latin-1")
+                    for key, value in scope.get("headers") or []
+                    if key == b"authorization"
+                ),
+                None,
+            )
+            _authorization.set(auth)
+        await self.app(scope, receive, send)
+
+
+def build_inner_app() -> Any:
+    """The SDK's streamable-HTTP Starlette app, configured for our mount.
+
+    DNS-rebinding protection is off on purpose: every tool call is bearer-key
+    authenticated and the app runs behind the edge proxy, which owns Host.
+    """
+    from app.mcp.server import mcp
+
+    return mcp.streamable_http_app(
+        streamable_http_path="/",
+        stateless_http=True,
+        json_response=True,
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    )
+
+
+@contextlib.asynccontextmanager
+async def run_session_manager(inner: Any) -> AsyncIterator[None]:
+    """Run the mounted app's lifespan (mounted lifespans don't run on their own)."""
+    async with inner.router.lifespan_context(inner):
+        yield

@@ -1,0 +1,83 @@
+# Connecting AI agents over MCP
+
+Stept ships a built-in [MCP](https://modelcontextprotocol.io) server, so Claude Code, Claude
+Desktop, Cursor, ChatGPT or any MCP client can search your knowledge base, ask questions with
+citations, read conversations and tours — and, with the Chrome extension connected, see and
+drive a real browser.
+
+## 1. Create a key (Settings → MCP · AI clients)
+
+Pick your client's tab and press **Create key for this client** — the key is created with a
+sensible name and the setup snippet below it is filled in, ready to copy. The full key is shown
+exactly once.
+
+Keys are ordinary workspace API keys (`sk_stept_…`). Scopes map to what the MCP tools may do:
+`read` → search/ask/read tools, `write` → notes + document creation + browser driving,
+`admin` → everything except workspace deletion.
+
+## 2. Point your client at the server
+
+Endpoint: `https://<your-stept-host>/mcp` (streamable HTTP).
+
+- **Claude Code**
+  ```bash
+  claude mcp add --transport http stept https://<host>/mcp \
+    --header "Authorization: Bearer sk_stept_…"
+  ```
+- **Claude Desktop / Cursor** — add to the client's MCP config:
+  ```json
+  {
+    "mcpServers": {
+      "stept": {
+        "url": "https://<host>/mcp",
+        "headers": { "Authorization": "Bearer sk_stept_…" }
+      }
+    }
+  }
+  ```
+- **ChatGPT** — Settings → Connectors → Add: URL as above, auth header
+  `Authorization: Bearer sk_stept_…`.
+- **Anything else / smoke test**
+  ```bash
+  curl -X POST https://<host>/mcp \
+    -H 'Authorization: Bearer sk_stept_…' -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+  ```
+- **stdio** (for clients without HTTP support), from `backend/`:
+  ```bash
+  STEPT_API_KEY=sk_stept_… uv run python -m app.mcp_stdio
+  ```
+
+## 3. What the tools can do
+
+| Area | Tools |
+|---|---|
+| Knowledge & RAG | `search_knowledge`, `ask_knowledge_base` (answer + citations + confidence), `get_document`, `create_document` |
+| Help center | `search_articles`, `get_article` |
+| Tours (DAP) | `list_tours`, `get_tour_steps`, `tours_health` (self-healing/breakage rollup) |
+| Inbox | `search_conversations`, `get_conversation`, `add_conversation_note` |
+| Browser (via extension) | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start`/`browser_record_stop` (records a tour), `browser_run_tour` |
+
+## 4. Driving a real browser
+
+Install the Stept Chrome extension and sign in. It keeps an outbound connection to
+`/ws/extension`; the **Let Stept control this browser** switch in the extension's settings
+drawer gates the whole capability (on by default while signed in, off kills the connection).
+
+A connected AI agent can then `browser_open` a page, read an indexed snapshot
+(`[3]<button "Save">` …), click/type/scroll with trusted input, watch console/network, record a
+workflow as a tour, or replay an existing tour — in the user's real, logged-in browser.
+Browser tools require a key with the `write` scope. Chrome shows its debugging banner while a
+drive session is attached; password fields are never typed into or read.
+
+## 5. Exposing a single AI agent as a channel
+
+Each configured Stept agent can also be its own MCP endpoint:
+`https://<host>/mcp/agents/<agent-id>` — enable it on the agent's **MCP channel** card. External
+LLM clients get `ask_agent` (grounded answers with citations, using the agent's model, prompt
+and retrieval settings) plus the agent's own enabled tools.
+
+Write tools honor the card's **approval mode**: ask in chat (default — the client prompts its
+user), ask in Stept (calls pause until approved on the Approvals page), never ask, or deny.
+Keys minted on the card are bound to that agent and don't work anywhere else.

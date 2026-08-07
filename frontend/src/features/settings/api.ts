@@ -11,9 +11,14 @@ export type Role = components['schemas']['RoleOut']
 export type RoleCreate = components['schemas']['RoleCreate']
 export type RoleUpdate = components['schemas']['RoleUpdate']
 export type PermissionCatalog = components['schemas']['PermissionCatalogOut']
-export type ApiKey = components['schemas']['ApiKeyOut']
-export type ApiKeyCreated = components['schemas']['ApiKeyCreated']
-export type ApiKeyCreate = components['schemas']['ApiKeyCreate']
+/**
+ * API keys grew a nullable `agent_id` for the MCP channel (a set agent_id binds
+ * the key to that agent's /mcp/agents/{id} endpoint only). The generated
+ * schema.d.ts predates the field — extend locally until `make types` runs.
+ */
+export type ApiKey = components['schemas']['ApiKeyOut'] & { agent_id?: string | null }
+export type ApiKeyCreated = components['schemas']['ApiKeyCreated'] & { agent_id?: string | null }
+export type ApiKeyCreate = components['schemas']['ApiKeyCreate'] & { agent_id?: string | null }
 export type AuditLog = components['schemas']['AuditLogOut']
 export type Inbox = components['schemas']['InboxOut']
 export type InboxCreate = components['schemas']['InboxCreate']

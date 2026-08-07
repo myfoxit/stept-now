@@ -514,6 +514,7 @@ async def update_document(
     actor: Actor,
     title: str | None = None,
     content: str | None = None,
+    ai_searchable: bool | None = None,
 ) -> Document:
     """Re-edit an authored document: store the new text and re-index inline.
 
@@ -521,9 +522,28 @@ async def update_document(
     away; unchanged content short-circuits inside `ingest_document` (chunk ids
     stay stable). A changed title forces a re-chunk because the title is
     prefixed onto every chunk. Non-editable documents raise ConflictError.
+
+    ``ai_searchable`` toggles the retrieval opt-out and works on ANY document
+    (connector/portal-backed included) — it filters at query time, so flipping
+    it never re-chunks or re-embeds anything.
     """
     document = await get_document(session, workspace_id, document_id)
     source = await get_source(session, workspace_id, document.source_id)
+    if ai_searchable is not None:
+        document.ai_searchable = ai_searchable
+    if title is None and content is None:
+        # Flag-only (or empty) PATCH: no text changed, nothing to re-index.
+        await session.flush()
+        await audit.record(
+            session,
+            workspace_id,
+            actor=actor,
+            action="knowledge.document.update",
+            target_type="document",
+            target_id=document.id,
+            meta={"title": document.title, "ai_searchable": document.ai_searchable},
+        )
+        return document
     if not is_editable_document(document, source):
         raise ConflictError("Only authored text documents can be edited")
     if title is not None:

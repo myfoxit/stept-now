@@ -79,6 +79,16 @@ export function useApprovals(status = 'pending') {
   })
 }
 
+export function useMcpApprovals(status: 'pending' | 'all' = 'pending') {
+  const workspaceId = currentWorkspaceId()
+  return useQuery({
+    queryKey: aiKeys.mcpApprovals(workspaceId, status),
+    queryFn: () => aiApi.listMcpApprovals(status),
+    // No dedicated realtime topic yet — a light poll keeps the queue fresh.
+    refetchInterval: status === 'pending' ? 30_000 : false,
+  })
+}
+
 export function useInvalidateAi() {
   const workspaceId = currentWorkspaceId()
   const queryClient = useQueryClient()

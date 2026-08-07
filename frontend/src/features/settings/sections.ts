@@ -1,4 +1,5 @@
 import {
+  Bot,
   Building2,
   Inbox,
   KeyRound,
@@ -25,6 +26,7 @@ export const SECTIONS: SectionDef[] = [
   { key: 'channels', label: 'Channels', icon: Inbox, perm: 'conversations:read' },
   { key: 'sla', label: 'SLA', icon: Timer, perm: 'conversations:read' },
   { key: 'api-keys', label: 'API keys', icon: KeyRound, perm: 'apikeys:manage' },
+  { key: 'mcp', label: 'MCP · AI clients', icon: Bot, perm: 'apikeys:manage' },
   { key: 'audit', label: 'Audit log', icon: ScrollText, perm: 'audit:read' },
   { key: 'profile', label: 'Profile', icon: UserCog },
 ]

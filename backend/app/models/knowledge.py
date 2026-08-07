@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, String, Text
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import GUID, Base, EmbeddingVector, PortableJSON, UTCDateTime, utcnow
@@ -59,6 +59,10 @@ class Document(TimestampMixin, WorkspaceScopedMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     error: Mapped[str | None] = mapped_column(Text)
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Retrieval opt-out (parity with the old repo's `rag_indexed`): when False the
+    # document's chunks are excluded from `search_chunks` on both dialect paths.
+    # The document itself stays listed/editable — only AI retrieval skips it.
+    ai_searchable: Mapped[bool] = mapped_column(default=True, server_default=true(), nullable=False)
     meta: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
 
 

@@ -10,6 +10,7 @@ from app.core.errors import BadRequestError, NotFoundError
 from app.core.events import Actor
 from app.core.permissions import API_KEY_SCOPES
 from app.core.security import generate_api_key
+from app.models.agent import Agent
 from app.models.api_key import ApiKey
 from app.services import audit
 
@@ -21,12 +22,17 @@ async def create_key(
     actor: Actor,
     name: str,
     scopes: list[str],
+    agent_id: str | None = None,
 ) -> tuple[ApiKey, str]:
     unknown = [s for s in scopes if s not in API_KEY_SCOPES]
     if unknown:
         raise BadRequestError(f"Unknown scopes: {', '.join(unknown)}")
     if not scopes:
         raise BadRequestError("At least one scope is required")
+    if agent_id is not None:
+        agent = await session.get(Agent, agent_id)
+        if agent is None or agent.workspace_id != workspace_id:
+            raise NotFoundError("Agent not found")
     full, prefix, hashed = generate_api_key()
     api_key = ApiKey(
         workspace_id=workspace_id,
@@ -34,10 +40,14 @@ async def create_key(
         prefix=prefix,
         hashed_key=hashed,
         scopes=sorted(set(scopes)),
+        agent_id=agent_id,
         created_by=actor.id,
     )
     session.add(api_key)
     await session.flush()
+    meta: dict[str, object] = {"name": name, "scopes": scopes}
+    if agent_id is not None:
+        meta["agent_id"] = agent_id
     await audit.record(
         session,
         workspace_id,
@@ -45,7 +55,7 @@ async def create_key(
         action="api_key.create",
         target_type="api_key",
         target_id=api_key.id,
-        meta={"name": name, "scopes": scopes},
+        meta=meta,
     )
     return api_key, full
 

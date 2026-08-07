@@ -20,6 +20,7 @@ from app.models import (  # noqa: F401
     inbox,
     knowledge,
     macro,
+    mcp_approval,
     message,
     notification,
     search_analytics,

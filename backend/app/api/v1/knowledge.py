@@ -235,7 +235,8 @@ async def get_document(document_id: str, principal: Member, session: Db):
 )
 async def update_document(document_id: str, body: DocumentUpdate, principal: Member, session: Db):
     """Edit an authored document's title/content; re-indexes inline. Documents
-    backed by a URL, the portal, or a connector return 409."""
+    backed by a URL, the portal, or a connector return 409 for text edits —
+    the `ai_searchable` retrieval opt-out toggles on any document."""
     document = await knowledge_service.update_document(
         session,
         principal.workspace.id,
@@ -243,6 +244,7 @@ async def update_document(document_id: str, body: DocumentUpdate, principal: Mem
         actor=_actor(principal),
         title=body.title,
         content=body.content,
+        ai_searchable=body.ai_searchable,
     )
     return DocumentOut.model_validate(document)
 

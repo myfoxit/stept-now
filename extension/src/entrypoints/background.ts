@@ -21,8 +21,12 @@ import type {
   SignInResult,
   SimpleResult,
 } from '../messages';
+import { RemoteDriveController } from '../remote/drive-controller';
+import { deviceName, ensureDeviceId, RunClient } from '../remote/run-client';
 import {
   emptyPanelState,
+  type DriveOp,
+  type DriveSnapshot,
   type DriveStepStatus,
   type PanelState,
   type RawEvent,
@@ -35,6 +39,8 @@ import { isInternalUrl } from '../url-pattern';
 const KEEPALIVE_ALARM = 'stept-keepalive';
 const SCREENSHOT_REUSE_MS = 500;
 const PRE_CAPTURE_REUSE_MS = 350;
+/** chrome.storage.local key for the "Let Stept control this browser" switch. */
+const REMOTE_CONTROL_KEY = 'remoteControl';
 
 /**
  * The service worker: session anchor, message router, capture pipeline, save
@@ -62,6 +68,10 @@ export default defineBackground(() => {
   let driveRunner: DriveRunner | null = null;
   /** A navigation WE initiated for the guide: 'step' advances when it commits. */
   let guideAwaitingNav: 'step' | null = null;
+  /** Remote drive (MCP → gateway → this browser): the gateway WS + the one
+   * controller an MCP client may be driving a tab through. */
+  let runClient: RunClient | null = null;
+  let remoteDrive: RemoteDriveController | null = null;
 
   const api = new DapClient(
     () => session?.apiBase ?? state.auth.apiBase,
@@ -120,9 +130,21 @@ export default defineBackground(() => {
     }
 
     state.auth.apiBase = await loadApiBase();
+    // "Let Stept control this browser" — source of truth in local storage so it
+    // survives worker teardowns AND browser restarts. Default: enabled.
+    const rc = await chrome.storage.local
+      .get(REMOTE_CONTROL_KEY)
+      .catch(() => ({}) as Record<string, unknown>);
+    state.remoteControl = rc[REMOTE_CONTROL_KEY] !== false;
+    // the gateway WS and any remote CDP session died with the previous worker
+    state.remoteConnected = false;
+    state.remoteDrive = null;
     applySession(await loadSession());
     await persist();
-    if (session) void validateSession();
+    if (session) {
+      void validateSession();
+      startRunClient();
+    }
   }
 
   /** Confirm the stored token still works. A revoked member (or a reset DB)
@@ -165,6 +187,7 @@ export default defineBackground(() => {
     state.editing = null;
     await stopGuide();
     stopDrive();
+    await stopRemote();
     await persist();
   }
 
@@ -187,13 +210,15 @@ export default defineBackground(() => {
   void restore();
 
   // Keepalive: an idle MV3 worker is torn down, which would strand a recording
-  // mid-flight. A periodic alarm revives it (re-running this script → restore()).
+  // (or drop the gateway socket) mid-flight. A periodic alarm revives it
+  // (re-running this script → restore()) and re-opens the WS if it died.
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name !== KEEPALIVE_ALARM) return;
-    if (!state.recording && !state.guide && !state.drive) {
+    if (!state.recording && !state.guide && !state.drive && !runClient) {
       chrome.alarms.clear(KEEPALIVE_ALARM);
       return;
     }
+    runClient?.ensureConnected();
     void persist();
   });
 
@@ -690,6 +715,13 @@ export default defineBackground(() => {
         void guideAdvance(msg.dir);
         return false;
       case 'drive-start':
+        if (remoteDrive || state.remoteDrive) {
+          sendResponse({
+            ok: false,
+            error: 'An AI client is driving this browser right now — close that remote session first.',
+          });
+          return false;
+        }
         void startDrive(msg.tourId).then(sendResponse);
         return true;
       case 'drive-stop':
@@ -717,6 +749,13 @@ export default defineBackground(() => {
         return false;
       case 'clear-picked':
         state.picked = null;
+        void persist();
+        return false;
+      case 'set-remote-control':
+        state.remoteControl = msg.enabled;
+        void chrome.storage.local.set({ [REMOTE_CONTROL_KEY]: msg.enabled }).catch(() => {});
+        if (msg.enabled) startRunClient();
+        else void stopRemote();
         void persist();
         return false;
     }
@@ -779,6 +818,7 @@ export default defineBackground(() => {
       state.auth.error = null;
       await persist();
       void validateSession();
+      startRunClient();
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -814,6 +854,7 @@ export default defineBackground(() => {
       state.auth.error = null;
       await persist();
       void refreshTours();
+      startRunClient();
       return { ok: true };
     } catch (err) {
       session = previous;
@@ -1079,14 +1120,18 @@ export default defineBackground(() => {
 
   // ---- drive mode --------------------------------------------------------
 
-  async function startDrive(tourId: string): Promise<SimpleResult> {
+  async function startDrive(
+    tourId: string,
+    targetTabId?: number,
+    onDone?: (status: 'completed' | 'failed' | 'cancelled', error?: string) => void,
+  ): Promise<SimpleResult> {
     if (state.recording) return { ok: false, error: 'Stop the recording before driving a tour.' };
     if (state.guide) await stopGuide();
     stopDrive();
     const tour = await guarded(() => api.getTour(tourId));
     if (!tour) return { ok: false, error: 'Could not load that tour.' };
     if (!tour.steps.length) return { ok: false, error: 'This tour has no steps yet.' };
-    const tabId = await activeTab();
+    const tabId = targetTabId ?? (await activeTab());
     if (tabId == null) return { ok: false, error: 'No tab to drive.' };
 
     driveSteps = tour.steps;
@@ -1134,6 +1179,14 @@ export default defineBackground(() => {
     await runner.prepare();
     void runner.run().finally(() => {
       if (driveRunner === runner) driveRunner = null;
+      // Completion seam for remote run-tour: derive the terminal outcome from
+      // the state the runner/stopDrive left behind.
+      if (onDone) {
+        const st = state.drive;
+        if (st?.status === 'completed') onDone('completed');
+        else if (!st) onDone('cancelled'); // stopDrive() without a reason
+        else onDone('failed', st.error ?? undefined);
+      }
       refreshBadge();
       void persist();
     });
@@ -1151,6 +1204,185 @@ export default defineBackground(() => {
     driveSteps = [];
     refreshBadge();
     void persist();
+  }
+
+  // ---- remote drive (MCP → backend gateway → this browser) ---------------
+
+  /** Open the gateway WS. Runs after session restore/login, gated on the
+   * "Let Stept control this browser" switch. Safe to call repeatedly — it
+   * replaces any previous client. */
+  function startRunClient(): void {
+    if (!session || state.remoteControl === false) return;
+    const forSession = session;
+    runClient?.stop();
+    runClient = null;
+    void ensureDeviceId().then((deviceId) => {
+      // Signed out / toggled off / re-logged while the id loaded — stand down.
+      // Compared by TOKEN, not object identity: validateSession() rebuilds the
+      // session object (same token) and must not kill the client under us.
+      if (
+        !session ||
+        session.extensionToken !== forSession.extensionToken ||
+        state.remoteControl === false
+      ) {
+        return;
+      }
+      const client = new RunClient(
+        forSession.apiBase,
+        forSession.extensionToken,
+        deviceId,
+        deviceName(),
+        {
+          execOp: handleRemoteOp,
+          recordStart: remoteRecordStart,
+          recordStop: remoteRecordStop,
+          runTour: remoteRunTour,
+          onConnectionChange: (connected) => {
+            if (state.remoteConnected === connected) return;
+            state.remoteConnected = connected;
+            broadcast();
+          },
+        },
+      );
+      runClient = client;
+      client.start();
+      // the alarm keeps the worker alive and re-opens the WS after a teardown
+      armKeepalive();
+    });
+  }
+
+  /** Tear the remote transport down: gateway WS + any driven-tab session. */
+  async function stopRemote(): Promise<void> {
+    runClient?.stop();
+    runClient = null;
+    state.remoteConnected = false;
+    const drive = remoteDrive;
+    remoteDrive = null;
+    state.remoteDrive = null;
+    // queued behind any in-flight op so a mid-op teardown can't interleave
+    if (drive) await drive.handle({ op: 'close' }).catch(() => {});
+  }
+
+  /** One gateway exec-op. 'open' lazily creates the controller; every other op
+   * needs a live one. Panel state mirrors the session after every op. */
+  async function handleRemoteOp(
+    op: DriveOp['op'],
+    args: DriveOp['args'] | undefined,
+  ): Promise<DriveSnapshot> {
+    if (op === 'open') {
+      if (state.drive) {
+        throw new Error(
+          'a tour is being driven in this browser right now — try again when it finishes',
+        );
+      }
+      remoteDrive ??= new RemoteDriveController();
+    }
+    if (!remoteDrive) {
+      // benign double-close: the session is already gone, which is what close wants
+      if (op === 'close') return { url: '', elements: '', count: 0, note: 'drive session closed' };
+      throw new Error('no driven tab — call browser_open first');
+    }
+    const controller = remoteDrive;
+    try {
+      return await controller.handle({ op, args });
+    } finally {
+      const live = controller.sessionState;
+      state.remoteDrive = op === 'close' || !live ? null : live;
+      if (op === 'close' && remoteDrive === controller) remoteDrive = null;
+      void persist();
+    }
+  }
+
+  /** Gateway record-start → the existing recorder. `url` opens/updates a tab
+   * first — the caller asked to record a flow STARTING there. */
+  async function remoteRecordStart(
+    url?: string,
+  ): Promise<{ ok: boolean; recording?: boolean; error?: string }> {
+    if (!session) {
+      return { ok: false, error: 'the extension is signed out — open the Stept side panel and sign in' };
+    }
+    if (state.recording) {
+      return {
+        ok: false,
+        error: 'a recording is already in progress in this browser — stop it in the side panel first',
+      };
+    }
+    let target: number | undefined;
+    if (url) {
+      const active = await activeTab();
+      if (active != null) {
+        const updated = await chrome.tabs
+          .update(active, { url })
+          .then(() => true)
+          .catch(() => false);
+        if (updated) target = active;
+      }
+      if (target == null) {
+        target = (await chrome.tabs.create({ url, active: true }).catch(() => null))?.id;
+        if (target == null) return { ok: false, error: 'could not open a tab to record in' };
+      }
+    }
+    await startRecording(target);
+    return state.recording
+      ? { ok: true, recording: true }
+      : { ok: false, error: 'could not start recording — is there an open tab to record?' };
+  }
+
+  /** Gateway record-stop → stop + save through the existing saveTour flow.
+   * The ack carries the draft tour id and how many raw events were captured. */
+  async function remoteRecordStop(
+    title: string,
+    _description?: string,
+  ): Promise<{
+    ok: boolean;
+    recording?: boolean;
+    tour_id?: string;
+    event_count?: number;
+    error?: string;
+  }> {
+    if (!state.recording) {
+      return { ok: false, error: 'no recording is in progress in this browser' };
+    }
+    const eventCount = state.events.length;
+    await stopRecording();
+    const saved = await saveTour(title.trim() || 'Recorded tour');
+    if (!saved.ok) {
+      return { ok: false, recording: false, event_count: eventCount, error: saved.error ?? 'save failed' };
+    }
+    return {
+      ok: true,
+      recording: false,
+      tour_id: state.lastSave?.tourId,
+      event_count: eventCount,
+    };
+  }
+
+  /** Gateway run-tour → the existing DriveRunner, in the driven tab when an
+   * MCP session is open, else a fresh tab (never hijack the user's page).
+   * Resolves when the run reaches a terminal state (the onDone seam). */
+  async function remoteRunTour(
+    tourId: string,
+  ): Promise<{ status: 'completed' | 'failed' | 'cancelled'; error?: string }> {
+    if (state.drive) {
+      return {
+        status: 'failed',
+        error: 'a tour is already being driven in this browser — try again when it finishes',
+      };
+    }
+    let tabId = remoteDrive?.sessionState?.tabId ?? null;
+    if (tabId == null) {
+      tabId = (await chrome.tabs.create({ active: true }).catch(() => null))?.id ?? null;
+    }
+    if (tabId == null) {
+      return { status: 'failed', error: 'could not open a tab to run the tour in' };
+    }
+    const target = tabId;
+    return new Promise((resolve) => {
+      void startDrive(tourId, target, (status, error) => resolve({ status, error })).then((r) => {
+        // startDrive failed before the runner existed — onDone will never fire
+        if (!r.ok) resolve({ status: 'failed', error: r.error });
+      });
+    });
   }
 
   // ---- selector picker ---------------------------------------------------

@@ -114,6 +114,12 @@ async def require_member(
         ).scalar_one_or_none()
         if api_key is None or api_key.revoked_at is not None:
             raise UnauthorizedError("Invalid API key")
+        # Agent-bound keys are minted for one MCP agent endpoint and nothing
+        # else: they carry the workspace's scopes, so accepting them here would
+        # silently widen "let Claude talk to this one agent" into full API
+        # access.
+        if api_key.agent_id is not None:
+            raise UnauthorizedError("Agent-bound MCP keys cannot access the REST API")
         if api_key.workspace_id != workspace_id:
             raise ForbiddenError("API key belongs to another workspace")
         api_key.last_used_at = utcnow()

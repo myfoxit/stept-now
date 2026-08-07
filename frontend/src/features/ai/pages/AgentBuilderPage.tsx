@@ -20,6 +20,7 @@ import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
 
 import { aiApi, aiKeys, type AgentSettings, type ToolConfig, type ToolPolicy } from '../api'
 import { CustomActionsSection } from '../components/CustomActionsSection'
+import { McpChannelCard } from '../components/McpChannelCard'
 import { PageHeader, PageShell } from '../components/shell'
 import { TestSandbox } from '../components/TestSandbox'
 import { ToolPolicyMatrix, type PolicyRow } from '../components/ToolPolicyMatrix'
@@ -109,7 +110,10 @@ export function Component() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
+      // Spread the server settings first so keys owned elsewhere (e.g. the MCP
+      // channel card's settings.mcp) survive a builder save.
       const settings: AgentSettings = {
+        ...((agent?.settings ?? {}) as Partial<AgentSettings>),
         retrieval: { enabled: retrievalEnabled, k: retrievalK, source_ids: sourceIds },
         handoff_message: handoffMessage,
         guardrails: { max_tool_calls: maxToolCalls, require_citations: requireCitations },
@@ -419,6 +423,9 @@ export function Component() {
                 </CardContent>
               ) : null}
             </Card>
+
+            {/* MCP channel */}
+            <McpChannelCard agent={agent} />
 
             {/* Tools */}
             <Card>

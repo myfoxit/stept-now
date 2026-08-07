@@ -18,7 +18,7 @@ from app.ai.base import ChatMessage, ChatRequest
 from app.ai.registry import resolve_chat
 from app.models.conversation import Conversation
 from app.models.message import Message
-from app.rag.context import build_context
+from app.rag.context import build_context, guard_retrieved
 from app.rag.retrieval import search_chunks
 from app.services.search_analytics import record_search
 
@@ -54,11 +54,14 @@ async def suggest_reply(
     citations: list[dict[str, Any]] = []
     context_block = "No knowledge-base sources were found."
     if query:
+        # Answer path: rerank on (self-gates to >5 fused candidates; any rerank
+        # failure keeps the fused order — see app.rag.rerank).
         results = await search_chunks(
             session,
             conversation.workspace_id,
             query,
             k=5,
+            rerank=True,
             history=[message.content for message in reversed(recent_contact) if message.content],
         )
         await record_search(
@@ -72,7 +75,7 @@ async def suggest_reply(
         context = build_context(results, query, max_tokens=_COPILOT_CONTEXT_TOKENS)
         citations = context.citation_dicts()
         if context.context_text:
-            context_block = f"Sources:\n{context.context_text}"
+            context_block = guard_retrieved(context.context_text)
 
     system = (
         f"You are a support copilot drafting a reply on behalf of {member_name}. "

@@ -12,6 +12,8 @@ from app.schemas.common import ORMModel
 class ApiKeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     scopes: list[str] = Field(default_factory=lambda: ["read"])
+    # Bind the key to one AI agent's MCP endpoint (None → workspace-wide key).
+    agent_id: str | None = None
 
 
 class ApiKeyOut(ORMModel):
@@ -19,6 +21,7 @@ class ApiKeyOut(ORMModel):
     name: str
     prefix: str
     scopes: list[str]
+    agent_id: str | None = None
     last_used_at: datetime | None = None
     revoked_at: datetime | None = None
     created_at: datetime

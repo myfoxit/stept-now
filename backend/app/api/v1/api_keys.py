@@ -23,7 +23,12 @@ async def list_keys(principal: Member, session: Db):
 async def create_key(body: ApiKeyCreate, principal: Member, session: Db):
     actor = Actor(type=principal.kind, id=principal.actor_id, label=principal.label)
     api_key, full = await service.create_key(
-        session, principal.workspace.id, actor=actor, name=body.name, scopes=body.scopes
+        session,
+        principal.workspace.id,
+        actor=actor,
+        name=body.name,
+        scopes=body.scopes,
+        agent_id=body.agent_id,
     )
     return ApiKeyCreated(**ApiKeyOut.model_validate(api_key).model_dump(), key=full)
 

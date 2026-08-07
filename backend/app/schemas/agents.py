@@ -42,6 +42,22 @@ class GuardrailSettings(BaseModel):
     require_citations: bool = False
 
 
+class McpChannelSettings(BaseModel):
+    """Per-agent MCP channel: may external LLM clients talk to this agent?
+
+    ``approval_mode`` gates WRITE tools called over MCP (reads always run):
+    - ``ask_in_chat``: trust the client to confirm (descriptors carry destructive
+      hints + a "confirm with the user" suffix); executes server-side.
+    - ``ask_in_stept``: park the call as an ``McpToolApproval``; a teammate
+      approves in Stept and the client retries the same call.
+    - ``never_ask``: trusted automations — writes run unprompted.
+    - ``deny``: writes are rejected outright.
+    """
+
+    enabled: bool = False
+    approval_mode: Literal["ask_in_chat", "ask_in_stept", "never_ask", "deny"] = "ask_in_chat"
+
+
 class PageControlSettings(BaseModel):
     """In-app guidance: may this agent see — and act on — the visitor's page?
 
@@ -60,6 +76,7 @@ class AgentSettings(BaseModel):
     handoff_message: str = "Let me connect you with a teammate who can help."
     guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)
     page_control: PageControlSettings = Field(default_factory=PageControlSettings)
+    mcp: McpChannelSettings = Field(default_factory=McpChannelSettings)
 
 
 class AgentCreate(BaseModel):

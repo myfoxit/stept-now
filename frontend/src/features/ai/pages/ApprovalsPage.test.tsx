@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockFetch } from '@/test/helpers'
 
 import { Component as ApprovalsPage } from './ApprovalsPage'
-import { makeApproval, renderPage, seedAuth } from '../test-utils'
+import { makeApproval, makeMcpApproval, renderPage, seedAuth } from '../test-utils'
 
 /* Minimal controllable WebSocket so we can inject realtime frames. */
 const wsInstances: FakeWS[] = []
@@ -37,6 +37,7 @@ describe('ApprovalsPage', () => {
     seedAuth()
     const fetchFn = mockFetch({
       'GET /api/v1/w/w1/ai/approvals': () => ({ body: [makeApproval({ id: 'ap1' })] }),
+      'GET /api/v1/w/w1/mcp-approvals': () => ({ body: [] }),
       'POST /api/v1/w/w1/ai/approvals/ap1/decide': () => ({
         body: makeApproval({ id: 'ap1', status: 'approved' }),
       }),
@@ -60,7 +61,10 @@ describe('ApprovalsPage', () => {
   it('prepends an approval that arrives over the realtime channel', async () => {
     vi.stubGlobal('WebSocket', FakeWS)
     seedAuth(['ai:read', 'ai:manage', 'ai:approve'], { token: 'tok' })
-    mockFetch({ 'GET /api/v1/w/w1/ai/approvals': () => ({ body: [] }) })
+    mockFetch({
+      'GET /api/v1/w/w1/ai/approvals': () => ({ body: [] }),
+      'GET /api/v1/w/w1/mcp-approvals': () => ({ body: [] }),
+    })
     renderPage(<ApprovalsPage />)
 
     expect(await screen.findByText(/all caught up/i)).toBeInTheDocument()
@@ -85,5 +89,54 @@ describe('ApprovalsPage', () => {
 
     expect(await screen.findByText('close_conversation')).toBeInTheDocument()
     expect(screen.getByText('Sage')).toBeInTheDocument()
+  })
+
+  it('lists MCP approvals and records an approve decision', async () => {
+    seedAuth()
+    let pending = [makeMcpApproval({ id: 'm1' })]
+    let decideBody: unknown
+    mockFetch({
+      'GET /api/v1/w/w1/ai/approvals': () => ({ body: [] }),
+      'GET /api/v1/w/w1/mcp-approvals': () => ({ body: pending }),
+      'POST /api/v1/w/w1/mcp-approvals/m1/decide': (init) => {
+        decideBody = JSON.parse(init!.body as string)
+        pending = []
+        return { body: makeMcpApproval({ id: 'm1', status: 'approved' }) }
+      },
+    })
+    renderPage(<ApprovalsPage />)
+
+    expect(await screen.findByText('MCP clients')).toBeInTheDocument()
+    expect(screen.getByText('action_create_ticket')).toBeInTheDocument()
+    expect(screen.getByText('MCP')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /approve/i }))
+
+    await waitFor(() => expect(decideBody).toEqual({ decision: 'approve' }))
+    await waitFor(() => expect(screen.queryByText('action_create_ticket')).not.toBeInTheDocument())
+  })
+
+  it('records a deny decision for an MCP approval', async () => {
+    seedAuth()
+    let pending = [makeMcpApproval({ id: 'm2', tool_key: 'add_conversation_note' })]
+    let decideBody: unknown
+    mockFetch({
+      'GET /api/v1/w/w1/ai/approvals': () => ({ body: [] }),
+      'GET /api/v1/w/w1/mcp-approvals': () => ({ body: pending }),
+      'POST /api/v1/w/w1/mcp-approvals/m2/decide': (init) => {
+        decideBody = JSON.parse(init!.body as string)
+        pending = []
+        return { body: makeMcpApproval({ id: 'm2', status: 'denied' }) }
+      },
+    })
+    renderPage(<ApprovalsPage />)
+
+    expect(await screen.findByText('add_conversation_note')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /deny/i }))
+
+    await waitFor(() => expect(decideBody).toEqual({ decision: 'deny' }))
+    await waitFor(() =>
+      expect(screen.queryByText('add_conversation_note')).not.toBeInTheDocument()
+    )
   })
 })

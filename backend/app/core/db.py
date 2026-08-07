@@ -280,6 +280,11 @@ async def ensure_pg_indexes(engine: AsyncEngine) -> None:
            USING GIN (to_tsvector('english', content))""",
         """CREATE INDEX IF NOT EXISTS ix_contacts_name_trgm ON contacts
            USING GIN (name gin_trgm_ops)""",
+        # Backs the typo/fuzzy fallback leg of global search, which runs when
+        # the FTS leg returns almost nothing — exactly when a sequential
+        # similarity() scan would hurt most.
+        """CREATE INDEX IF NOT EXISTS ix_chunks_content_trgm ON chunks
+           USING GIN (content gin_trgm_ops)""",
     ]
     for stmt in statements:
         try:

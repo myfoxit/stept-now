@@ -29,6 +29,7 @@ from app.api.v1 import (
     inboxes,
     knowledge,
     macros,
+    mcp_approvals,
     me,
     members,
     reports,
@@ -72,6 +73,7 @@ api_router.include_router(ai_providers.router, prefix=WS, tags=["ai-providers"])
 api_router.include_router(agents.router, prefix=WS, tags=["agents"])
 api_router.include_router(agent_runs.router, prefix=WS, tags=["agent-runs"])
 api_router.include_router(approvals.router, prefix=WS, tags=["approvals"])
+api_router.include_router(mcp_approvals.router, prefix=WS, tags=["mcp-approvals"])
 api_router.include_router(automations.router, prefix=WS, tags=["automations"])
 api_router.include_router(macros.router, prefix=WS, tags=["macros"])
 api_router.include_router(campaigns.router, prefix=WS, tags=["campaigns"])
