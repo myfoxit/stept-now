@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
-import { ApiError } from '@/api/client'
+import { ApiError, adoptAccessToken } from '@/api/client'
 import { AuthCard } from '@/features/auth/components/AuthCard'
 import { SocialLoginButtons } from '@/features/auth/components/SocialLoginButtons'
 import { authApi } from '@/features/auth/api'
@@ -35,13 +35,13 @@ export function Component() {
   const location = useLocation() as { state?: { from?: string } }
   const [params] = useSearchParams()
   const oauthError = params.get('error') ? OAUTH_ERRORS[params.get('error') as string] : undefined
-  const { setAccessToken, setSession } = useAuthStore()
+  const { setSession } = useAuthStore()
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   async function onSubmit(values: FormValues) {
     try {
       const token = await authApi.login(values)
-      setAccessToken(token.access_token)
+      adoptAccessToken(token.access_token, token.expires_in)
       const me = await authApi.me()
       setSession(me.user, me.memberships)
       navigate(location.state?.from ?? '/', { replace: true })

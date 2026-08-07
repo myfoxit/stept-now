@@ -1,6 +1,7 @@
 import { LogOut, Moon, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
+import { announceLogout } from '@/api/client'
 import { authApi } from '@/features/auth/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -26,6 +27,7 @@ export function UserMenu() {
 
   async function logout() {
     await authApi.logout().catch(() => undefined)
+    announceLogout() // other tabs clear + redirect themselves
     clear()
     navigate('/login')
   }

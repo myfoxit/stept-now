@@ -92,7 +92,9 @@ jobs:
       - run: cd backend && uv sync --frozen
       - run: pnpm install --frozen-lockfile
       - name: Build widget (served by backend in e2e)
-        run: pnpm --filter @stept/widget build --if-present
+        # No trailing --if-present: pnpm 10 forwards unknown flags to the script,
+        # and vite aborts on it (this is what turned master CI red on 2026-08-07).
+        run: pnpm --filter @stept/widget build
       - name: Install Playwright
         run: pnpm --filter @stept/e2e exec playwright install --with-deps chromium
       - name: Run e2e

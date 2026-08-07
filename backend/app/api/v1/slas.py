@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.billing import require_plan_feature
 from app.core.deps import Db, Member, Principal, require_perm
 from app.core.events import Actor
 from app.core.permissions import Perm
@@ -25,6 +26,7 @@ from app.schemas.slas import (
 )
 from app.services import conversations as conversations_service
 from app.services import slas as slas_service
+from app.services.billing import Feature
 
 router = APIRouter()
 
@@ -47,7 +49,10 @@ async def list_sla_policies(principal: Member, session: Db) -> list[SlaPolicyOut
     "/slas",
     response_model=SlaPolicyOut,
     status_code=201,
-    dependencies=[Depends(require_perm(Perm.AUTOMATIONS_MANAGE))],
+    dependencies=[
+        Depends(require_perm(Perm.AUTOMATIONS_MANAGE)),
+        Depends(require_plan_feature(Feature.SLA_MANAGEMENT)),
+    ],
 )
 async def create_sla_policy(body: SlaPolicyCreate, principal: Member, session: Db) -> SlaPolicyOut:
     policy = await slas_service.create_policy(
@@ -67,7 +72,10 @@ async def create_sla_policy(body: SlaPolicyCreate, principal: Member, session: D
 @router.patch(
     "/slas/{policy_id}",
     response_model=SlaPolicyOut,
-    dependencies=[Depends(require_perm(Perm.AUTOMATIONS_MANAGE))],
+    dependencies=[
+        Depends(require_perm(Perm.AUTOMATIONS_MANAGE)),
+        Depends(require_plan_feature(Feature.SLA_MANAGEMENT)),
+    ],
 )
 async def update_sla_policy(
     policy_id: str, body: SlaPolicyUpdate, principal: Member, session: Db
@@ -85,7 +93,10 @@ async def update_sla_policy(
 @router.delete(
     "/slas/{policy_id}",
     response_model=Msg,
-    dependencies=[Depends(require_perm(Perm.AUTOMATIONS_MANAGE))],
+    dependencies=[
+        Depends(require_perm(Perm.AUTOMATIONS_MANAGE)),
+        Depends(require_plan_feature(Feature.SLA_MANAGEMENT)),
+    ],
 )
 async def delete_sla_policy(policy_id: str, principal: Member, session: Db) -> Msg:
     await slas_service.delete_policy(

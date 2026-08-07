@@ -1,14 +1,16 @@
 /**
- * The Stept mark: an ascending stepped path with a filled node at the top —
- * adoption climbing, and the agent's pointer arriving at the destination.
+ * The Stept mark — building blocks with the last block set apart, taken from
+ * the internal `stepped` app's post-login brand (its lucide `Blocks` lockup).
+ * The detached block is filled: the step that just clicked into place.
  *
- * Stroked with `currentColor` so it works on any surface, and legible down to
- * 16px. Same geometry as the marketing site and the favicon.
+ * Inherits `currentColor` so it works on any surface, legible down to 16px.
+ * Same geometry as the marketing site, the docs and the favicons — regenerate
+ * those from this file, never redraw them.
  */
 export function StepMark({ className, title }: { className?: string; title?: string }) {
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 24 24"
       fill="none"
       className={className}
       role={title ? 'img' : 'presentation'}
@@ -17,13 +19,13 @@ export function StepMark({ className, title }: { className?: string; title?: str
       focusable="false"
     >
       <path
-        d="M4 27V21.5H12.5V14.5H21V7.5H28"
+        d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3"
         stroke="currentColor"
-        strokeWidth={3.6}
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="27.5" cy="7.5" r="4" fill="currentColor" />
+      <rect x="14" y="3" width="7" height="7" rx="1.4" fill="currentColor" />
     </svg>
   )
 }

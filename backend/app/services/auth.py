@@ -71,19 +71,34 @@ async def rotate_refresh_token(
     payload = security.decode_token(raw_token, "refresh")
     record = await session.get(RefreshToken, payload["jti"])
     now = utcnow()
+    settings = get_settings()
     if record is None:
         raise UnauthorizedError("Unknown refresh token")
     if record.revoked_at is not None or record.replaced_by is not None:
-        # Reuse of a consumed token → assume theft, revoke everything for the user.
-        # Commit immediately: the request will end 401 and roll back otherwise.
-        logger.warning("refresh token reuse detected for user %s", record.user_id)
-        await session.execute(
-            update(RefreshToken)
-            .where(RefreshToken.user_id == record.user_id, RefreshToken.revoked_at.is_(None))
-            .values(revoked_at=now)
+        # A token consumed *by rotation* moments ago is almost always a benign
+        # race — a second tab, a Set-Cookie response lost to a reload, a
+        # back/forward-cache replay — not theft. Nuking the whole family here is
+        # what logged users out of every tab, so within the grace window we mint
+        # a sibling instead. Tokens revoked without a successor (logout, password
+        # change, admin revoke) never get grace.
+        grace = timedelta(seconds=settings.refresh_rotation_grace_seconds)
+        rotated_recently = (
+            record.replaced_by is not None
+            and record.revoked_at is not None
+            and now - record.revoked_at <= grace
         )
-        await session.commit()
-        raise UnauthorizedError("Refresh token reuse detected; please log in again")
+        if not rotated_recently:
+            # Reuse of a consumed token → assume theft, revoke everything for the
+            # user. Commit immediately: the request will end 401 and roll back
+            # otherwise.
+            logger.warning("refresh token reuse detected for user %s", record.user_id)
+            await session.execute(
+                update(RefreshToken)
+                .where(RefreshToken.user_id == record.user_id, RefreshToken.revoked_at.is_(None))
+                .values(revoked_at=now)
+            )
+            await session.commit()
+            raise UnauthorizedError("Refresh token reuse detected; please log in again")
     if record.expires_at <= now:
         raise UnauthorizedError("Refresh token expired")
 
@@ -92,7 +107,6 @@ async def rotate_refresh_token(
         raise UnauthorizedError("Unknown user")
 
     new_token, new_jti = security.create_refresh_token(user.id)
-    settings = get_settings()
     session.add(
         RefreshToken(
             id=new_jti,
@@ -103,8 +117,11 @@ async def rotate_refresh_token(
             ip=ip,
         )
     )
-    record.replaced_by = new_jti
-    record.revoked_at = now
+    if record.replaced_by is None:
+        record.replaced_by = new_jti
+        record.revoked_at = now
+    # else: grace-window sibling — the consumed record stays frozen so its
+    # revoked_at cannot be pushed forward to extend the window indefinitely.
     await session.flush()
     return user, new_token
 

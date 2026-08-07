@@ -36,9 +36,10 @@ async def test_wrong_password_rejected(client):
     assert response.status_code == 401
 
 
-async def test_refresh_rotation_and_reuse_detection(client):
+async def test_concurrent_refresh_within_grace_is_benign(client):
+    """Two tabs sharing one cookie both refresh: the second must NOT nuke the
+    session family (this was the 'I keep getting logged out' bug)."""
     await signup(client, "rot@example.com")
-    # httpx keeps cookies; grab the current refresh cookie value.
     original_cookie = client.cookies.get("stept_refresh")
     assert original_cookie
 
@@ -47,14 +48,69 @@ async def test_refresh_rotation_and_reuse_detection(client):
     rotated_cookie = client.cookies.get("stept_refresh")
     assert rotated_cookie and rotated_cookie != original_cookie
 
-    # Replaying the consumed token must fail and revoke the family.
+    # Tab 2 replays the just-consumed token → sibling session, not a family wipe.
+    client.cookies.delete("stept_refresh")
+    client.cookies.set("stept_refresh", original_cookie, path="/api/v1/auth")
+    replay = await client.post("/api/v1/auth/refresh")
+    assert replay.status_code == 200
+    sibling_cookie = replay.cookies.get("stept_refresh")
+    assert sibling_cookie and sibling_cookie != original_cookie
+
+    # Both live chains keep working.
+    client.cookies.delete("stept_refresh")
+    client.cookies.set("stept_refresh", rotated_cookie, path="/api/v1/auth")
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 200
+    client.cookies.delete("stept_refresh")
+    client.cookies.set("stept_refresh", sibling_cookie, path="/api/v1/auth")
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 200
+
+
+async def test_stale_reuse_still_revokes_family(client, session):
+    """Replay outside the grace window is theft: every live token dies."""
+    from datetime import timedelta
+
+    from sqlalchemy import update as sa_update
+
+    from app.core.db import utcnow
+    from app.models.user import RefreshToken
+
+    await signup(client, "theft@example.com")
+    original_cookie = client.cookies.get("stept_refresh")
+    assert original_cookie
+
+    first = await client.post("/api/v1/auth/refresh")
+    assert first.status_code == 200
+    rotated_cookie = client.cookies.get("stept_refresh")
+
+    # Age the rotation beyond the grace window.
+    await session.execute(
+        sa_update(RefreshToken)
+        .where(RefreshToken.revoked_at.is_not(None))
+        .values(revoked_at=utcnow() - timedelta(minutes=10))
+    )
+    await session.commit()
+
     client.cookies.set("stept_refresh", original_cookie, path="/api/v1/auth")
     replay = await client.post("/api/v1/auth/refresh")
     assert replay.status_code == 401
 
+    # The whole family is gone, including the legitimate successor.
     client.cookies.set("stept_refresh", rotated_cookie, path="/api/v1/auth")
     after_revoke = await client.post("/api/v1/auth/refresh")
     assert after_revoke.status_code == 401
+
+
+async def test_logged_out_token_gets_no_grace(client):
+    """Grace applies only to rotation races — a cookie revoked by logout stays dead."""
+    await signup(client, "lo@example.com")
+    cookie = client.cookies.get("stept_refresh")
+    assert cookie
+
+    assert (await client.post("/api/v1/auth/logout")).status_code == 200
+
+    client.cookies.set("stept_refresh", cookie, path="/api/v1/auth")
+    replay = await client.post("/api/v1/auth/refresh")
+    assert replay.status_code == 401
 
 
 async def test_unauthenticated_me_rejected(client):

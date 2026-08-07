@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import uuid7
+from app.core.db import get_session_factory, uuid7
 from app.core.errors import ForbiddenError
 from app.models.billing import BillingSubscription
 from app.models.workspace import Workspace
@@ -58,6 +58,62 @@ async def test_paid_plans_are_fully_entitled(monkeypatch, db_only: AsyncSession,
     workspace = await make_workspace(db_only, plan=plan)
     for feature in ALL_FEATURES:
         await require_feature(db_only, workspace.id, feature)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# router wiring: the gates actually guard the endpoints over HTTP
+# ---------------------------------------------------------------------------
+
+ROLE_BODY = {"name": "Support Lead", "description": "", "permissions": ["conversations:read"]}
+
+
+async def test_free_hosted_workspace_gets_402_style_403_on_gated_routes(
+    monkeypatch, client, workspace_ctx
+):
+    apply_stripe_env(monkeypatch)
+
+    create_role = await client.post(
+        f"{workspace_ctx.base}/roles", json=ROLE_BODY, headers=workspace_ctx.owner_headers
+    )
+    assert create_role.status_code == 403
+    assert "Upgrade required" in create_role.json()["error"]["message"]
+
+    audit_read = await client.get(
+        f"{workspace_ctx.base}/audit", headers=workspace_ctx.owner_headers
+    )
+    assert audit_read.status_code == 403
+    assert "Upgrade required" in audit_read.json()["error"]["message"]
+
+    sla_create = await client.post(
+        f"{workspace_ctx.base}/slas",
+        json={"name": "Gold", "first_response_minutes": 30},
+        headers=workspace_ctx.owner_headers,
+    )
+    assert sla_create.status_code == 403
+    assert "Upgrade required" in sla_create.json()["error"]["message"]
+
+
+async def test_self_hosted_keeps_everything_ungated(client, workspace_ctx):
+    assert billing_enabled() is False
+    create_role = await client.post(
+        f"{workspace_ctx.base}/roles", json=ROLE_BODY, headers=workspace_ctx.owner_headers
+    )
+    assert create_role.status_code == 201, create_role.text
+    audit_read = await client.get(
+        f"{workspace_ctx.base}/audit", headers=workspace_ctx.owner_headers
+    )
+    assert audit_read.status_code == 200
+
+
+async def test_paid_hosted_workspace_passes_the_gates(monkeypatch, client, workspace_ctx):
+    apply_stripe_env(monkeypatch)
+    async with get_session_factory()() as db:
+        db.add(BillingSubscription(workspace_id=workspace_ctx.id, plan="cloud"))
+        await db.commit()
+    create_role = await client.post(
+        f"{workspace_ctx.base}/roles", json=ROLE_BODY, headers=workspace_ctx.owner_headers
+    )
+    assert create_role.status_code == 201, create_role.text
 
 
 async def test_unknown_plan_fails_open(monkeypatch, db_only: AsyncSession):

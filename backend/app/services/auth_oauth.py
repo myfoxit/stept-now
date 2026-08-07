@@ -160,13 +160,17 @@ def safe_next_path(value: object) -> str:
 
 def mint_login_state(
     *, provider: str, next_path: str | None = None, invite_token: str | None = None
-) -> str:
-    claims: dict[str, Any] = {"provider": provider, "nonce": uuid7()}
+) -> tuple[str, str]:
+    """Returns (state, nonce). The router mirrors the nonce into a short-lived
+    browser cookie so the callback can prove the flow was started by the same
+    browser it finishes in (login-CSRF protection)."""
+    nonce = uuid7()
+    claims: dict[str, Any] = {"provider": provider, "nonce": nonce}
     if next_path:
         claims["next"] = safe_next_path(next_path)
     if invite_token:
         claims["invite"] = invite_token
-    return security._encode(claims, STATE_TTL, _STATE_TOKEN_TYPE)
+    return security._encode(claims, STATE_TTL, _STATE_TOKEN_TYPE), nonce
 
 
 def verify_login_state(state: str) -> dict[str, Any]:

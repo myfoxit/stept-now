@@ -30,6 +30,7 @@ from tests.auth_oauth.conftest import (
     run_callback,
     start,
     start_state,
+    state_of,
 )
 
 
@@ -319,6 +320,43 @@ async def test_state_provider_mismatch_rejected(client):
     state = await start_state(client, "google")
     response = await run_callback(client, "github", state=state)
     assert response.headers["location"] == _login_url("error=oauth_failed")
+
+
+async def test_callback_from_a_different_browser_rejected(client):
+    """Login-CSRF guard: a state minted in one browser must not complete in
+    another — the nonce cookie set at /start is the proof of same-browser."""
+    state = await start_state(client, "google")
+    client.cookies.clear()  # the victim's browser never saw /start
+    with respx.mock:
+        respx.post(GOOGLE_TOKEN_URL).mock(
+            return_value=httpx.Response(200, json=google_token_response())
+        )
+        response = await run_callback(client, "google", state=state)
+    assert response.status_code == 302
+    assert response.headers["location"] == _login_url("error=oauth_failed")
+    assert await fetch_users() == []
+
+
+async def test_nonce_cookie_set_on_start_and_cleared_on_success(client):
+    started = await start(client, "google")
+    set_cookie = started.headers.get("set-cookie", "").lower()
+    assert set_cookie.startswith("stept_oauth_nonce=")
+    assert "httponly" in set_cookie
+    assert "path=/api/v1/auth/oauth" in set_cookie
+
+    state = state_of(started.headers["location"])
+    with respx.mock:
+        respx.post(GOOGLE_TOKEN_URL).mock(
+            return_value=httpx.Response(200, json=google_token_response())
+        )
+        response = await run_callback(client, "google", state=state)
+    assert response.status_code == 302
+    cleared = [
+        header
+        for header in response.headers.get_list("set-cookie")
+        if header.lower().startswith("stept_oauth_nonce=")
+    ]
+    assert cleared and 'max-age=0' in cleared[0].lower().replace('"', "")
 
 
 async def test_user_denied_at_provider(client):

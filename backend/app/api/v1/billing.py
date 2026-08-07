@@ -28,6 +28,20 @@ def _actor(principal: Principal) -> Actor:
     return Actor(type=principal.kind, id=principal.actor_id, label=principal.label)
 
 
+def require_plan_feature(feature: billing_service.Feature):
+    """Router dependency: 403 when a hosted workspace's plan lacks the feature.
+
+    Self-hosted installs (no Stripe key) are always entitled — the check is a
+    no-op there, so OSS behavior is unchanged. Compose it AFTER require_perm so
+    permission errors (who you are) outrank plan errors (what you pay for).
+    """
+
+    async def checker(principal: Member, session: Db) -> None:
+        await billing_service.require_feature(session, principal.workspace.id, feature)
+
+    return checker
+
+
 @router.get("/billing", response_model=BillingOut)
 async def get_billing(principal: Member, session: Db) -> BillingOut:
     return await billing_service.get_billing(session, principal.workspace.id)

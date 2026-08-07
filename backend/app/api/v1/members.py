@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from app.api.v1.billing import require_plan_feature
 from app.core.deps import Db, Member, require_perm
 from app.core.events import Actor
 from app.core.permissions import BUILTIN_ROLES, Perm
@@ -19,6 +20,7 @@ from app.schemas.workspace import (
     RoleUpdate,
 )
 from app.services import members as members_service
+from app.services.billing import Feature
 
 router = APIRouter()
 
@@ -123,7 +125,10 @@ async def permission_catalog(principal: Member):
     "/roles",
     response_model=RoleOut,
     status_code=201,
-    dependencies=[Depends(require_perm(Perm.ROLES_MANAGE))],
+    dependencies=[
+        Depends(require_perm(Perm.ROLES_MANAGE)),
+        Depends(require_plan_feature(Feature.CUSTOM_ROLES)),
+    ],
 )
 async def create_role(body: RoleCreate, principal: Member, session: Db):
     role = await members_service.create_role(
@@ -140,7 +145,10 @@ async def create_role(body: RoleCreate, principal: Member, session: Db):
 @router.patch(
     "/roles/{role_id}",
     response_model=RoleOut,
-    dependencies=[Depends(require_perm(Perm.ROLES_MANAGE))],
+    dependencies=[
+        Depends(require_perm(Perm.ROLES_MANAGE)),
+        Depends(require_plan_feature(Feature.CUSTOM_ROLES)),
+    ],
 )
 async def update_role(role_id: str, body: RoleUpdate, principal: Member, session: Db):
     role = await members_service.update_role(
@@ -158,7 +166,10 @@ async def update_role(role_id: str, body: RoleUpdate, principal: Member, session
 @router.delete(
     "/roles/{role_id}",
     response_model=Msg,
-    dependencies=[Depends(require_perm(Perm.ROLES_MANAGE))],
+    dependencies=[
+        Depends(require_perm(Perm.ROLES_MANAGE)),
+        Depends(require_plan_feature(Feature.CUSTOM_ROLES)),
+    ],
 )
 async def delete_role(role_id: str, principal: Member, session: Db):
     await members_service.delete_role(

@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
-import { ApiError } from '@/api/client'
+import { ApiError, adoptAccessToken } from '@/api/client'
 import { authApi } from '@/features/auth/api'
 import { AuthCard } from '@/features/auth/components/AuthCard'
 import { SocialLoginButtons } from '@/features/auth/components/SocialLoginButtons'
@@ -26,13 +26,13 @@ export function Component() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const inviteToken = params.get('invite')
-  const { setAccessToken, setSession } = useAuthStore()
+  const { setSession } = useAuthStore()
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   async function onSubmit(values: FormValues) {
     try {
       const token = await authApi.signup(values)
-      setAccessToken(token.access_token)
+      adoptAccessToken(token.access_token, token.expires_in)
       if (inviteToken) {
         await authApi.acceptInvite(inviteToken).catch(() => {
           toast.error('Could not accept the invitation automatically')

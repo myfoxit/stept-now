@@ -102,6 +102,10 @@ class Settings(BaseSettings):
 
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
+    # Reuse of a just-rotated refresh token within this window is treated as a
+    # benign race (second tab, lost Set-Cookie response, bfcache replay) and gets
+    # a sibling token instead of tripping theft detection. Auth0-style.
+    refresh_rotation_grace_seconds: int = 60
     invitation_ttl_days: int = 7
     rate_limit_enabled: bool = True
     # How many reverse proxies append to X-Forwarded-For before the request

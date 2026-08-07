@@ -9,6 +9,7 @@
 
 import { useEffect } from 'react'
 
+import { refreshSession } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
 export interface RealtimeMessage {
@@ -68,11 +69,20 @@ function connect() {
       /* ignore malformed frames */
     }
   }
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     if (pingTimer) clearInterval(pingTimer)
     pingTimer = null
     if (handlers.size === 0) return
     const delay = Math.min(30_000, 1000 * 2 ** reconnectAttempt++)
+    if (event.code === 4401) {
+      // Token rejected (expired while the tab was idle): renew it first, then
+      // reconnect — retrying with the same dead token would loop forever.
+      socketKey = ''
+      reconnectTimer = setTimeout(() => {
+        void refreshSession().then(() => connect())
+      }, delay)
+      return
+    }
     reconnectTimer = setTimeout(connect, delay)
   }
   socket.onerror = () => socket?.close()

@@ -27,6 +27,25 @@ logger = log("auth_oauth")
 
 router = APIRouter()
 
+# Mirrors the state JWT's nonce into the browser that starts the flow: the
+# callback only accepts a state whose nonce matches this cookie, so an attacker
+# cannot complete a flow in a victim's browser that they started in their own
+# (login CSRF → silently signing the victim into the attacker's account).
+NONCE_COOKIE = "stept_oauth_nonce"
+NONCE_COOKIE_PATH = "/api/v1/auth/oauth"
+
+
+def _set_nonce_cookie(response: RedirectResponse, nonce: str) -> None:
+    response.set_cookie(
+        NONCE_COOKIE,
+        nonce,
+        max_age=int(oauth.STATE_TTL.total_seconds()),
+        httponly=True,
+        secure=get_settings().env == "prod",
+        samesite="lax",  # sent on the top-level GET redirect back from the provider
+        path=NONCE_COOKIE_PATH,
+    )
+
 
 @router.get("/oauth/providers")
 async def social_login_providers() -> dict[str, list[str]]:
@@ -47,16 +66,22 @@ async def social_login_start(
     credential = oauth.resolve_login_credential(provider)
     if spec is None or credential is None:
         raise BadRequestError(f"Social login with '{provider}' is not available")
-    state = oauth.mint_login_state(provider=provider, next_path=next_path, invite_token=invite)
+    state, nonce = oauth.mint_login_state(
+        provider=provider, next_path=next_path, invite_token=invite
+    )
     url = oauth.build_authorize_url(
         spec, credential[0], state=state, redirect_uri=oauth.redirect_uri_for(provider)
     )
-    return RedirectResponse(url, status_code=302)
+    response = RedirectResponse(url, status_code=302)
+    _set_nonce_cookie(response, nonce)
+    return response
 
 
 def _login_error_redirect(code: str) -> RedirectResponse:
     base = get_settings().app_base_url.rstrip("/")
-    return RedirectResponse(f"{base}/login?error={code}", status_code=302)
+    response = RedirectResponse(f"{base}/login?error={code}", status_code=302)
+    response.delete_cookie(NONCE_COOKIE, path=NONCE_COOKIE_PATH)
+    return response
 
 
 @router.get(
@@ -78,6 +103,11 @@ async def social_login_callback(
     except oauth.SocialLoginError:
         return _login_error_redirect("oauth_failed")
     if claims.get("provider") != provider:
+        return _login_error_redirect("oauth_failed")
+    nonce = claims.get("nonce")
+    browser_nonce = request.cookies.get(NONCE_COOKIE)
+    if not nonce or not browser_nonce or nonce != browser_nonce:
+        # The browser finishing the flow is not the one that started it.
         return _login_error_redirect("oauth_failed")
     if error:
         # The provider bounced the user back without a code. Only ever forward
@@ -119,4 +149,5 @@ async def social_login_callback(
     )
     # Exactly the attributes POST /auth/login sets — same helper, no fork.
     _set_refresh_cookie(response, refresh)
+    response.delete_cookie(NONCE_COOKIE, path=NONCE_COOKIE_PATH)  # single-use
     return response

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
+from app.api.v1.billing import require_plan_feature
 from app.core.deps import Db, Member, require_perm
 from app.core.errors import ForbiddenError
 from app.core.pagination import OffsetPage, clamp_limit
@@ -12,6 +13,7 @@ from app.schemas.audit import AuditLogOut, NotificationOut
 from app.schemas.common import Msg
 from app.services import audit as audit_service
 from app.services import notifications as notification_service
+from app.services.billing import Feature
 
 router = APIRouter()
 
@@ -19,7 +21,10 @@ router = APIRouter()
 @router.get(
     "/audit",
     response_model=OffsetPage[AuditLogOut],
-    dependencies=[Depends(require_perm(Perm.AUDIT_READ))],
+    dependencies=[
+        Depends(require_perm(Perm.AUDIT_READ)),
+        Depends(require_plan_feature(Feature.AUDIT_LOG)),
+    ],
 )
 async def list_audit(
     principal: Member,

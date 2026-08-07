@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { api, ApiError } from '@/api/client'
+import { adoptAccessToken, api, ApiError, refreshSession } from '@/api/client'
 import { mockFetch } from '@/test/helpers'
 import { useAuthStore } from '@/stores/auth'
 
@@ -50,5 +50,46 @@ describe('api client', () => {
     expect(String(url)).toContain('q=hi')
     expect(String(url)).not.toContain('cursor')
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+  })
+})
+
+describe('session keep-alive', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    useAuthStore.setState({ accessToken: null })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('adoptAccessToken stores the token and proactively renews before expiry', async () => {
+    const fetchMock = mockFetch({
+      'POST /api/v1/auth/refresh': () => ({
+        body: { access_token: 'renewed', expires_in: 900 },
+      }),
+    })
+    adoptAccessToken('first', 900)
+    expect(useAuthStore.getState().accessToken).toBe('first')
+
+    // The renewal timer is armed at 80% of the TTL (720s), not at expiry.
+    await vi.advanceTimersByTimeAsync(719_000)
+    expect(fetchMock).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(useAuthStore.getState().accessToken).toBe('renewed')
+  })
+
+  it('refreshSession is single-flight per tab', async () => {
+    let calls = 0
+    mockFetch({
+      'POST /api/v1/auth/refresh': () => {
+        calls += 1
+        return { body: { access_token: `t${calls}`, expires_in: 900 } }
+      },
+    })
+    const [a, b] = await Promise.all([refreshSession(), refreshSession()])
+    expect(a).toBe(true)
+    expect(b).toBe(true)
+    expect(calls).toBe(1)
   })
 })

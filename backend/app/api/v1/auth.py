@@ -83,7 +83,11 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
     return _token_response(UserOut.model_validate(user), create_access_token(user.id))
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    dependencies=[Depends(RateLimit("refresh", times=30, seconds=60))],
+)
 async def refresh(request: Request, response: Response, session: Db):
     raw = request.cookies.get(REFRESH_COOKIE)
     if not raw:
