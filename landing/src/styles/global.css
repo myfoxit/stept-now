@@ -1,51 +1,90 @@
 /*
- * Stept design tokens — ported verbatim from the app (frontend/src/index.css)
- * so the marketing site and the product read as one system. Same oklch palette,
- * same 0.5rem radius, same indigo primary; light by default, dark via the
- * viewer's OS preference (the app toggles the same values with a .dark class).
+ * Stept marketing design system.
+ *
+ * Neutral-first: near-black type on white (and near-black surfaces in dark),
+ * with indigo reserved as *punctuation* — the mark, links, AI moments, focus
+ * rings. Primary actions are solid near-black, not indigo, so the colour on the
+ * page is the product screenshots and the partner logos, not the chrome.
+ * The indigo is the same hue the app ships, so the two read as one system.
+ *
+ * Type: Instrument Sans (variable, self-hosted) for display + UI, JetBrains
+ * Mono for code. Both are bundled — the page still makes zero external
+ * requests.
  */
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --primary: oklch(0.488 0.217 275.6);
-  --primary-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --ring: oklch(0.488 0.217 275.6);
-  --radius: 0.5rem;
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource-variable/jetbrains-mono';
 
-  /* Landing-only helpers derived from the palette. */
-  --primary-soft: oklch(0.488 0.217 275.6 / 0.08);
-  --primary-ring: oklch(0.488 0.217 275.6 / 0.18);
-  --shadow-color: 0 0 0;
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.06);
-  --shadow-md: 0 8px 30px oklch(0.145 0 0 / 0.08);
-  --shadow-lg: 0 24px 60px oklch(0.145 0 0 / 0.12);
-  --max: 1120px;
+:root {
+  color-scheme: light;
+
+  /* neutrals (zinc) */
+  --background: #ffffff;
+  --surface: #fafafa;
+  --surface-2: #f4f4f5;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --foreground: #09090b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+
+  /* accent — used sparingly */
+  --primary: #5b46e5;
+  --primary-hover: #4c39d6;
+  --primary-foreground: #ffffff;
+  --primary-soft: rgba(91, 70, 229, 0.07);
+  --primary-ring: rgba(91, 70, 229, 0.22);
+
+  /* solid action colour (near-black) */
+  --action: #09090b;
+  --action-hover: #27272a;
+  --action-foreground: #ffffff;
+
+  --ring: #5b46e5;
+  --radius: 0.625rem;
+
+  --shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.05);
+  --shadow-md: 0 10px 30px -10px rgba(9, 9, 11, 0.15);
+  --shadow-lg: 0 30px 70px -25px rgba(9, 9, 11, 0.28);
+
+  --font-display: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --max: 1160px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.185 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --primary: oklch(0.673 0.182 276.7);
-    --primary-foreground: oklch(0.145 0 0);
-    --border: oklch(1 0 0 / 0.12);
-    --ring: oklch(0.673 0.182 276.7);
+    color-scheme: dark;
 
-    --primary-soft: oklch(0.673 0.182 276.7 / 0.12);
-    --primary-ring: oklch(0.673 0.182 276.7 / 0.24);
-    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
-    --shadow-md: 0 8px 30px oklch(0 0 0 / 0.45);
-    --shadow-lg: 0 24px 60px oklch(0 0 0 / 0.6);
+    --background: #09090b;
+    --surface: #0f0f11;
+    --surface-2: #18181b;
+    --card: #101013;
+    --card-foreground: #fafafa;
+    --foreground: #fafafa;
+    --muted: #18181b;
+    --muted-foreground: #a1a1aa;
+    --border: #232327;
+    --border-strong: #2f2f35;
+
+    --primary: #8b8dfb;
+    --primary-hover: #a0a2fc;
+    --primary-foreground: #09090b;
+    --primary-soft: rgba(139, 141, 251, 0.12);
+    --primary-ring: rgba(139, 141, 251, 0.3);
+
+    --action: #fafafa;
+    --action-hover: #e4e4e7;
+    --action-foreground: #09090b;
+
+    --ring: #8b8dfb;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 30px 70px -25px rgba(0, 0, 0, 0.85);
   }
 }
 
@@ -63,21 +102,22 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  font-feature-settings: 'cv11', 'ss01';
+  font-family: var(--font-display);
+  font-size: 1rem;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 h1,
 h2,
 h3 {
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+  line-height: 1.05;
   margin: 0;
   text-wrap: balance;
+  font-weight: 700;
 }
 
 p {
@@ -94,13 +134,23 @@ img {
   display: block;
 }
 
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: calc(var(--radius) - 2px);
 }
 
-/* ---- shared layout primitives ---- */
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* ---- layout primitives ---- */
 
 .container {
   width: 100%;
@@ -110,26 +160,34 @@ img {
 }
 
 .section {
-  padding-block: clamp(3.5rem, 8vw, 6.5rem);
+  padding-block: clamp(4rem, 9vw, 7.5rem);
 }
 
+/* Small caps label above a section heading. Neutral by default — indigo is
+   saved for things that are actually about the AI. */
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.eyebrow-accent {
   color: var(--primary);
-  text-transform: none;
 }
 
 .lead {
   color: var(--muted-foreground);
-  font-size: clamp(1.05rem, 2.2vw, 1.2rem);
-  max-width: 42ch;
+  font-size: clamp(1.05rem, 2.1vw, 1.1875rem);
+  max-width: 46ch;
+  line-height: 1.65;
 }
 
-/* ---- buttons (mirror the shadcn Button used across the app) ---- */
+/* ---- buttons ---- */
 
 .btn {
   display: inline-flex;
@@ -140,8 +198,10 @@ img {
   padding-inline: 1.25rem;
   border-radius: var(--radius);
   border: 1px solid transparent;
+  font-family: inherit;
   font-size: 0.9375rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
   transition:
     transform 0.06s ease,
@@ -155,20 +215,21 @@ img {
   transform: translateY(1px);
 }
 
+/* Primary = solid near-black. */
 .btn-primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--action);
+  color: var(--action-foreground);
   box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 6px 20px var(--primary-ring);
+  background: var(--action-hover);
 }
 
 .btn-ghost {
-  background: transparent;
+  background: var(--background);
   color: var(--foreground);
-  border-color: var(--border);
+  border-color: var(--border-strong);
 }
 
 .btn-ghost:hover {
@@ -181,14 +242,13 @@ img {
   font-size: 0.875rem;
 }
 
-/* ---- card ---- */
+/* ---- surfaces ---- */
 
 .card {
   background: var(--card);
   color: var(--card-foreground);
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 0.25rem);
-  box-shadow: var(--shadow-sm);
 }
 
 .visually-hidden {

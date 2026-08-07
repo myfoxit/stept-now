@@ -1,51 +1,66 @@
 ---
-/*
- * The Stept wordmark — identical construction to the app's AuthCard brand mark:
- * a rounded indigo square holding a bold "S", next to the semibold wordmark.
+/**
+ * The Stept mark: an ascending stepped path with a filled node at the top.
+ *
+ * It reads as three steps climbing left→right — adoption, progress, the guided
+ * walkthrough the product is named for — and the node is the agent's pointer
+ * arriving at the destination. Drawn as one stroked path so it stays legible at
+ * 16px, and it inherits `currentColor` so it works on any background.
  */
 interface Props {
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
+  markOnly?: boolean
 }
-const { size = 'md' } = Astro.props
+const { size = 'md', markOnly = false } = Astro.props
+const px = size === 'sm' ? 22 : size === 'lg' ? 34 : 27
 ---
 
-<span class:list={['wordmark', size]}>
-  <span class="glyph" aria-hidden="true">S</span>
-  <span class="name">Stept</span>
+<span class:list={['wm', `wm-${size}`]}>
+  <svg
+    class="wm-mark"
+    width={px}
+    height={px}
+    viewBox="0 0 32 32"
+    fill="none"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      d="M4 27V21.5H12.5V14.5H21V7.5H28"
+      stroke="currentColor"
+      stroke-width="3.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    ></path>
+    <circle cx="27.5" cy="7.5" r="4" fill="currentColor"></circle>
+  </svg>
+  {!markOnly && <span class="wm-text">Stept</span>}
 </span>
 
 <style>
-  .wordmark {
+  .wm {
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    gap: 0.5rem;
+    color: var(--primary);
   }
-  .glyph {
-    display: grid;
-    place-items: center;
-    background: var(--primary);
-    color: var(--primary-foreground);
+  .wm-mark {
+    flex: none;
+  }
+  .wm-text {
+    font-family: var(--font-display);
     font-weight: 700;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-sm);
+    letter-spacing: -0.035em;
+    color: var(--foreground);
+    line-height: 1;
   }
-  .md .glyph {
-    width: 2.25rem;
-    height: 2.25rem;
-    font-size: 1.125rem;
+  .wm-sm .wm-text {
+    font-size: 1.0625rem;
   }
-  .md .name {
-    font-size: 1.25rem;
+  .wm-md .wm-text {
+    font-size: 1.3125rem;
   }
-  .sm .glyph {
-    width: 1.75rem;
-    height: 1.75rem;
-    font-size: 0.9rem;
-    border-radius: calc(var(--radius) - 2px);
-  }
-  .sm .name {
-    font-size: 1.05rem;
+  .wm-lg .wm-text {
+    font-size: 1.625rem;
   }
 </style>
