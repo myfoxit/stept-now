@@ -27,7 +27,7 @@ export function PageHeader({
 }) {
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3 sm:px-6">
-      <SidebarTrigger className="-ml-1" />
+      <SidebarTrigger className="-ml-1 hidden md:flex" />
       {back}
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-base font-semibold">{title}</h1>

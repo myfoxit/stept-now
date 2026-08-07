@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { AlertCircle, Download, Loader2, Search, Upload, Users } from 'lucide-react'
+import { AlertCircle, Download, Loader2, Plus, Search, Upload, Users } from 'lucide-react'
 
 import { timeAgo } from '@/lib/format'
+import { useHasPerm } from '@/stores/auth'
+import { NewContactDialog } from '@/features/contacts/components/NewContactDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useHasPerm } from '@/stores/auth'
 import { authHeaders } from '@/api/client'
 import { ContactAvatar } from '@/features/inbox/components/atoms'
 import { ImportDialog } from '@/features/contacts/components/ImportDialog'
@@ -51,9 +52,10 @@ export function Component() {
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [segmentId, setSegmentId] = useState<string | undefined>()
+  const [creating, setCreating] = useState(false)
+  const canWrite = useHasPerm('contacts:write')
 
   const { data: segments = [] } = useSegments()
-  const canWrite = useHasPerm('contacts:write')
   const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
@@ -71,26 +73,37 @@ export function Component() {
         <Users className="size-5" />
         <h1 className="text-lg font-semibold">Contacts</h1>
         {canWrite ? (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadExport()}>
+              <Download className="mr-1 size-4" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="mr-1 size-4" />
+              Import
+            </Button>
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="size-4" /> New contact
+            </Button>
+          </div>
+        ) : (
           <Button
             variant="outline"
             size="sm"
             className="ml-auto"
-            onClick={() => setImportOpen(true)}
+            onClick={() => downloadExport()}
           >
-            <Upload className="mr-1 size-4" />
-            Import
+            <Download className="mr-1 size-4" />
+            Export
           </Button>
-        ) : null}
-        <Button
-          variant="outline"
-          size="sm"
-          className={canWrite ? undefined : 'ml-auto'}
-          onClick={() => downloadExport()}
-        >
-          <Download className="mr-1 size-4" />
-          Export
-        </Button>
+        )}
       </div>
+
+      <NewContactDialog
+        open={creating}
+        onOpenChange={setCreating}
+        onCreated={(c) => navigate(`/contacts/${c.id}`)}
+      />
 
       <div className="flex flex-wrap items-center gap-2 border-b px-6 py-3">
         <div className="relative max-w-sm flex-1">
@@ -146,11 +159,17 @@ export function Component() {
               <EmptyDescription>
                 {q || segmentId
                   ? 'Try a different search or segment.'
-                  : 'Contacts appear here as people reach out.'}
+                  : 'Contacts appear here as people reach out — or add one yourself.'}
               </EmptyDescription>
             </EmptyHeader>
+            {!q && !segmentId && canWrite ? (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="size-4" /> New contact
+              </Button>
+            ) : null}
           </Empty>
         ) : (
+          <div className="px-6">
           <Table>
             <TableHeader>
               <TableRow>
@@ -164,8 +183,19 @@ export function Component() {
               {contacts.map((c) => (
                 <TableRow
                   key={c.id}
-                  className="cursor-pointer"
+                  className="cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                  // The row was a bare click handler: no keyboard access and
+                  // nothing announced to assistive tech.
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Open contact ${c.name || c.email || 'Unnamed'}`}
                   onClick={() => navigate(`/contacts/${c.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/contacts/${c.id}`)
+                    }
+                  }}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -199,6 +229,7 @@ export function Component() {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
 
         {hasNextPage ? (

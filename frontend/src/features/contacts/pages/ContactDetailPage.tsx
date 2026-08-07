@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { ArrowLeft, BadgeCheck, MessageSquare, Plus, Trash2, Zap } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { fullDateTime, timeAgo } from '@/lib/format'
+import { parseApiError } from '@/lib/errors'
 import { useAuthStore, useHasPerm } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,6 +52,7 @@ export function Component() {
   const [form, setForm] = useState({ name: '', email: '', phone: '' })
   const [attrs, setAttrs] = useState<[string, string][]>([])
   const [noteBody, setNoteBody] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const contact = contactQuery.data
 
@@ -57,15 +60,29 @@ export function Component() {
     if (!contact) return
     setForm({ name: contact.name ?? '', email: contact.email ?? '', phone: contact.phone ?? '' })
     setAttrs(Object.entries(contact.attributes ?? {}).map(([k, v]) => [k, String(v)]))
+    setFieldErrors({})
     setEditing(true)
   }
 
   function save() {
     const attributes: Record<string, unknown> = {}
     for (const [k, v] of attrs) if (k.trim()) attributes[k.trim()] = v
+    setFieldErrors({})
     update.mutate(
       { name: form.name, email: form.email || null, phone: form.phone || null, attributes },
-      { onSuccess: () => setEditing(false) }
+      {
+        onSuccess: () => {
+          setEditing(false)
+          toast.success('Contact saved')
+        },
+        onError: (error) => {
+          // Without this the server's 422 was dropped on the floor and Save
+          // looked inert.
+          const { message, fields } = parseApiError(error)
+          setFieldErrors(fields)
+          toast.error(message)
+        },
+      }
     )
   }
 
@@ -143,30 +160,25 @@ export function Component() {
             {editing ? (
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    />
-                  </div>
+                  {(['name', 'email', 'phone'] as const).map((field) => (
+                    <div key={field} className="grid gap-1.5">
+                      <Label htmlFor={field} className="capitalize">
+                        {field}
+                      </Label>
+                      <Input
+                        id={field}
+                        value={form[field]}
+                        aria-invalid={!!fieldErrors[field]}
+                        aria-describedby={fieldErrors[field] ? `${field}-error` : undefined}
+                        onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                      />
+                      {fieldErrors[field] ? (
+                        <p id={`${field}-error`} role="alert" className="text-xs text-destructive">
+                          {fieldErrors[field]}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
                 <div className="space-y-2">
                   <Label>Attributes</Label>
