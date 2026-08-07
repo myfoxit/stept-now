@@ -143,7 +143,7 @@ const STYLE_ID = 'stept-checklist-style'
 const CSS = `
 .stept-cl-pill{position:fixed;bottom:20px;z-index:2147482890;display:flex;align-items:center;gap:8px;
   border:0;border-radius:99px;padding:10px 16px;cursor:pointer;
-  background:var(--stept-accent,#6366f1);color:#fff;font:600 13px/1.2 -apple-system,BlinkMacSystemFont,
+  background:var(--stept-accent,#5b46e5);color:#fff;font:600 13px/1.2 -apple-system,BlinkMacSystemFont,
   "Segoe UI",Roboto,Helvetica,Arial,sans-serif;box-shadow:0 6px 20px rgba(15,23,42,.28)}
 .stept-cl-pill:hover{transform:translateY(-1px)}
 .stept-cl-pill[hidden],.stept-cl-panel[hidden]{display:none}
@@ -160,18 +160,18 @@ const CSS = `
 .stept-cl-close{border:0;background:transparent;color:#94a3b8;font-size:16px;line-height:1;cursor:pointer;padding:2px 4px}
 .stept-cl-progress{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:12px;color:#64748b}
 .stept-cl-bar{flex:1;height:6px;border-radius:3px;background:rgba(100,116,139,.2);overflow:hidden}
-.stept-cl-bar i{display:block;height:100%;background:var(--stept-accent,#6366f1);transition:width .2s ease}
+.stept-cl-bar i{display:block;height:100%;background:var(--stept-accent,#5b46e5);transition:width .2s ease}
 .stept-cl-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
 .stept-cl-item{border-radius:10px;padding:8px}
 .stept-cl-item:hover{background:rgba(100,116,139,.08)}
 .stept-cl-row{display:flex;align-items:center;gap:10px}
 .stept-cl-check{flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:2px solid rgba(100,116,139,.45);
   background:transparent;cursor:pointer;padding:0;color:#fff;font-size:12px;line-height:16px}
-.stept-cl-item.done .stept-cl-check{background:var(--stept-accent,#6366f1);border-color:var(--stept-accent,#6366f1)}
+.stept-cl-item.done .stept-cl-check{background:var(--stept-accent,#5b46e5);border-color:var(--stept-accent,#5b46e5)}
 .stept-cl-title{flex:1;text-align:left;border:0;background:transparent;cursor:pointer;padding:0;font:inherit;color:inherit}
 .stept-cl-item.done .stept-cl-title{color:#94a3b8;text-decoration:line-through}
 .stept-cl-cta{border:0;border-radius:8px;padding:5px 12px;font:600 12px/1.2 inherit;cursor:pointer;
-  background:var(--stept-accent,#6366f1);color:#fff}
+  background:var(--stept-accent,#5b46e5);color:#fff}
 .stept-cl-body{margin:6px 0 0 30px;font-size:13px;color:#475569}
 .stept-cl-body[hidden]{display:none}
 .stept-cl-body p{margin:0 0 6px}
@@ -334,7 +334,7 @@ export class ChecklistWidget {
   private build(): void {
     if (this.pill && this.panel) return
     const side = this.checklist?.theme?.position === 'bottom-left' ? 'left' : 'right'
-    const accent = this.checklist?.theme?.accent || '#6366f1'
+    const accent = this.checklist?.theme?.accent || '#5b46e5'
 
     const pill = node(this.doc, 'button', `stept-cl-pill stept-cl-${side}`)
     pill.style.setProperty('--stept-accent', accent)

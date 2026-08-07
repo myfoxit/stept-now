@@ -36,7 +36,7 @@ from app.models.inbox import ChannelType, Inbox
 from app.services import audit
 
 DEFAULT_WIDGET_CONFIG: dict[str, Any] = {
-    "accent_color": "#6366f1",
+    "accent_color": "#5b46e5",
     "greeting": "Hi! How can we help?",
     # Off by default so inbound conversations land in Unassigned for the team to
     # triage. With it on, a single-member workspace silently pre-claims every

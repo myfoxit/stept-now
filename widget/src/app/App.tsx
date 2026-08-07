@@ -17,7 +17,7 @@ export function App({ controller }: { controller: Controller }) {
     void controller.boot()
   }, [controller])
 
-  const accent = state.config.accent_color || '#6366f1'
+  const accent = state.config.accent_color || '#5b46e5'
   const workspaceName = state.workspace?.name || 'Chat'
   const close = () => controller.requestClose()
 

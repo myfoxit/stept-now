@@ -14,10 +14,19 @@ export default defineConfig({
   },
   integrations: [
     starlight({
-      title: 'Stept Docs',
+      title: 'Stept',
       description:
         'Documentation for Stept — the open-source Intercom + Fin alternative: shared inbox, AI agent, knowledge base, product tours.',
+      // Same mark, palette and type as stepped.ai — see src/styles/stept.css.
+      logo: { src: './public/logo.svg', alt: 'Stept' },
+      customCss: ['./src/styles/stept.css'],
+      favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/myfoxit/stept-now' }],
+      components: {
+        // The docs are one surface of the product, not an island: link back to
+        // the site and the app from the header.
+        SocialIcons: './src/components/HeaderLinks.astro',
+      },
       editLink: {
         baseUrl: 'https://github.com/myfoxit/stept-now/edit/master/docs-site/',
       },

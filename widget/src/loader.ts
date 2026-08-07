@@ -86,7 +86,7 @@ const STYLE_ID = 'stept-loader-style'
 const CSS = `
 #${LAUNCHER_ID}{position:fixed;bottom:20px;z-index:2147482900;width:60px;height:60px;
   border-radius:50%;border:0;cursor:pointer;box-shadow:0 6px 20px rgba(15,23,42,.28);
-  background:var(--stept-accent,#6366f1);color:#fff;display:flex;align-items:center;
+  background:var(--stept-accent,#5b46e5);color:#fff;display:flex;align-items:center;
   justify-content:center;transition:transform .15s ease,opacity .15s ease}
 #${LAUNCHER_ID}:hover{transform:scale(1.05)}
 #${LAUNCHER_ID}.stept-right{right:20px}
@@ -119,7 +119,7 @@ class WidgetHost {
   private apiBase: string
   private widgetKey: string
   private position: 'left' | 'right' = 'right'
-  private accent = '#6366f1'
+  private accent = '#5b46e5'
 
   private launcher: HTMLButtonElement | null = null
   private badge: HTMLSpanElement | null = null

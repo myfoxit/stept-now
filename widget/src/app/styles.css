@@ -1,13 +1,17 @@
-/* Stept messenger — self-contained styles (no external fonts / CDN). */
+/* Stept messenger — self-contained styles (no external fonts / CDN).
+ *
+ * Palette matches the marketing site and the app (zinc neutrals, the same
+ * indigo). The type stack stays system-native on purpose: this bundle loads on
+ * customer pages, and a webfont would cost more than the whole widget. */
 
 :root {
-  --sw-accent: #6366f1;
+  --sw-accent: #5b46e5;
   --sw-bg: #ffffff;
-  --sw-panel: #f8fafc;
-  --sw-text: #0f172a;
-  --sw-muted: #64748b;
-  --sw-border: #e2e8f0;
-  --sw-bubble-them: #f1f5f9;
+  --sw-panel: #fafafa;
+  --sw-text: #09090b;
+  --sw-muted: #71717a;
+  --sw-border: #e4e4e7;
+  --sw-bubble-them: #f4f4f5;
   --sw-radius: 16px;
   --sw-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
@@ -129,6 +133,7 @@ body {
   margin: 0 0 4px;
   font-size: 24px;
   font-weight: 700;
+  letter-spacing: -0.03em;
 }
 .sw-hero-sub {
   margin: 0;

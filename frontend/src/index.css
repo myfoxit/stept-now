@@ -1,8 +1,18 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource-variable/jetbrains-mono';
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Design tokens — kept in lockstep with the marketing site
+ * (landing/src/styles/global.css). The system is neutral-first: `--primary` is
+ * near-black so primary actions read as solid and serious, and the indigo lives
+ * in `--brand`, reserved for the mark, AI moments, links and focus rings. Change
+ * one side and you must change the other, or the product and the site drift
+ * apart again.
+ */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -10,8 +20,13 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.488 0.217 275.6);
+  /* Primary action = near-black, matching the landing's solid CTA. */
+  --primary: oklch(0.145 0 0);
   --primary-foreground: oklch(0.985 0 0);
+  /* Brand/AI accent — the indigo the mark is drawn in. */
+  --brand: oklch(0.488 0.217 275.6);
+  --brand-foreground: oklch(0.985 0 0);
+  --brand-soft: oklch(0.488 0.217 275.6 / 0.08);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -46,8 +61,11 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.185 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.673 0.182 276.7);
+  --primary: oklch(0.985 0 0);
   --primary-foreground: oklch(0.145 0 0);
+  --brand: oklch(0.673 0.182 276.7);
+  --brand-foreground: oklch(0.145 0 0);
+  --brand-soft: oklch(0.673 0.182 276.7 / 0.14);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -83,6 +101,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -119,6 +140,17 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  code,
+  pre,
+  kbd {
+    font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
   }
   html,
   body,

@@ -328,7 +328,7 @@ const CSS = `
 .stept-tour-root.stept-veil{pointer-events:auto;background:rgba(15,23,42,.55)}
 .stept-tour-hole{position:fixed;z-index:2147483000;border-radius:8px;
   box-shadow:0 0 0 9999px rgba(15,23,42,.55);transition:all .18s ease;pointer-events:none;
-  outline:2px solid var(--stept-accent,#6366f1);outline-offset:2px}
+  outline:2px solid var(--stept-accent,#5b46e5);outline-offset:2px}
 .stept-tour-hole.stept-nodim{box-shadow:none}
 .stept-tour-hole[hidden]{display:none}
 .stept-tour-tip{position:fixed;z-index:2147483001;max-width:340px;width:calc(100vw - 32px);
@@ -336,7 +336,7 @@ const CSS = `
   padding:16px 16px 12px;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   box-sizing:border-box}
 .stept-tour-tip[hidden]{display:none}
-.stept-tour-tip:focus{outline:2px solid var(--stept-accent,#6366f1);outline-offset:2px}
+.stept-tour-tip:focus{outline:2px solid var(--stept-accent,#5b46e5);outline-offset:2px}
 .stept-tour-tip.stept-centered{top:50%;left:50%;transform:translate(-50%,-50%);max-width:420px}
 .stept-tour-tip h4{margin:0 0 6px;font-size:15px;font-weight:600}
 .stept-tour-tip p{margin:0 0 8px;color:#334155}
@@ -355,18 +355,18 @@ const CSS = `
 .stept-tour-hint{font-size:12px;color:#64748b;margin:0}
 .stept-tour-actions{display:flex;gap:8px}
 .stept-tour-bar{height:3px;border-radius:2px;background:rgba(100,116,139,.22);margin:0 0 10px;overflow:hidden}
-.stept-tour-bar i{display:block;height:100%;background:var(--stept-accent,#6366f1);transition:width .2s ease}
+.stept-tour-bar i{display:block;height:100%;background:var(--stept-accent,#5b46e5);transition:width .2s ease}
 .stept-tour-btn{border:0;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;
   font-family:inherit}
-.stept-tour-btn.primary{background:var(--stept-accent,#6366f1);color:#fff}
+.stept-tour-btn.primary{background:var(--stept-accent,#5b46e5);color:#fff}
 .stept-tour-btn.ghost{background:transparent;color:#475569}
 .stept-tour-close{position:absolute;top:8px;right:8px;border:0;background:transparent;
   font-size:16px;line-height:1;cursor:pointer;color:#94a3b8;padding:4px}
 .stept-tour-badge{display:inline-block;margin:0 0 6px;padding:1px 7px;border-radius:99px;font-size:10px;
-  font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--stept-accent,#6366f1);color:#fff}
+  font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--stept-accent,#5b46e5);color:#fff}
 .stept-tour-banner{position:fixed;left:0;right:0;z-index:2147483001;pointer-events:auto;
   display:flex;align-items:center;gap:12px;padding:12px 16px;box-sizing:border-box;
-  background:var(--stept-banner-bg,var(--stept-accent,#6366f1));color:var(--stept-banner-fg,#fff);
+  background:var(--stept-banner-bg,var(--stept-accent,#5b46e5));color:var(--stept-banner-fg,#fff);
   font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   box-shadow:0 6px 24px rgba(15,23,42,.22)}
 .stept-tour-banner[hidden]{display:none}
@@ -396,7 +396,7 @@ const CSS = `
   border:1px solid currentColor;opacity:.85}
 .stept-tour-banner .stept-tour-close{position:static;color:inherit;opacity:.85}
 .stept-tour-beacon{position:fixed;z-index:2147483001;width:18px;height:18px;border-radius:50%;
-  background:var(--stept-accent,#6366f1);border:0;padding:0;cursor:pointer;pointer-events:auto;
+  background:var(--stept-accent,#5b46e5);border:0;padding:0;cursor:pointer;pointer-events:auto;
   box-shadow:0 0 0 4px rgba(99,102,241,.35);animation:stept-tour-pulse 1.8s ease-out infinite}
 .stept-tour-beacon[hidden]{display:none}
 @keyframes stept-tour-pulse{
@@ -404,7 +404,7 @@ const CSS = `
   70%{box-shadow:0 0 0 14px rgba(99,102,241,0)}
   100%{box-shadow:0 0 0 0 rgba(99,102,241,0)}
 }
-.stept-tour-acting{outline:3px solid var(--stept-accent,#6366f1) !important;outline-offset:2px;
+.stept-tour-acting{outline:3px solid var(--stept-accent,#5b46e5) !important;outline-offset:2px;
   animation:stept-tour-pulse .6s ease-out 1}
 @media (prefers-color-scheme:dark){
   .stept-tour-tip{background:#1e293b;color:#f1f5f9}
@@ -453,7 +453,7 @@ export class TourPlayer {
   constructor(opts: TourPlayerOptions = {}) {
     this.doc = opts.doc ?? document
     this.win = opts.win ?? (this.doc.defaultView as Window & typeof globalThis) ?? window
-    this.accent = opts.accent ?? '#6366f1'
+    this.accent = opts.accent ?? '#5b46e5'
     this.onEvent = opts.onEvent ?? (() => {})
     this.progressKey = opts.progressKey ?? 'stept:tour-progress'
     this.apiBase = opts.apiBase ?? ''

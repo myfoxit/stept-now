@@ -80,33 +80,33 @@ const CSS = `
 .stept-sv-card[hidden]{display:none}
 .stept-sv-card.stept-sv-slideout{right:20px;bottom:92px}
 .stept-sv-card.stept-sv-modal{top:50%;left:50%;transform:translate(-50%,-50%);width:400px}
-.stept-sv-card:focus{outline:2px solid var(--stept-accent,#6366f1);outline-offset:2px}
+.stept-sv-card:focus{outline:2px solid var(--stept-accent,#5b46e5);outline-offset:2px}
 .stept-sv-close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:#94a3b8;
   font-size:16px;line-height:1;cursor:pointer;padding:4px}
 .stept-sv-q{margin:0 0 12px;font-size:15px;font-weight:600;padding-right:16px}
 .stept-sv-nps{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 8px}
 .stept-sv-nps button{flex:1 0 auto;min-width:26px;border:1px solid rgba(100,116,139,.35);background:transparent;
   border-radius:6px;padding:6px 0;font:600 12px/1 inherit;color:inherit;cursor:pointer}
-.stept-sv-nps button[aria-pressed="true"]{background:var(--stept-accent,#6366f1);color:#fff;
-  border-color:var(--stept-accent,#6366f1)}
+.stept-sv-nps button[aria-pressed="true"]{background:var(--stept-accent,#5b46e5);color:#fff;
+  border-color:var(--stept-accent,#5b46e5)}
 .stept-sv-scale{display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin:0 0 12px}
 .stept-sv-stars{display:flex;gap:6px;margin:0 0 12px}
 .stept-sv-stars button{border:0;background:transparent;font-size:26px;line-height:1;cursor:pointer;padding:0;
   color:rgba(100,116,139,.45)}
-.stept-sv-stars button[aria-pressed="true"]{color:var(--stept-accent,#6366f1)}
+.stept-sv-stars button[aria-pressed="true"]{color:var(--stept-accent,#5b46e5)}
 .stept-sv-options{display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
 .stept-sv-options button{border:1px solid rgba(100,116,139,.35);background:transparent;border-radius:8px;
   padding:8px 10px;text-align:left;font:inherit;color:inherit;cursor:pointer}
-.stept-sv-options button[aria-pressed="true"]{border-color:var(--stept-accent,#6366f1);
+.stept-sv-options button[aria-pressed="true"]{border-color:var(--stept-accent,#5b46e5);
   background:rgba(99,102,241,.12)}
 .stept-sv-text{width:100%;box-sizing:border-box;min-height:72px;border-radius:8px;padding:8px;font:inherit;
   border:1px solid rgba(100,116,139,.35);background:transparent;color:inherit;margin:0 0 12px;resize:vertical}
 .stept-sv-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .stept-sv-dots{display:flex;gap:5px}
 .stept-sv-dots i{width:6px;height:6px;border-radius:50%;background:rgba(100,116,139,.35)}
-.stept-sv-dots i.on{background:var(--stept-accent,#6366f1)}
+.stept-sv-dots i.on{background:var(--stept-accent,#5b46e5)}
 .stept-sv-btn{border:0;border-radius:8px;padding:7px 14px;font:600 13px/1.2 inherit;cursor:pointer;
-  background:var(--stept-accent,#6366f1);color:#fff}
+  background:var(--stept-accent,#5b46e5);color:#fff}
 .stept-sv-btn[disabled]{opacity:.5;cursor:default}
 .stept-sv-btn.ghost{background:transparent;color:#64748b}
 .stept-sv-thanks p{margin:0}
@@ -237,7 +237,7 @@ export class SurveyWidget {
 
   private build(survey: Survey): void {
     const modal = survey.presentation === 'modal'
-    const accent = survey.theme?.accent || '#6366f1'
+    const accent = survey.theme?.accent || '#5b46e5'
     if (modal) {
       const veil = node(this.doc, 'div', 'stept-sv-veil')
       veil.onclick = () => this.dismiss()
