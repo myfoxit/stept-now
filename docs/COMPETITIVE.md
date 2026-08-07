@@ -1,5 +1,9 @@
 # Stept — Competitive Feature Analysis
 
+> **Superseded for Chatwoot by `docs/CHATWOOT-BACKLOG.md` (2026-08-07).** Every 🚧 row below shipped
+> in W6; the Chatwoot columns here predate W6–W8 and Chatwoot's own Captain/voice work.
+> The Onyx and DAP comparisons below are still current.
+
 > Written 2026-07-31 from source-level analysis of fresh Chatwoot + Onyx clones
 > (`docs/research/chatwoot-gaps.md`, `docs/research/onyx-gaps.md`) plus product
 > knowledge of Intercom and the DAP leaders (Pendo, WalkMe, Appcues, Userpilot).
