@@ -8,6 +8,7 @@ import { useHasPerm } from '@/stores/auth'
 import { ApiKeysPanel } from '../components/ApiKeysPanel'
 import { AttributesPanel } from '../components/AttributesPanel'
 import { AuditPanel } from '../components/AuditPanel'
+import { BillingPanel } from '../components/BillingPanel'
 import { ChannelsPanel } from '../components/ChannelsPanel'
 import { IntegrationsPanel } from '../components/IntegrationsPanel'
 import { McpPanel } from '../components/McpPanel'
@@ -25,6 +26,7 @@ const PANELS: Record<string, () => ReactElement> = {
   roles: () => <RolesPanel />,
   channels: () => <ChannelsPanel />,
   integrations: () => <IntegrationsPanel />,
+  billing: () => <BillingPanel />,
   sla: () => <SlaPanel />,
   'working-hours': () => <WorkingHoursPanel />,
   attributes: () => <AttributesPanel />,
@@ -44,6 +46,7 @@ export function Component() {
     'integrations:manage': useHasPerm('integrations:manage'),
     'apikeys:manage': useHasPerm('apikeys:manage'),
     'audit:read': useHasPerm('audit:read'),
+    'workspace:manage': useHasPerm('workspace:manage'),
   }
   const visible = SECTIONS.filter((s) => !s.perm || permMap[s.perm])
 

@@ -158,3 +158,86 @@ async def test_refresh_scan_job_registered_and_runs(workspace_ctx):
     reset_jobs_state()
     ran = await run_due()
     assert "knowledge_refresh_scan" in ran  # no due sources → still a clean no-op run
+
+
+# ---------------------------------------------------------------------------
+# stuck-sync recovery
+# ---------------------------------------------------------------------------
+
+
+async def make_source_stuck(source_id, *, since):
+    """Simulate a crashed worker: status frozen at "syncing" with every
+    activity stamp (start stamp, updated_at, last_synced_at) aged to `since`.
+    updated_at is set explicitly, which suppresses the onupdate refresh."""
+    from app.core.db import get_session_factory
+    from app.models.knowledge import KnowledgeSource
+
+    async with get_session_factory()() as session:
+        source = await session.get(KnowledgeSource, source_id)
+        source.status = "syncing"
+        source.config = {**source.config, "sync_started_at": since.isoformat()}
+        source.last_synced_at = since
+        source.updated_at = since
+        await session.commit()
+
+
+async def test_stuck_syncing_source_fails_over_after_timeout(client, workspace_ctx):
+    from app.core.db import utcnow
+    from app.rag.tasks import scan_due_sources
+
+    source = await create_urls_source(client, workspace_ctx)  # no refresh_minutes
+    await make_source_stuck(source["id"], since=utcnow() - timedelta(minutes=45))
+
+    assert await scan_due_sources() == 0  # recovered, but not due (no refresh_minutes)
+    refreshed = await get_source_json(client, workspace_ctx, source["id"])
+    assert refreshed["status"] == "error"
+    assert refreshed["error"] == "sync timed out"
+
+
+async def test_stuck_source_with_refresh_due_is_resynced_in_the_same_scan(client, workspace_ctx):
+    from app.core.db import utcnow
+    from app.rag.tasks import scan_due_sources
+
+    source = await create_urls_source(client, workspace_ctx, refresh_minutes=5)
+    await make_source_stuck(source["id"], since=utcnow() - timedelta(hours=2))
+
+    with respx.mock:
+        respx.get(PAGE_URL).mock(return_value=page_response())
+        assert await scan_due_sources() == 1  # failed over, then immediately re-enqueued
+        await drain_tasks()
+
+    refreshed = await get_source_json(client, workspace_ctx, source["id"])
+    assert refreshed["status"] == "idle"  # scheduled refresh resumed
+    assert refreshed["error"] is None
+
+
+async def test_recently_started_sync_is_not_failed_over(client, workspace_ctx):
+    from app.core.db import utcnow
+    from app.rag.tasks import scan_due_sources
+
+    source = await create_urls_source(client, workspace_ctx, refresh_minutes=5)
+    await make_source_stuck(source["id"], since=utcnow() - timedelta(minutes=5))
+
+    assert await scan_due_sources() == 0
+    refreshed = await get_source_json(client, workspace_ctx, source["id"])
+    assert refreshed["status"] == "syncing"  # inside the timeout — leave it alone
+
+
+async def test_sync_records_a_start_stamp_in_config(client, workspace_ctx):
+    from datetime import datetime
+
+    from app.core.db import utcnow
+
+    source = await create_urls_source(client, workspace_ctx)
+    with respx.mock:
+        respx.get(PAGE_URL).mock(return_value=page_response())
+        response = await client.post(
+            f"{workspace_ctx.base}/knowledge/sources/{source['id']}/sync",
+            headers=workspace_ctx.owner_headers,
+        )
+        assert response.status_code == 200
+        await drain_tasks()
+
+    refreshed = await get_source_json(client, workspace_ctx, source["id"])
+    started = datetime.fromisoformat(refreshed["config"]["sync_started_at"])
+    assert utcnow() - started < timedelta(minutes=1)

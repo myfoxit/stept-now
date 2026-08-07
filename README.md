@@ -2,21 +2,25 @@
 
 # Stept
 
-**The open-source, AI-first customer support platform.**
-An Intercom + Fin alternative you can self-host: shared inbox, multi-channel,
-world-class RAG, a configurable AI agent engine with human approval gates, and
-built-in product tours.
+**Open-source Intercom + Fin + Pendo in one box — with an AI agent that
+doesn't just answer, it *shows* and *does*.**
+Shared inbox · AI agent with real tools · knowledge base · help center ·
+product tours. MIT, self-hosted, and its full AI stack runs offline with zero
+API keys.
+
+[stepped.ai](https://stepped.ai) · [docs.stepped.ai](https://docs.stepped.ai) ·
+[Stept Cloud (early access, free)](https://app.stepped.ai/signup)
 
 </div>
 
 ---
 
-> **Status: feature-complete v0.1.** The backend (multi-tenancy, RBAC, conversations,
-> channels, multi-provider AI, RAG, the agent engine with approval gates, automation,
-> reports, tours), the React dashboard, the embeddable widget, and the Chrome tour
-> recorder are all built and tested — **550+ automated tests** across pytest, vitest, and
-> Playwright, all green with zero external services required. See `docs/PLAN.md` for the
-> build history.
+> **Status: feature-complete v0.1, running in production.** The backend
+> (multi-tenancy, RBAC, conversations, channels, multi-provider AI, RAG, the agent
+> engine with approval gates, automation, reports, tours), the React dashboard, the
+> embeddable widget, and the Chrome tour recorder are all built and tested —
+> **1,900+ automated tests** across pytest, vitest, and Playwright, all green with
+> zero external services required. See `docs/PLAN.md` for the build history.
 
 ## Why Stept
 
@@ -59,6 +63,13 @@ self-hostable and MIT-licensed:
   one-off scheduled sends to a segment; SLA policies with first-response / next-response /
   resolution targets, breach events, and inbox badges. Plus **macros** (one-click
   multi-action shortcuts) and 👍/👎 feedback on AI answers.
+- 🖐️ **An agent with hands** — with the visitor's explicit consent, the agent can see the
+  page they're on and act on it: play the right product tour, compose an on-the-spot
+  walkthrough with coach-marks, or click/fill/navigate for them — capped per run, with
+  password fields off-limits and approval gates on anything sensitive.
+- 🔌 **MCP server built in** — every workspace (and every agent) is an MCP endpoint:
+  Claude, Cursor or any MCP client can search your knowledge, read conversations, create
+  docs, and even run tours in a real browser through the Chrome extension bridge.
 - 🔐 **Enterprise-ready** — multi-workspace tenancy, RBAC with builtin + custom roles,
   team management, invitations, API keys with scopes, audit log, outbound webhooks.
 - 🧪 **Built to iterate** — backend (pytest), frontend (vitest), and end-to-end
@@ -85,7 +96,7 @@ You need **Python 3.12+** (with [uv](https://docs.astral.sh/uv/)) and **Node 20+
 SQLite, in-memory queues, and the mock AI provider.
 
 ```bash
-git clone <your-fork-url> stept && cd stept
+git clone https://github.com/myfoxit/stept-now stept && cd stept
 make setup          # installs backend (uv) + frontend (pnpm) deps
 make seed           # creates a demo workspace + data (idempotent)
 make dev            # backend on :8600, dashboard on :5273

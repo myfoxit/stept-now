@@ -13,8 +13,120 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** Inbound Email */
+    /**
+     * Inbound Email
+     * @description Legacy bare endpoint (one release of back-compat). Routing resolves the
+     *     inbox; once that inbox carries a webhook_token the ``?token=`` query param
+     *     must match, and unresolvable mail 404s instead of being accepted.
+     */
     post: operations['inbound_email_api_channels_email_inbound_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/email/inbound/mailgun/{inbox_id}/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Inbound Mailgun */
+    post: operations['inbound_mailgun_api_channels_email_inbound_mailgun__inbox_id___token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/email/inbound/postmark/{inbox_id}/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Inbound Postmark */
+    post: operations['inbound_postmark_api_channels_email_inbound_postmark__inbox_id___token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/email/inbound/resend/{inbox_id}/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Inbound Resend */
+    post: operations['inbound_resend_api_channels_email_inbound_resend__inbox_id___token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/email/inbound/sendgrid/{inbox_id}/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Inbound Sendgrid */
+    post: operations['inbound_sendgrid_api_channels_email_inbound_sendgrid__inbox_id___token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/email/inbound/ses/{inbox_id}/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Inbound Ses
+     * @description SNS envelope: confirm subscriptions (SSRF-guarded GET), then unwrap SES
+     *     receipt notifications carrying the raw MIME in ``content``. Receipts using
+     *     the S3 action (no inline content) are acknowledged but ignored.
+     */
+    post: operations['inbound_ses_api_channels_email_inbound_ses__inbox_id___token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/channels/email/inbound/{inbox_id}/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Inbound Email Tokened */
+    post: operations['inbound_email_tokened_api_channels_email_inbound__inbox_id___token__post']
     delete?: never
     options?: never
     head?: never
@@ -160,6 +272,60 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/integrations/oauth/{provider}/callback': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Oauth Callback */
+    get: operations['oauth_callback_api_integrations_oauth__provider__callback_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/integrations/oauth/{provider}/start': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Oauth Start
+     * @description Retry re-entry: rebuild the authorize redirect from a still-valid state.
+     */
+    get: operations['oauth_start_api_integrations_oauth__provider__start_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/stripe/webhook': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Stripe Webhook */
+    post: operations['stripe_webhook_api_stripe_webhook_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/login': {
     parameters: {
       query?: never
@@ -188,6 +354,60 @@ export interface paths {
     put?: never
     /** Logout */
     post: operations['logout_api_v1_auth_logout_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/oauth/providers': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Social Login Providers
+     * @description Public: which social-login buttons the SPA should render.
+     */
+    get: operations['social_login_providers_api_v1_auth_oauth_providers_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/oauth/{provider}/callback': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Social Login Callback */
+    get: operations['social_login_callback_api_v1_auth_oauth__provider__callback_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/oauth/{provider}/start': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Social Login Start */
+    get: operations['social_login_start_api_v1_auth_oauth__provider__start_get']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -930,6 +1150,57 @@ export interface paths {
     put?: never
     /** Toggle Automation */
     post: operations['toggle_automation_api_v1_w__workspace_id__automations__rule_id__toggle_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/billing': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Billing */
+    get: operations['get_billing_api_v1_w__workspace_id__billing_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/billing/checkout-session': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Create Checkout Session */
+    post: operations['create_checkout_session_api_v1_w__workspace_id__billing_checkout_session_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/billing/portal-session': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Create Portal Session */
+    post: operations['create_portal_session_api_v1_w__workspace_id__billing_portal_session_post']
     delete?: never
     options?: never
     head?: never
@@ -1780,6 +2051,92 @@ export interface paths {
     put: operations['set_working_hours_api_v1_w__workspace_id__inboxes__inbox_id__working_hours_put']
     post?: never
     delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/integrations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Integrations */
+    get: operations['list_integrations_api_v1_w__workspace_id__integrations_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/integrations/connections/{connection_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Disconnect Integration */
+    delete: operations['disconnect_integration_api_v1_w__workspace_id__integrations_connections__connection_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/integrations/connections/{connection_id}/reconnect': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Reconnect Integration */
+    post: operations['reconnect_integration_api_v1_w__workspace_id__integrations_connections__connection_id__reconnect_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/integrations/{provider}/connect': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Connect Integration */
+    post: operations['connect_integration_api_v1_w__workspace_id__integrations__provider__connect_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/integrations/{provider}/credentials': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /** Put Credentials */
+    put: operations['put_credentials_api_v1_w__workspace_id__integrations__provider__credentials_put']
+    post?: never
+    /** Delete Credentials */
+    delete: operations['delete_credentials_api_v1_w__workspace_id__integrations__provider__credentials_delete']
     options?: never
     head?: never
     patch?: never
@@ -4413,6 +4770,38 @@ export interface components {
       /** Text Color */
       text_color?: string | null
     }
+    /**
+     * BillingOut
+     * @description Plan + usage readout for the settings billing panel.
+     *
+     *     `billing_enabled` is False on self-hosted installs (no Stripe key
+     *     configured) — the frontend hides the whole panel body then.
+     */
+    BillingOut: {
+      /** Ai Runs This Period */
+      ai_runs_this_period: number
+      /** Billing Enabled */
+      billing_enabled: boolean
+      /**
+       * Cancel At Period End
+       * @default false
+       */
+      cancel_at_period_end: boolean
+      /** Current Period End */
+      current_period_end?: string | null
+      /** Included Ai Runs */
+      included_ai_runs: number
+      /** Member Count */
+      member_count: number
+      /** Plan */
+      plan: string
+      /** Publishable Key */
+      publishable_key?: string | null
+      /** Seats */
+      seats: number
+      /** Status */
+      status: string
+    }
     /** Body_upload_contact_import_api_v1_w__workspace_id__contacts_imports_post */
     Body_upload_contact_import_api_v1_w__workspace_id__contacts_imports_post: {
       /** File */
@@ -4835,6 +5224,22 @@ export interface components {
       theme?: components['schemas']['ChecklistTheme'] | null
       trigger?: components['schemas']['ChecklistTrigger'] | null
     }
+    /**
+     * CheckoutSessionCreate
+     * @description Only paid plans are checkout-able; downgrades go through the portal.
+     */
+    CheckoutSessionCreate: {
+      /**
+       * Plan
+       * @enum {string}
+       */
+      plan: 'cloud' | 'business'
+    }
+    /** CheckoutSessionOut */
+    CheckoutSessionOut: {
+      /** Url */
+      url: string
+    }
     /** ChunkPreviewOut */
     ChunkPreviewOut: {
       /** Content */
@@ -4953,6 +5358,50 @@ export interface components {
       op: 'eq' | 'neq' | 'contains' | 'in' | 'exists'
       /** Value */
       value?: unknown
+    }
+    /** ConnectIn */
+    ConnectIn: {
+      /**
+       * Return To
+       * @default /settings/integrations
+       */
+      return_to: string
+    }
+    /** ConnectOut */
+    ConnectOut: {
+      /** Authorize Url */
+      authorize_url: string
+    }
+    /** ConnectionOut */
+    ConnectionOut: {
+      /** Account Label */
+      account_label?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Id */
+      id: string
+      /**
+       * Meta
+       * @default {}
+       */
+      meta: {
+        [key: string]: unknown
+      }
+      /** Provider */
+      provider: string
+      /**
+       * Scopes
+       * @default []
+       */
+      scopes: string[]
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'connected' | 'reauth_required' | 'error' | 'revoked'
     }
     /** ContactBlockRequest */
     ContactBlockRequest: {
@@ -5405,6 +5854,45 @@ export interface components {
       citations: components['schemas']['Citation'][]
       /** Content */
       content: string
+    }
+    /** CredentialIn */
+    CredentialIn: {
+      /** Client Id */
+      client_id: string
+      /** Client Secret */
+      client_secret?: string | null
+      /**
+       * Extra
+       * @default {}
+       */
+      extra: {
+        [key: string]: string
+      }
+    }
+    /**
+     * CredentialOut
+     * @description The operator-visible view of an app credential (secret never echoed).
+     */
+    CredentialOut: {
+      /** Client Id */
+      client_id?: string | null
+      /**
+       * Fields
+       * @default []
+       */
+      fields: string[]
+      /**
+       * From Env
+       * @default false
+       */
+      from_env: boolean
+      /**
+       * Has Secret
+       * @default false
+       */
+      has_secret: boolean
+      /** Redirect Uri */
+      redirect_uri: string
     }
     /** CsatOut */
     CsatOut: {
@@ -5972,7 +6460,11 @@ export interface components {
       /** Identity Secret */
       identity_secret: string
     }
-    /** InboundEmail */
+    /**
+     * InboundEmail
+     * @description The one internal shape every inbound source (generic webhook, ESP
+     *     webhooks, IMAP poll) parses into.
+     */
     InboundEmail: {
       /** From */
       from?: string | null
@@ -6084,6 +6576,11 @@ export interface components {
       secrets?: {
         [key: string]: unknown
       } | null
+    }
+    /** IntegrationsOut */
+    IntegrationsOut: {
+      /** Providers */
+      providers: components['schemas']['ProviderOut'][]
     }
     /** InvitationAccept */
     InvitationAccept: {
@@ -6736,6 +7233,11 @@ export interface components {
       collections: components['schemas']['PortalCollectionOut'][]
       workspace: components['schemas']['PortalWorkspaceOut']
     }
+    /** PortalSessionOut */
+    PortalSessionOut: {
+      /** Url */
+      url: string
+    }
     /** PortalWorkspaceOut */
     PortalWorkspaceOut: {
       /** Logo Url */
@@ -6752,6 +7254,35 @@ export interface components {
       expires_minutes: number
       /** Token */
       token: string
+    }
+    /** ProviderOut */
+    ProviderOut: {
+      /**
+       * Auth
+       * @enum {string}
+       */
+      auth: 'oauth2' | 'token' | 'none'
+      /**
+       * Category
+       * @enum {string}
+       */
+      category: 'email' | 'knowledge' | 'channel' | 'app'
+      /** Configured */
+      configured: boolean
+      /**
+       * Connections
+       * @default []
+       */
+      connections: components['schemas']['ConnectionOut'][]
+      credential?: components['schemas']['CredentialOut'] | null
+      /** Description */
+      description: string
+      /** Doc Slug */
+      doc_slug: string
+      /** Id */
+      id: string
+      /** Name */
+      name: string
     }
     /** ProviderTestRequest */
     ProviderTestRequest: {
@@ -7368,7 +7899,17 @@ export interface components {
        * Type
        * @enum {string}
        */
-      type: 'files' | 'urls' | 'text' | 'sitemap' | 'crawl' | 'github' | 'notion'
+      type:
+        | 'files'
+        | 'urls'
+        | 'text'
+        | 'sitemap'
+        | 'crawl'
+        | 'github'
+        | 'notion'
+        | 'confluence'
+        | 'gdrive'
+        | 'zendesk'
     }
     /** SourceOut */
     SourceOut: {
@@ -8701,9 +9242,225 @@ export type $defs = Record<string, never>
 export interface operations {
   inbound_email_api_channels_email_inbound_post: {
     parameters: {
-      query?: never
+      query?: {
+        token?: string
+      }
       header?: never
       path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InboundEmail']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  inbound_mailgun_api_channels_email_inbound_mailgun__inbox_id___token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  inbound_postmark_api_channels_email_inbound_postmark__inbox_id___token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          [key: string]: unknown
+        }
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  inbound_resend_api_channels_email_inbound_resend__inbox_id___token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  inbound_sendgrid_api_channels_email_inbound_sendgrid__inbox_id___token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  inbound_ses_api_channels_email_inbound_ses__inbox_id___token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  inbound_email_tokened_api_channels_email_inbound__inbox_id___token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        token: string
+      }
       cookie?: never
     }
     requestBody: {
@@ -9098,6 +9855,96 @@ export interface operations {
       }
     }
   }
+  oauth_callback_api_integrations_oauth__provider__callback_get: {
+    parameters: {
+      query?: {
+        code?: string | null
+        state?: string | null
+        error?: string | null
+      }
+      header?: never
+      path: {
+        provider: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  oauth_start_api_integrations_oauth__provider__start_get: {
+    parameters: {
+      query: {
+        state: string
+      }
+      header?: never
+      path: {
+        provider: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  stripe_webhook_api_stripe_webhook_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+    }
+  }
   login_api_v1_auth_login_post: {
     parameters: {
       query?: never
@@ -9147,6 +9994,97 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Msg']
+        }
+      }
+    }
+  }
+  social_login_providers_api_v1_auth_oauth_providers_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: string[]
+          }
+        }
+      }
+    }
+  }
+  social_login_callback_api_v1_auth_oauth__provider__callback_get: {
+    parameters: {
+      query?: {
+        code?: string | null
+        state?: string | null
+        error?: string | null
+      }
+      header?: never
+      path: {
+        provider: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  social_login_start_api_v1_auth_oauth__provider__start_get: {
+    parameters: {
+      query?: {
+        next?: string | null
+        invite?: string | null
+      }
+      header?: never
+      path: {
+        provider: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }
@@ -11211,6 +12149,103 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['AutomationRuleOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_billing_api_v1_w__workspace_id__billing_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BillingOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_checkout_session_api_v1_w__workspace_id__billing_checkout_session_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CheckoutSessionCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CheckoutSessionOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_portal_session_api_v1_w__workspace_id__billing_portal_session_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PortalSessionOut']
         }
       }
       /** @description Validation Error */
@@ -13648,6 +14683,209 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['WorkingHoursOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_integrations_api_v1_w__workspace_id__integrations_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IntegrationsOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  disconnect_integration_api_v1_w__workspace_id__integrations_connections__connection_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        connection_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reconnect_integration_api_v1_w__workspace_id__integrations_connections__connection_id__reconnect_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        connection_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ConnectIn'] | null
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ConnectOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  connect_integration_api_v1_w__workspace_id__integrations__provider__connect_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        provider: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ConnectIn'] | null
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ConnectOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  put_credentials_api_v1_w__workspace_id__integrations__provider__credentials_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        provider: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CredentialIn']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CredentialOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_credentials_api_v1_w__workspace_id__integrations__provider__credentials_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        provider: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
         }
       }
       /** @description Validation Error */

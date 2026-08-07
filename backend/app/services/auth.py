@@ -31,6 +31,14 @@ async def signup(session: AsyncSession, *, email: str, name: str, password: str)
 async def authenticate(session: AsyncSession, *, email: str, password: str) -> User:
     email = email.strip().lower()
     user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if user is not None and user.password_hash is None:
+        # Social-login-only account: no password can ever match, and the generic
+        # message would steer the user to password reset instead of the button
+        # that works.
+        raise UnauthorizedError(
+            "This account uses social login — continue with Google or GitHub, "
+            "or set a password via password reset"
+        )
     if user is None or not security.verify_password(password, user.password_hash):
         raise UnauthorizedError("Invalid email or password")
     user.last_seen_at = utcnow()

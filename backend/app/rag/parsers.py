@@ -70,6 +70,9 @@ def normalize_mime(filename: str, mime: str | None) -> str | None:
         # Some browsers send text/x-markdown or application/octet-stream.
         if mime in ("text/x-markdown", "application/x-markdown"):
             return "text/markdown"
+        # XHTML parses fine with the lxml-backed HTML extractor.
+        if mime == "application/xhtml+xml":
+            return "text/html"
     lowered = filename.lower()
     for extension, extension_mime in _EXTENSION_MIME.items():
         if lowered.endswith(extension):

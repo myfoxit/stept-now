@@ -81,6 +81,51 @@ def test_robots_ignores_comments_and_casing():
     assert rules.allows("https://docs.example.com/docs/private") is False
 
 
+def test_robots_star_wildcards_match_any_run_of_characters():
+    rules = parse_robots("User-agent: *\nDisallow: /docs/*/draft\nDisallow: /private*\n")
+    assert rules.allows("https://x.example.com/docs/guide/draft") is False
+    assert rules.allows("https://x.example.com/docs/a/b/draft") is False  # * spans slashes
+    assert rules.allows("https://x.example.com/docs/guide") is True
+    assert rules.allows("https://x.example.com/privateer") is False  # prefix + wildcard
+    assert rules.allows("https://x.example.com/public") is True
+
+
+def test_robots_dollar_anchors_the_end_of_the_path():
+    rules = parse_robots("User-agent: *\nDisallow: /*.pdf$\n")
+    assert rules.allows("https://x.example.com/docs/manual.pdf") is False
+    assert rules.allows("https://x.example.com/docs/manual.pdfs") is True  # not at the end
+    assert rules.allows("https://x.example.com/docs/manual") is True
+
+    literal = parse_robots("User-agent: *\nDisallow: /a$b\n")  # mid-pattern $ is literal
+    assert literal.allows("https://x.example.com/a$b/c") is False
+    assert literal.allows("https://x.example.com/ab/c") is True
+
+
+def test_robots_wildcard_allow_still_beats_disallow_by_specificity():
+    rules = parse_robots("User-agent: *\nDisallow: /docs/*\nAllow: /docs/public/*\n")
+    assert rules.allows("https://x.example.com/docs/secret") is False
+    assert rules.allows("https://x.example.com/docs/public/guide") is True
+
+
+def test_robots_crawl_delay_parsed_capped_and_star_group_only():
+    assert parse_robots("User-agent: *\nCrawl-delay: 3\n").crawl_delay == 3.0
+    assert parse_robots("User-agent: *\nCrawl-delay: 99\n").crawl_delay == 10.0  # capped
+    assert parse_robots("User-agent: googlebot\nCrawl-delay: 3\n").crawl_delay is None
+    assert parse_robots("User-agent: *\nCrawl-delay: soon\n").crawl_delay is None
+    assert parse_robots("User-agent: *\nCrawl-delay: -1\n").crawl_delay is None
+
+
+def test_robots_sitemap_lines_collected_anywhere_in_the_file():
+    rules = parse_robots(
+        "Sitemap: https://x.example.com/s1.xml\n"
+        "User-agent: *\nDisallow: /private\n"
+        "Sitemap: https://x.example.com/s2.xml\n"
+        "Sitemap: not-a-url\n"
+    )
+    assert rules.sitemaps == ["https://x.example.com/s1.xml", "https://x.example.com/s2.xml"]
+    assert rules.allows("https://x.example.com/private") is False  # rules unaffected
+
+
 # ---------------------------------------------------------------------------
 # robots.txt during a crawl
 # ---------------------------------------------------------------------------
@@ -269,12 +314,17 @@ async def test_crawl_fetches_a_whole_depth_level_and_respects_max_pages(client, 
     assert (await get_source_json(client, workspace_ctx, source["id"]))["status"] == "idle"
 
 
-async def test_crawl_collects_per_page_errors_without_losing_good_pages(client, workspace_ctx):
+async def test_crawl_partial_failure_stays_idle_with_summary_and_good_pages(client, workspace_ctx):
+    """A 404 is recorded, an unsupported type is a skip note, a text/plain page
+    is indexed — and because pages succeeded, the source stays "idle" with the
+    summary stored instead of going red."""
     source = await crawl_source(client, workspace_ctx)
     with respx.mock:
         respx.get(ROBOTS_URL).mock(return_value=httpx.Response(404))
         respx.get(BASE).mock(
-            return_value=html_page("Docs Home", "Welcome.", links=("ok", "missing", "plain"))
+            return_value=html_page(
+                "Docs Home", "Welcome.", links=("ok", "missing", "plain", "diagram")
+            )
         )
         respx.get("https://docs.example.com/docs/ok").mock(
             return_value=html_page("Okay", "Okay body.")
@@ -284,17 +334,36 @@ async def test_crawl_collects_per_page_errors_without_losing_good_pages(client, 
         )
         respx.get("https://docs.example.com/docs/plain").mock(
             return_value=httpx.Response(
-                200, content=b"just text", headers={"content-type": "text/plain"}
+                200, content=b"Plain notes body.", headers={"content-type": "text/plain"}
+            )
+        )
+        respx.get("https://docs.example.com/docs/diagram").mock(
+            return_value=httpx.Response(
+                200, content=b"\x89PNG", headers={"content-type": "image/png"}
             )
         )
         await sync_now(client, workspace_ctx, source["id"])
 
     refreshed = await get_source_json(client, workspace_ctx, source["id"])
-    assert refreshed["status"] == "error"
+    assert refreshed["status"] == "idle"  # partial success never reds the source
     assert "/docs/missing: HTTP 404" in refreshed["error"]
-    assert "text/plain" in refreshed["error"]
-    docs = await list_docs(client, workspace_ctx, source["id"])
-    assert {d["title"] for d in docs} == {"Docs Home", "Okay"}  # good pages still indexed
+    assert "image/png" in refreshed["error"]  # unsupported type recorded as a skip
+    docs = {d["title"]: d for d in await list_docs(client, workspace_ctx, source["id"])}
+    assert set(docs) == {"Docs Home", "Okay", "plain"}  # text/plain page indexed too
+    assert docs["plain"]["mime"] == "text/plain"
+    assert docs["plain"]["status"] == "indexed"
+
+
+async def test_crawl_total_failure_sets_error_status(client, workspace_ctx):
+    source = await crawl_source(client, workspace_ctx)
+    with respx.mock:
+        respx.get(ROBOTS_URL).mock(return_value=httpx.Response(404))
+        respx.get(BASE).mock(return_value=httpx.Response(404, content=b"gone"))
+        await sync_now(client, workspace_ctx, source["id"])
+
+    refreshed = await get_source_json(client, workspace_ctx, source["id"])
+    assert refreshed["status"] == "error"  # nothing fetched at all
+    assert "HTTP 404" in refreshed["error"]
 
 
 async def test_crawl_still_enforces_the_two_megabyte_page_cap(client, workspace_ctx):
@@ -312,7 +381,7 @@ async def test_crawl_still_enforces_the_two_megabyte_page_cap(client, workspace_
         await sync_now(client, workspace_ctx, source["id"])
 
     refreshed = await get_source_json(client, workspace_ctx, source["id"])
-    assert refreshed["status"] == "error"
+    assert refreshed["status"] == "idle"  # the home page synced fine
     assert "2MB" in refreshed["error"]
     docs = await list_docs(client, workspace_ctx, source["id"])
     assert [d["title"] for d in docs] == ["Docs Home"]

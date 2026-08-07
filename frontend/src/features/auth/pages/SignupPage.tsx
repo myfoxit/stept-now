@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { ApiError } from '@/api/client'
 import { authApi } from '@/features/auth/api'
 import { AuthCard } from '@/features/auth/components/AuthCard'
+import { SocialLoginButtons } from '@/features/auth/components/SocialLoginButtons'
 import { FieldError } from '@/features/auth/pages/LoginPage'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +59,7 @@ export function Component() {
         </p>
       }
     >
+      <SocialLoginButtons next="/" inviteToken={inviteToken} />
       <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         <div className="grid gap-2">
           <Label htmlFor="name">Name</Label>

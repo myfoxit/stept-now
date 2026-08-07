@@ -1,14 +1,14 @@
-"""Users (global accounts) and refresh-token records."""
+"""Users (global accounts), linked social identities, and refresh-token records."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import GUID, Base, PortableJSON, UTCDateTime
+from app.core.db import GUID, Base, PortableJSON, UTCDateTime, utcnow
 from app.models.base import TimestampMixin, pk
 
 
@@ -18,11 +18,37 @@ class User(TimestampMixin, Base):
     id: Mapped[str] = pk()
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(300), nullable=False)
+    # NULL ⇒ social-login-only account (signed up via Google/GitHub); such users
+    # can set a password later through the password-reset flow.
+    password_hash: Mapped[str | None] = mapped_column(String(300))
     avatar_url: Mapped[str | None] = mapped_column(String(500))
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     preferences: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
+
+
+class UserIdentity(Base):
+    """External identity-provider account linked to a user (social login).
+
+    One row per (provider, provider_user_id). A user may hold several identities
+    (Google and GitHub) alongside — or instead of — a password.
+    """
+
+    __tablename__ = "user_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="uq_user_identity_provider_account"),
+    )
+
+    id: Mapped[str] = pk()
+    user_id: Mapped[str] = mapped_column(
+        GUID, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Email as asserted by the provider at link time (informational; the User row
+    # keeps the canonical address).
+    email: Mapped[str | None] = mapped_column(String(320))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
 class RefreshToken(Base):

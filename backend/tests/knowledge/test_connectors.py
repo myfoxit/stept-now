@@ -232,7 +232,9 @@ async def test_sitemap_resync_prunes_documents_removed_from_listing(client, work
     assert chunk_count == 0
 
 
-async def test_sitemap_resync_with_fetch_failure_never_prunes(client, workspace_ctx):
+async def test_sitemap_resync_with_fetch_failure_keeps_the_doc_and_stays_idle(
+    client, workspace_ctx
+):
     source = await create_source(
         client,
         workspace_ctx,
@@ -261,8 +263,42 @@ async def test_sitemap_resync_with_fetch_failure_never_prunes(client, workspace_
     by_uri = {d["uri"]: d for d in docs}
     assert by_uri["https://site.example.com/b"]["status"] == "failed"
     refreshed = await get_source_json(client, workspace_ctx, source["id"])
-    assert refreshed["status"] == "error"
+    # Partial success: one page fetched fine, so the source stays usable ("idle")
+    # with the per-page failure recorded in the summary.
+    assert refreshed["status"] == "idle"
     assert "404" in refreshed["error"]
+
+
+async def test_sitemap_sync_with_every_page_failing_goes_error_and_never_prunes(
+    client, workspace_ctx
+):
+    source = await create_source(
+        client,
+        workspace_ctx,
+        type="sitemap",
+        config={"sitemap_url": "https://site.example.com/sitemap.xml"},
+    )
+    listing = ["https://site.example.com/a", "https://site.example.com/b"]
+    with respx.mock:
+        respx.get("https://site.example.com/sitemap.xml").mock(
+            return_value=sitemap_response(listing)
+        )
+        respx.get("https://site.example.com/a").mock(return_value=html_page("Alpha", "A ok."))
+        respx.get("https://site.example.com/b").mock(return_value=html_page("Beta", "B ok."))
+        await sync_now(client, workspace_ctx, source["id"])
+
+    with respx.mock:  # total outage — nothing fetched at all
+        respx.get("https://site.example.com/sitemap.xml").mock(
+            return_value=sitemap_response(listing)
+        )
+        respx.get("https://site.example.com/a").mock(return_value=httpx.Response(404))
+        respx.get("https://site.example.com/b").mock(return_value=httpx.Response(404))
+        await sync_now(client, workspace_ctx, source["id"])
+
+    refreshed = await get_source_json(client, workspace_ctx, source["id"])
+    assert refreshed["status"] == "error"  # nothing fetched → the sync failed
+    docs = await list_docs(client, workspace_ctx, source["id"])
+    assert len(docs) == 2  # and a failed sync never prunes
 
 
 # ---------------------------------------------------------------------------

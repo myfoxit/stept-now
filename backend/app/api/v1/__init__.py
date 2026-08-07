@@ -18,7 +18,9 @@ from app.api.v1 import (
     articles,
     audit,
     auth,
+    auth_oauth,
     automations,
+    billing,
     campaigns,
     canned_responses,
     checklists,
@@ -53,6 +55,7 @@ api_router = APIRouter()
 # global (no workspace scope)
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(auth_oauth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(me.router, tags=["me"])
 api_router.include_router(workspaces.router, tags=["workspaces"])
 
@@ -81,6 +84,7 @@ api_router.include_router(agent_runs.router, prefix=WS, tags=["agent-runs"])
 api_router.include_router(approvals.router, prefix=WS, tags=["approvals"])
 api_router.include_router(mcp_approvals.router, prefix=WS, tags=["mcp-approvals"])
 api_router.include_router(automations.router, prefix=WS, tags=["automations"])
+api_router.include_router(billing.router, prefix=WS, tags=["billing"])
 api_router.include_router(macros.router, prefix=WS, tags=["macros"])
 api_router.include_router(campaigns.router, prefix=WS, tags=["campaigns"])
 api_router.include_router(slas.router, prefix=WS, tags=["slas"])

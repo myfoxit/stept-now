@@ -191,10 +191,11 @@ async def test_gdrive_pdf_skip_is_recorded_but_pruning_still_runs(
     docs = await list_docs(client, workspace_ctx, source["id"])
     assert [d["uri"] for d in docs] == ["https://drive.example.com/view/f1"]  # guide.md pruned
     refreshed = await get_source_json(client, workspace_ctx, source["id"])
-    # The skip is recorded in the sync error summary (contract: never silent)…
+    # The skip is recorded in the sync summary (contract: never silent), but a
+    # skip is not an error — the source stays "idle".
     assert "report.pdf" in refreshed["error"]
     assert "not indexed yet" in refreshed["error"]
-    assert refreshed["status"] == "error"
+    assert refreshed["status"] == "idle"
 
 
 async def test_gdrive_oversized_raw_file_skipped_with_note(client, workspace_ctx, monkeypatch):

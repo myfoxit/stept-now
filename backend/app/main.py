@@ -15,6 +15,7 @@ from app.api.channels import channels_router
 from app.api.extension_assets import router as extension_assets_router
 from app.api.oauth_public import router as oauth_public_router
 from app.api.portal import router as portal_router
+from app.api.stripe_webhooks import router as stripe_webhooks_router
 from app.api.v1 import api_router
 from app.api.widget import widget_router
 from app.core.config import get_settings
@@ -202,6 +203,12 @@ def create_app() -> FastAPI:
         oauth_public_router,
         prefix="/api/integrations",
         dependencies=[Depends(RateLimit("integrations_oauth", times=60, seconds=60))],
+    )
+    # Stripe webhooks (unauthenticated; verified by signature on the raw body).
+    application.include_router(
+        stripe_webhooks_router,
+        prefix="/api/stripe",
+        dependencies=[Depends(RateLimit("stripe_webhooks", times=600, seconds=60))],
     )
     application.include_router(extension_assets_router, prefix="/extension-assets")
     application.include_router(app_ws_router)

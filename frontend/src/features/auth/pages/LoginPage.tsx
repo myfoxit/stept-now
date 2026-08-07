@@ -1,12 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertCircle } from 'lucide-react'
 import { useForm } from 'react-hook-form'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
 import { ApiError } from '@/api/client'
 import { AuthCard } from '@/features/auth/components/AuthCard'
+import { SocialLoginButtons } from '@/features/auth/components/SocialLoginButtons'
 import { authApi } from '@/features/auth/api'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,9 +22,19 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+/** Codes the social-login callback can bounce back with (?error=…). */
+const OAUTH_ERRORS: Record<string, string> = {
+  oauth_denied: 'Sign-in was cancelled at the provider. You can try again.',
+  email_unverified:
+    "Your email address isn't verified with that provider. Verify it there first, or sign up with email and password.",
+  oauth_failed: "Social sign-in didn't complete. Try again, or log in with your password.",
+}
+
 export function Component() {
   const navigate = useNavigate()
   const location = useLocation() as { state?: { from?: string } }
+  const [params] = useSearchParams()
+  const oauthError = params.get('error') ? OAUTH_ERRORS[params.get('error') as string] : undefined
   const { setAccessToken, setSession } = useAuthStore()
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
 
@@ -50,6 +63,13 @@ export function Component() {
         </p>
       }
     >
+      {oauthError ? (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle />
+          <AlertDescription>{oauthError}</AlertDescription>
+        </Alert>
+      ) : null}
+      <SocialLoginButtons next="/" />
       <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>

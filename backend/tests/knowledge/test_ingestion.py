@@ -264,7 +264,9 @@ async def test_sync_url_failure_sets_source_error_but_indexes_rest(client, works
         f"{workspace_ctx.base}/knowledge/sources/{source['id']}",
         headers=workspace_ctx.owner_headers,
     )
-    assert refreshed.json()["status"] == "error"
+    # Partial success: the good page synced, so the source stays "idle" with
+    # the per-URL failure recorded in the summary.
+    assert refreshed.json()["status"] == "idle"
     assert "https://site.example.com/missing" in refreshed.json()["error"]
     assert "404" in refreshed.json()["error"]
 
@@ -276,12 +278,20 @@ async def test_sync_url_failure_sets_source_error_but_indexes_rest(client, works
     assert documents.json()["items"][0]["status"] == "indexed"
 
 
-async def test_sync_rejects_oversized_and_non_html(client, workspace_ctx):
+async def test_sync_enforces_size_cap_indexes_plain_text_and_skips_unknown_types(
+    client, workspace_ctx
+):
     source = await create_source(
         client,
         workspace_ctx,
         type="urls",
-        config={"urls": ["https://big.example.com/page", "https://plain.example.com/file"]},
+        config={
+            "urls": [
+                "https://big.example.com/page",
+                "https://plain.example.com/file",
+                "https://img.example.com/logo",
+            ]
+        },
     )
     with respx.mock:
         respx.get("https://big.example.com/page").mock(
@@ -293,7 +303,12 @@ async def test_sync_rejects_oversized_and_non_html(client, workspace_ctx):
         )
         respx.get("https://plain.example.com/file").mock(
             return_value=httpx.Response(
-                200, content=b"just text", headers={"content-type": "text/plain"}
+                200, content=b"Plain text facts.", headers={"content-type": "text/plain"}
+            )
+        )
+        respx.get("https://img.example.com/logo").mock(
+            return_value=httpx.Response(
+                200, content=b"\x89PNG", headers={"content-type": "image/png"}
             )
         )
         await client.post(
@@ -306,11 +321,17 @@ async def test_sync_rejects_oversized_and_non_html(client, workspace_ctx):
         f"{workspace_ctx.base}/knowledge/sources/{source['id']}",
         headers=workspace_ctx.owner_headers,
     )
-    assert refreshed.json()["status"] == "error"
+    # The plain-text page indexed, so the source is "idle"; the oversized page
+    # is an error and the image is a recorded skip — both in the summary.
+    assert refreshed.json()["status"] == "idle"
     assert "2MB" in refreshed.json()["error"]
-    assert "text/plain" in refreshed.json()["error"]
+    assert "image/png" in refreshed.json()["error"]
     documents = await client.get(
         f"{workspace_ctx.base}/knowledge/documents?source_id={source['id']}",
         headers=workspace_ctx.owner_headers,
     )
-    assert documents.json()["total"] == 0
+    assert documents.json()["total"] == 1
+    doc = documents.json()["items"][0]
+    assert doc["uri"] == "https://plain.example.com/file"
+    assert doc["mime"] == "text/plain"
+    assert doc["status"] == "indexed"
