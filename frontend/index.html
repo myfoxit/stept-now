@@ -12,16 +12,8 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script>
-      // Apply persisted theme before first paint to avoid flashing.
-      try {
-        const theme = localStorage.getItem('stept-theme')
-        const dark =
-          theme === 'dark' ||
-          (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-        document.documentElement.classList.toggle('dark', dark)
-      } catch {}
-    </script>
+    <!-- External (not inline) so the dashboard CSP stays script-src 'self'. -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
