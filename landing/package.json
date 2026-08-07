@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Marketing landing page for Stept — the open-source Intercom + Fin alternative.",
+  "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp"]
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
