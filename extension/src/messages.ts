@@ -58,6 +58,40 @@ export type BgToDriver =
   | { type: 'driver-wait-element'; step: TourStep; timeoutMs: number }
   | { type: 'driver-settle'; quietMs: number; maxMs: number };
 
+/** Background → remote-exec island (`exec.content.ts`). Request/response with
+ * envelope `{type:'stept-exec', op, args}` → `{ok, result}` | `{ok:false, error}`.
+ * Ops are the DOM half of the remote-drive contract (docs/MCP-CONTRACTS.md);
+ * the CDP half (screenshot, trusted input, telemetry) lives in `driver/cdp.ts`. */
+export type ExecOpName =
+  | 'compact-dom'
+  | 'resolve-index'
+  | 'describe'
+  | 'prepare'
+  | 'set-value'
+  | 'select-all'
+  | 'select'
+  | 'set-checked'
+  | 'extract'
+  | 'find'
+  | 'page-text'
+  | 'hit-test'
+  | 'overlay-open'
+  | 'scroll-at'
+  | 'dom-settle'
+  | 'url';
+
+export interface BgToExec {
+  type: 'stept-exec';
+  op: ExecOpName;
+  args?: Record<string, unknown>;
+}
+
+export interface ExecResult {
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+}
+
 /** What the driver island reports back for a resolve/prepare. */
 export interface DriverResolveResult {
   found: boolean;
@@ -113,7 +147,9 @@ export type PanelToBg =
   /** resolution of an error surfaced mid-drive */
   | { type: 'drive-decide'; decision: 'skip' | 'abort' | 'retry' }
   | { type: 'picker-start' }
-  | { type: 'clear-picked' };
+  | { type: 'clear-picked' }
+  /** "Let Stept control this browser" — off tears the gateway WS down */
+  | { type: 'set-remote-control'; enabled: boolean };
 
 export type BgToPanel =
   | { type: 'state'; state: PanelState }

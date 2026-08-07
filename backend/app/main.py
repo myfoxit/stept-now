@@ -24,7 +24,10 @@ from app.core.pubsub import get_pubsub, reset_pubsub
 from app.core.queue import get_queue, reset_queue
 from app.core.ratelimit import RateLimit
 from app.core.scheduler import Scheduler
+from app.mcp.agent_endpoint import router as agent_mcp_router
+from app.mcp.mount import McpAuthShim, build_inner_app, run_session_manager
 from app.realtime.app_ws import router as app_ws_router
+from app.realtime.extension_ws import router as extension_ws_router
 from app.realtime.manager import manager as ws_manager
 from app.realtime.widget_ws import router as widget_ws_router
 
@@ -100,6 +103,8 @@ def create_app() -> FastAPI:
         else None
     )
 
+    mcp_inner = build_inner_app()
+
     @contextlib.asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if settings.env != "prod":
@@ -114,7 +119,10 @@ def create_app() -> FastAPI:
             settings.env,
             "sqlite" if settings.is_sqlite else "postgres",
         )
-        yield
+        # The mounted MCP app's own lifespan (its session manager) never runs
+        # by itself — mounted lifespans are a Starlette no-op.
+        async with run_session_manager(mcp_inner):
+            yield
         if scheduler is not None:
             await scheduler.stop()
         await ws_manager.shutdown()
@@ -151,6 +159,10 @@ def create_app() -> FastAPI:
             return Response(
                 status_code=204, headers={**secure_headers, **cors.headers_for(request)}
             )
+        # Bare "/mcp" would 307 off the Starlette Mount; MCP clients don't
+        # reliably follow redirects, so land them on the mounted app directly.
+        if request.scope["path"] == "/mcp":
+            request.scope["path"] = "/mcp/"
         started = time.perf_counter()
         response = await call_next(request)
         for key, value in secure_headers.items():
@@ -187,6 +199,13 @@ def create_app() -> FastAPI:
     application.include_router(extension_assets_router, prefix="/extension-assets")
     application.include_router(app_ws_router)
     application.include_router(widget_ws_router)
+    application.include_router(extension_ws_router)
+
+    # MCP: the per-agent JSON-RPC routes MUST be registered before the /mcp
+    # mount (routes are matched in order; the mount would otherwise swallow
+    # every path under its prefix).
+    application.include_router(agent_mcp_router)
+    application.mount("/mcp", McpAuthShim(mcp_inner))
 
     # Built widget assets (loader.js + iframe app), when present.
     widget_dist = Path(__file__).resolve().parents[2] / "widget" / "dist"

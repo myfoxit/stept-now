@@ -209,6 +209,118 @@ export interface DriveState {
 }
 
 // ---------------------------------------------------------------------------
+// remote drive (MCP → backend gateway → this extension)
+// ---------------------------------------------------------------------------
+
+/** One op the server may ask the driven tab to perform (W9 contract). */
+export interface DriveOp {
+  op:
+    | 'open'
+    | 'snapshot'
+    | 'act'
+    | 'navigate'
+    | 'scroll'
+    | 'key'
+    | 'wait'
+    | 'close'
+    | 'page-text'
+    | 'find'
+    | 'console'
+    | 'network'
+    | 'extract'
+    | 'back'
+    | 'forward'
+    | 'resize';
+  args?: {
+    url?: string;
+    index?: number;
+    kind?:
+      | 'click'
+      | 'double-click'
+      | 'right-click'
+      | 'hover'
+      | 'type'
+      | 'select'
+      | 'check'
+      | 'uncheck'
+      | 'drag';
+    text?: string;
+    submit?: boolean;
+    /** coordinate acts: screenshot pixel space (0,0 = top-left) */
+    x?: number;
+    y?: number;
+    toX?: number;
+    toY?: number;
+    query?: string;
+    pattern?: string;
+    limit?: number;
+    maxChars?: number;
+    dir?: 'up' | 'down';
+    amount?: number;
+    key?: string;
+    ms?: number;
+    offset?: number;
+    extractKind?: 'text' | 'attr' | 'url';
+    attr?: string;
+    width?: number;
+    height?: number;
+  };
+}
+
+/** What every executed op returns to the server (→ the MCP client). */
+export interface DriveSnapshot {
+  url: string;
+  /** compact indexed listing — `[n]<role name …>` lines from @stept/dom-capture */
+  elements: string;
+  count: number;
+  /** base64 JPEG, viewport-clipped, longest edge ≤ 1568 */
+  screenshot?: string;
+  screenshotSize?: { w: number; h: number };
+  note?: string;
+  pageText?: string;
+  found?: Array<{ index: number; text: string; tag: string; visible: boolean }>;
+  extracted?: { kind: string; value: string };
+  console?: Array<{ level: string; text: string; t: number }>;
+  network?: Array<{ method: string; url: string; status?: number; t: number }>;
+}
+
+/** Backend gateway → extension (WS /ws/extension). snake_case on the wire. */
+export type GatewayToExtension =
+  | { type: 'pong' }
+  | { type: 'exec-op'; ctrl_id: string; op: DriveOp['op']; args?: DriveOp['args'] }
+  | { type: 'record-start'; ctrl_id: string; url?: string }
+  | { type: 'record-stop'; ctrl_id: string; title: string; description?: string }
+  | { type: 'run-tour'; ctrl_id: string; tour_id: string; mode: 'driven' };
+
+/** Extension → backend gateway. */
+export type ExtensionToGateway =
+  | { type: 'ping' }
+  | { type: 'exec-result'; ctrl_id: string; ok: boolean; data?: DriveSnapshot; error?: string }
+  | {
+      type: 'record-ack';
+      ctrl_id: string;
+      ok: boolean;
+      recording?: boolean;
+      tour_id?: string;
+      event_count?: number;
+      error?: string;
+    }
+  | {
+      type: 'run-result';
+      ctrl_id: string;
+      status: 'completed' | 'failed' | 'cancelled';
+      error?: string;
+    };
+
+/** Remote-drive session surfaced in the side panel. */
+export interface RemoteDriveState {
+  tabId: number;
+  url: string;
+  opCount: number;
+  startedAt: number;
+}
+
+// ---------------------------------------------------------------------------
 // panel state (background-owned, broadcast on every change)
 // ---------------------------------------------------------------------------
 
@@ -261,6 +373,12 @@ export interface PanelState {
   drive: DriveState | null;
   /** last capture from the selector picker (copyable in the panel) */
   picked: PickedSelector | null;
+  /** "Let Stept control this browser" — gates the whole remote-drive transport */
+  remoteControl: boolean;
+  /** live WS to the backend gateway right now */
+  remoteConnected: boolean;
+  /** an MCP client is currently driving a tab (null when idle) */
+  remoteDrive: RemoteDriveState | null;
 }
 
 export function emptyPanelState(apiBase = DEFAULT_API_BASE): PanelState {
@@ -292,5 +410,8 @@ export function emptyPanelState(apiBase = DEFAULT_API_BASE): PanelState {
     guide: null,
     drive: null,
     picked: null,
+    remoteControl: true,
+    remoteConnected: false,
+    remoteDrive: null,
   };
 }
