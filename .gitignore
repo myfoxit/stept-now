@@ -23,3 +23,6 @@ openapi.json
 data/
 e2e-uploads/
 .claude/
+
+# Editor-local settings (window colours, per-machine prefs)
+.vscode/
