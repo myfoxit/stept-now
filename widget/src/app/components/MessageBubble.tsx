@@ -60,12 +60,15 @@ export function MessageBubble({
   message,
   widgetKey = '',
   onFeedback,
+  onRetry,
 }: {
   message: UiMessage
   /** Namespaces the persisted thumb state; required for feedback to render. */
   widgetKey?: string
   /** Present on ratable threads: posts the rating (AI answers only). */
   onFeedback?: (messageId: string, rating: FeedbackRating) => void
+  /** Present when a failed send can be retried. */
+  onRetry?: (messageId: string) => void
 }) {
   const mine = message.direction === 'in'
   const system = message.author_type === 'system'
@@ -175,7 +178,17 @@ export function MessageBubble({
         )}
         <div class="sw-meta">
           {message.failed ? (
-            <span class="sw-failed">Not delivered</span>
+            <span class="sw-failed">
+              Not delivered
+              {onRetry && (
+                <>
+                  {' · '}
+                  <button type="button" class="sw-retry" onClick={() => onRetry(message.id)}>
+                    Retry
+                  </button>
+                </>
+              )}
+            </span>
           ) : message.pending ? (
             <span>Sending…</span>
           ) : (

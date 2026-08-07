@@ -26,6 +26,7 @@ export function Thread({
   onLoadMore,
   onCsat,
   onFeedback,
+  onRetry,
   onAllowActions,
 }: {
   messages: UiMessage[]
@@ -46,6 +47,7 @@ export function Thread({
   onLoadMore: () => void
   onCsat: (rating: number, feedback?: string) => void
   onFeedback: (messageId: string, rating: FeedbackRating) => void
+  onRetry: (messageId: string) => void
   onAllowActions: (allowed: boolean) => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
@@ -81,7 +83,13 @@ export function Thread({
           </div>
         )}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} widgetKey={widgetKey} onFeedback={onFeedback} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            widgetKey={widgetKey}
+            onFeedback={onFeedback}
+            onRetry={onRetry}
+          />
         ))}
         {agentTyping && <TypingDots />}
         {resolved && (

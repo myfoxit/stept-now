@@ -97,6 +97,7 @@ export function App({ controller }: { controller: Controller }) {
             screen.conversationId && void controller.submitCsat(screen.conversationId, rating, feedback)
           }
           onFeedback={(messageId, rating) => void controller.submitMessageFeedback(messageId, rating)}
+          onRetry={(messageId) => void controller.retry(messageId)}
         />
       )
       break

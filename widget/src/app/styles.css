@@ -343,6 +343,17 @@ body {
 .sw-failed {
   color: #dc2626;
 }
+.sw-retry {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #dc2626;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .sw-activity {
   text-align: center;
   font-size: 12px;

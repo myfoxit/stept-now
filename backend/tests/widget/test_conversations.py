@@ -10,6 +10,7 @@ from tests.widget.conftest import (
     agent_reply,
     auth_headers,
     boot,
+    system_notice,
 )
 
 
@@ -60,6 +61,94 @@ async def test_reply_read_and_unread_cycle(client: httpx.AsyncClient, widget: Wi
     listed = await client.get("/api/widget/conversations", headers=auth_headers(token))
     summary = next(c for c in listed.json() if c["id"] == conversation_id)
     assert summary["unread"] is False
+
+
+async def test_send_us_a_message_always_opens_a_fresh_thread(
+    client: httpx.AsyncClient, widget: WidgetSetup
+):
+    """POST /conversations is the 'Send us a message' button — it must open a new
+    thread even when an earlier one is still open (Intercom behavior)."""
+    token = await _boot_token(client, widget, "v1")
+    first = await client.post(
+        "/api/widget/conversations", json={"message": "first thread"}, headers=auth_headers(token)
+    )
+    second = await client.post(
+        "/api/widget/conversations", json={"message": "second thread"}, headers=auth_headers(token)
+    )
+    assert first.json()["id"] != second.json()["id"]
+
+    # The new thread contains only its own opening message.
+    messages = await client.get(
+        f"/api/widget/conversations/{second.json()['id']}/messages", headers=auth_headers(token)
+    )
+    contents = [m["content"] for m in messages.json()["items"]]
+    assert contents == ["second thread"]
+
+    # A plain follow-up (POST .../messages) still lands on the same thread.
+    follow = await client.post(
+        f"/api/widget/conversations/{second.json()['id']}/messages",
+        json={"message": "still the second thread"},
+        headers=auth_headers(token),
+    )
+    assert follow.status_code == 201
+
+
+async def test_public_system_notice_is_visible_to_the_visitor(
+    client: httpx.AsyncClient, widget: WidgetSetup
+):
+    """The engine tells a visitor about a handoff via a public system message —
+    it must come back through the widget (unlike activity/notes)."""
+    token = await _boot_token(client, widget, "v1")
+    created = await client.post(
+        "/api/widget/conversations", json={"message": "help"}, headers=auth_headers(token)
+    )
+    conversation_id = created.json()["id"]
+    await system_notice(conversation_id, "You're being connected to a teammate.")
+
+    messages = await client.get(
+        f"/api/widget/conversations/{conversation_id}/messages", headers=auth_headers(token)
+    )
+    items = messages.json()["items"]
+    notice = next(m for m in items if m["author_type"] == "system")
+    assert notice["content"] == "You're being connected to a teammate."
+
+
+async def test_public_only_pagination_never_returns_a_short_page(
+    client: httpx.AsyncClient, widget: WidgetSetup
+):
+    """A run of notes/activity between public messages must not shrink a page or
+    strand earlier public messages behind an empty one (the post-filter bug)."""
+    token = await _boot_token(client, widget, "v1")
+    created = await client.post(
+        "/api/widget/conversations", json={"message": "m0"}, headers=auth_headers(token)
+    )
+    conversation_id = created.json()["id"]
+    # Interleave 5 public replies with a wall of internal-only entries.
+    for i in range(1, 6):
+        await add_activity(conversation_id, f"internal activity {i}")
+        await agent_reply(conversation_id, f"internal note {i}", visibility="note")
+        await agent_reply(conversation_id, f"public {i}")
+
+    seen: list[str] = []
+    cursor: str | None = None
+    for _ in range(10):  # bounded walk
+        params = {"limit": 2}
+        if cursor:
+            params["cursor"] = cursor
+        page = await client.get(
+            f"/api/widget/conversations/{conversation_id}/messages",
+            params=params,
+            headers=auth_headers(token),
+        )
+        body = page.json()
+        for m in body["items"]:
+            assert "internal" not in m["content"]  # never a note/activity
+        seen.extend(m["content"] for m in body["items"])
+        cursor = body["next_cursor"]
+        if not cursor:
+            break
+    # All 6 public messages recovered (pages arrive newest-first), nothing dropped.
+    assert sorted(seen) == ["m0", "public 1", "public 2", "public 3", "public 4", "public 5"]
 
 
 async def test_visitor_can_post_followup_message(client: httpx.AsyncClient, widget: WidgetSetup):

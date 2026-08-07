@@ -197,6 +197,55 @@ describe('Controller.submitMessageFeedback', () => {
   })
 })
 
+describe('failed send + retry', () => {
+  async function openThread(c: Controller): Promise<void> {
+    await c.boot()
+    // Enter a fresh thread screen (conversationId=null); the first send creates it.
+    c.startNewConversation()
+    await c.send('first')
+  }
+
+  it('marks a send failed, then retry re-posts the same text and clears the failure', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    let failNext = false
+    const calls = mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      { method: 'POST', path: '/api/widget/conversations', body: { ...campaignConv, id: 'conv1' } },
+      { method: 'GET', path: '/api/widget/conversations/conv1/messages', body: { items: [], next_cursor: null } },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    const c = makeController()
+    await openThread(c)
+
+    // Next reply POST fails.
+    failNext = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: FetchCall['init'] = {}) => {
+        const isReply = url.includes('/conversations/conv1/messages') && init.method === 'POST'
+        if (isReply && failNext) throw new Error('network down')
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'stub',
+          text: async () => JSON.stringify({ id: 'real1', direction: 'in', author_type: 'contact', author_name: 'You', content: 'hello again', attachments: [], created_at: new Date().toISOString(), meta: {} }),
+        } as unknown as Response
+      }),
+    )
+
+    await c.send('hello again')
+    let failed = c.getState().messages.find((m) => m.failed)
+    expect(failed?.content).toBe('hello again')
+
+    // Retry succeeds this time.
+    failNext = false
+    await c.retry(failed!.id)
+    expect(c.getState().messages.some((m) => m.failed)).toBe(false)
+    expect(c.getState().messages.some((m) => m.id === 'real1')).toBe(true)
+    void calls
+  })
+})
+
 describe('blocked visitors', () => {
   it('shows a neutral message rather than confirming the block', async () => {
     // Telling a blocked visitor they're blocked is hostile and confirms it.

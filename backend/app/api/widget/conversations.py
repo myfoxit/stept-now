@@ -191,22 +191,29 @@ async def _ingest_visitor_message(
     *,
     content: str,
     attachments: list[dict[str, Any]] | None,
+    force_new: bool = False,
 ) -> tuple[Conversation, Message]:
     actor = Actor(type="contact", id=principal.contact.id, label=principal.contact.name or None)
-    conversation = (
-        (
-            await session.execute(
-                select(Conversation)
-                .where(
-                    Conversation.contact_inbox_id == principal.contact_inbox.id,
-                    Conversation.status != ConversationStatus.RESOLVED,
+    conversation = None
+    if not force_new:
+        # Reuse the visitor's still-open thread (email/return-visit continuity).
+        # "Send us a message" passes force_new=True so a deliberate new
+        # conversation opens a fresh thread instead of appending to an old one,
+        # matching what visitors expect from Intercom.
+        conversation = (
+            (
+                await session.execute(
+                    select(Conversation)
+                    .where(
+                        Conversation.contact_inbox_id == principal.contact_inbox.id,
+                        Conversation.status != ConversationStatus.RESOLVED,
+                    )
+                    .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
                 )
-                .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
             )
+            .scalars()
+            .first()
         )
-        .scalars()
-        .first()
-    )
     if conversation is None:
         conversation = await conversations_service.create_conversation(
             session,
@@ -262,6 +269,7 @@ async def create_conversation(
         principal,
         content=body.message,
         attachments=[a.model_dump() for a in body.attachments],
+        force_new=True,
     )
     return await _summary(session, conversation)
 
@@ -277,13 +285,16 @@ async def list_messages(
     cursor: str | None = None,
     limit: int | None = None,
 ) -> CursorPage[WidgetMessageOut]:
-    """Public messages only — notes and activity entries are never returned."""
+    """Public messages only — notes and activity entries are never returned.
+
+    Filtering happens in the query (``public_only``), so every page is a full
+    page of visitor-visible messages and the cursor never strands earlier ones.
+    """
     conversation = await _owned_conversation(session, principal, conversation_id)
     messages, next_cursor = await conversations_service.list_messages(
-        session, conversation, cursor=cursor, limit=limit
+        session, conversation, cursor=cursor, limit=limit, public_only=True
     )
-    public = [m for m in messages if m.visibility == MessageVisibility.PUBLIC]
-    return CursorPage(items=[_message_out(m) for m in public], next_cursor=next_cursor)
+    return CursorPage(items=[_message_out(m) for m in messages], next_cursor=next_cursor)
 
 
 @router.post(

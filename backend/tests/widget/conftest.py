@@ -127,3 +127,24 @@ async def add_activity(conversation_id: str, content: str) -> None:
             deliver=False,
         )
         await session.commit()
+
+
+async def system_notice(conversation_id: str, content: str) -> None:
+    """A public, system-authored notice — the shape the engine uses to tell the
+    visitor a handoff happened. Must be visible in the widget."""
+    async with get_session_factory()() as session:
+        conversation = await session.get(Conversation, conversation_id)
+        assert conversation is not None
+        await conversations_service.add_message(
+            session,
+            conversation,
+            direction="out",
+            author_type="system",
+            author_id=None,
+            author_name="",
+            content=content,
+            visibility="public",
+            actor=Actor.system(),
+            deliver=False,
+        )
+        await session.commit()

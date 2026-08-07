@@ -487,6 +487,15 @@ export class Controller {
     }
   }
 
+  /** Re-send a message that failed to deliver: drop the failed bubble and try
+   * again with its text (the composer stays clear). */
+  async retry(failedId: string): Promise<void> {
+    const failed = this.state.messages.find((m) => m.id === failedId && m.failed)
+    if (!failed) return
+    this.set({ messages: this.state.messages.filter((m) => m.id !== failedId) })
+    await this.send(failed.content)
+  }
+
   emitTyping(isTyping: boolean): void {
     const { screen } = this.state
     if (screen.name !== 'thread' || !screen.conversationId || !this.socket) return

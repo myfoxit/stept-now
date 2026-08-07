@@ -437,6 +437,7 @@ async def execute_run(
     # --- main loop ---
     max_calls = _max_tool_calls(agent)
     tool_calls_used = 0 if sandbox else await _executed_tool_calls(session, run.id)
+    await _set_agent_typing(ctx, True)
     safety = 0
     while True:
         safety += 1
@@ -736,6 +737,7 @@ async def _pause_for_approval(
             actor=ctx.actor,
         ),
     )
+    await _set_agent_typing(ctx, False)  # parked for a human decision — stop the dots
     return ExecutionResult("awaiting_approval", None, sink.sandbox_steps, _run_citations(ctx.run))
 
 
@@ -819,6 +821,7 @@ async def _pause_for_client(
             **op,
         },
     )
+    await _set_agent_typing(ctx, False)  # PageAssist UI takes over — stop the dots
     return ExecutionResult("awaiting_client", None, sink.sandbox_steps, _run_citations(ctx.run))
 
 
@@ -977,6 +980,7 @@ async def _fallback(
                 ctx.session, ctx.conversation, "open", actor=ctx.actor
             )
         await _activity(ctx, f"AI agent handed off to a teammate ({reason}).")
+        await _visitor_notice(ctx, "You're being connected to a teammate — they'll reply here.")
     await sink.add("handoff", output={"reason": reason})
     return await _complete(ctx, sink, status)
 
@@ -989,6 +993,7 @@ async def _fail(ctx: ToolContext, sink: _StepSink, error: str) -> ExecutionResul
             ctx.session, ctx.conversation, "open", actor=ctx.actor
         )
         await _activity(ctx, "AI agent failed — waiting for a teammate.")
+        await _visitor_notice(ctx, "You're being connected to a teammate — they'll reply here.")
     await sink.add("handoff", output={"reason": "provider failure"})
     return await _complete(ctx, sink, "failed")
 
@@ -999,6 +1004,7 @@ async def _complete(
     ctx.run.status = status
     ctx.run.finished_at = utcnow()
     ctx.run.lease_expires_at = None
+    await _set_agent_typing(ctx, False)
     if not ctx.sandbox:
         await ctx.session.flush()
         await emit(
@@ -1035,6 +1041,43 @@ async def _activity(ctx: ToolContext, text: str) -> None:
         visibility="activity",
         actor=ctx.actor,
         deliver=False,
+    )
+
+
+async def _set_agent_typing(ctx: ToolContext, is_typing: bool) -> None:
+    """Show/hide the 'AI is typing' dots in the widget while a run is active.
+    Fire-and-forget realtime only — never persisted, safe to miss."""
+    if ctx.sandbox or ctx.conversation is None:
+        return
+    await broadcast(
+        conversation_topic(ctx.conversation.id),
+        "typing",
+        {
+            "conversation_id": ctx.conversation.id,
+            "is_typing": is_typing,
+            "source": "agent",
+            "author_name": ctx.agent.name,
+        },
+    )
+
+
+async def _visitor_notice(ctx: ToolContext, text: str) -> None:
+    """A short, public, system-authored line the visitor actually sees — so a
+    handoff isn't just silence. Distinct from `_activity` (agent-only trace):
+    this one is `visibility=public`, `author_type=system`, and the widget
+    renders it as a centered status line, not a chat bubble."""
+    assert ctx.conversation is not None
+    await conversations_service.add_message(
+        ctx.session,
+        ctx.conversation,
+        direction="out",
+        author_type="system",
+        author_id=None,
+        author_name="",
+        content=text,
+        visibility="public",
+        actor=ctx.actor,
+        deliver=False,  # in-app only; don't email/SMS a "connecting…" notice
     )
 
 

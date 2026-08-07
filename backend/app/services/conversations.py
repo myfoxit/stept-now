@@ -695,15 +695,23 @@ async def list_messages(
     *,
     cursor: str | None = None,
     limit: int | None = None,
+    public_only: bool = False,
 ) -> tuple[list[Message], str | None]:
     """Newest page first (cursor walks older); items within a page are returned
-    in ascending order — natural chat display without client-side reversal."""
+    in ascending order — natural chat display without client-side reversal.
+
+    ``public_only`` filters in the query, not after — the widget must never
+    post-filter a page, or a page full of notes/activity comes back short (or
+    empty) while ``next_cursor`` still points further back.
+    """
     page_size = clamp_limit(limit, default=30, maximum=100)
     query = (
         select(Message)
         .where(Message.conversation_id == conversation.id)
         .order_by(Message.created_at.desc(), Message.id.desc())
     )
+    if public_only:
+        query = query.where(Message.visibility == MessageVisibility.PUBLIC)
     if cursor:
         created_raw, row_id = decode_cursor(cursor, 2)
         created = datetime.fromisoformat(created_raw)
