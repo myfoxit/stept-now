@@ -164,4 +164,76 @@ export class CdpSession {
     this.attached = false;
     await chrome.debugger.detach({ tabId: this.tabId }).catch(() => {});
   }
+
+  // -------------------------------------------------------------------------
+  // Remote-drive surface (W9). SIGNATURE STUBS — bodies are wave EXT-1's
+  // (docs/MCP-CONTRACTS.md); the remote drive-controller (EXT-2) compiles
+  // against these. Local drive above is untouched by any of it.
+  // -------------------------------------------------------------------------
+
+  /** Like `attach`, but a refusal THROWS: a remote caller must get the real
+   * error over MCP, not a silent downgrade to synthetic input. */
+  static async attachOrThrow(tabId: number): Promise<CdpSession> {
+    const session = await CdpSession.attach(tabId);
+    if (!session) {
+      throw new Error(
+        'Chrome refused the debugger attach on this tab (user declined, or another debugger owns it)',
+      );
+    }
+    return session;
+  }
+
+  /** Viewport-clipped base64 JPEG, longest edge ≤ 1568 px. */
+  async screenshot(_quality?: number): Promise<{ data: string; w: number; h: number }> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** `Runtime.evaluate` with returnByValue + userGesture. */
+  async evaluate<T = unknown>(_expression: string, _awaitPromise?: boolean): Promise<T> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** CSS viewport size of the driven tab. */
+  async viewportSize(): Promise<{ w: number; h: number }> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** `Page.navigate` + load-event wait. */
+  async navigate(_url: string): Promise<void> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** readyState poll raced against a hard timer — never hangs a driven op. */
+  async awaitIdle(_timeoutMs?: number): Promise<void> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** Key chord ("Meta+a", "Control+Shift+p") with macOS editing commands. */
+  async pressChord(_chord: string): Promise<void> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** Interpolated trusted drag (pointer down → 10 moves → up). */
+  async drag(_fromX: number, _fromY: number, _toX: number, _toY: number): Promise<void> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** Per-character trusted typing with real key codes; emoji/CJK fall back to
+   * `Input.insertText`. Use for canvas/rich editors; `insertText` otherwise. */
+  async typeText(_text: string): Promise<void> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** Console + page exceptions ring buffer (cap 200, armed on attach). */
+  consoleMessages(_pattern?: string, _limit?: number): Array<{ level: string; text: string; t: number }> {
+    throw new Error('EXT-1: not implemented yet');
+  }
+
+  /** Network request ring buffer (cap 200, armed on attach). */
+  networkRequests(
+    _pattern?: string,
+    _limit?: number,
+  ): Array<{ method: string; url: string; status?: number; t: number }> {
+    throw new Error('EXT-1: not implemented yet');
+  }
 }
