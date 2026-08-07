@@ -50,6 +50,20 @@
 		}
 	}
 
+	# MCP: AI clients (Claude, Cursor, …) call workspace + browser-drive tools
+	# here. Long-poll heavy — browser_run_tour legitimately holds the request
+	# open for up to 15 minutes, so this cannot share @api's 300s budget.
+	# The bare /mcp form matters: the backend 307-rewrites it to /mcp/ itself,
+	# and MCP clients do not reliably follow redirects issued from out here.
+	@mcp path /mcp /mcp/*
+	handle @mcp {
+		reverse_proxy api:8600 {
+			transport http {
+				read_timeout 960s
+			}
+		}
+	}
+
 	# Dashboard SPA + the widget bundle customer sites load.
 	handle {
 		reverse_proxy web:80
