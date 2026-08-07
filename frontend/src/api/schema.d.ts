@@ -1622,7 +1622,8 @@ export interface paths {
     /**
      * Update Document
      * @description Edit an authored document's title/content; re-indexes inline. Documents
-     *     backed by a URL, the portal, or a connector return 409.
+     *     backed by a URL, the portal, or a connector return 409 for text edits —
+     *     the `ai_searchable` retrieval opt-out toggles on any document.
      */
     patch: operations['update_document_api_v1_w__workspace_id__knowledge_documents__document_id__patch']
     trace?: never
@@ -1805,6 +1806,48 @@ export interface paths {
     put?: never
     /** Run Macro */
     post: operations['run_macro_api_v1_w__workspace_id__macros__macro_id__run_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/mcp-approvals': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Mcp Approvals
+     * @description Newest-first approvals for this workspace; ``status=all`` for history.
+     *
+     *     Overdue pending rows are lazily flipped to ``expired`` on the way through.
+     */
+    get: operations['list_mcp_approvals_api_v1_w__workspace_id__mcp_approvals_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/mcp-approvals/{approval_id}/decide': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Decide Mcp Approval
+     * @description Approve or deny; the external LLM's retry with the same params finds it.
+     */
+    post: operations['decide_mcp_approval_api_v1_w__workspace_id__mcp_approvals__approval_id__decide_post']
     delete?: never
     options?: never
     head?: never
@@ -3321,6 +3364,7 @@ export interface components {
        * @default Let me connect you with a teammate who can help.
        */
       handoff_message: string
+      mcp?: components['schemas']['McpChannelSettings']
       page_control?: components['schemas']['PageControlSettings']
       retrieval?: components['schemas']['RetrievalSettings']
     }
@@ -3554,6 +3598,8 @@ export interface components {
     }
     /** ApiKeyCreate */
     ApiKeyCreate: {
+      /** Agent Id */
+      agent_id?: string | null
       /** Name */
       name: string
       /** Scopes */
@@ -3561,6 +3607,8 @@ export interface components {
     }
     /** ApiKeyCreated */
     ApiKeyCreated: {
+      /** Agent Id */
+      agent_id?: string | null
       /**
        * Created At
        * Format: date-time
@@ -3583,6 +3631,8 @@ export interface components {
     }
     /** ApiKeyOut */
     ApiKeyOut: {
+      /** Agent Id */
+      agent_id?: string | null
       /**
        * Created At
        * Format: date-time
@@ -5023,6 +5073,11 @@ export interface components {
     }
     /** DocumentDetailOut */
     DocumentDetailOut: {
+      /**
+       * Ai Searchable
+       * @default true
+       */
+      ai_searchable: boolean
       /** Chunks */
       chunks?: components['schemas']['ChunkPreviewOut'][]
       /** Content */
@@ -5062,6 +5117,11 @@ export interface components {
     }
     /** DocumentOut */
     DocumentOut: {
+      /**
+       * Ai Searchable
+       * @default true
+       */
+      ai_searchable: boolean
       /** Content Hash */
       content_hash?: string | null
       /**
@@ -5097,9 +5157,13 @@ export interface components {
     }
     /**
      * DocumentUpdate
-     * @description Re-edit an authored (storage-backed text/markdown) document.
+     * @description Re-edit an authored (storage-backed text/markdown) document, and/or
+     *     toggle `ai_searchable` (works on ANY document — it is a retrieval opt-out,
+     *     not an edit).
      */
     DocumentUpdate: {
+      /** Ai Searchable */
+      ai_searchable?: boolean | null
       /** Content */
       content?: string | null
       /** Title */
@@ -5472,6 +5536,75 @@ export interface components {
       name?: string | null
       /** Visibility */
       visibility?: ('personal' | 'global') | null
+    }
+    /** McpApprovalDecideRequest */
+    McpApprovalDecideRequest: {
+      /**
+       * Decision
+       * @enum {string}
+       */
+      decision: 'approve' | 'deny'
+    }
+    /** McpApprovalOut */
+    McpApprovalOut: {
+      /** Agent Id */
+      agent_id: string
+      /** Agent Name */
+      agent_name?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Decided At */
+      decided_at: string | null
+      /** Decided By */
+      decided_by: string | null
+      /**
+       * Expires At
+       * Format: date-time
+       */
+      expires_at: string
+      /** Id */
+      id: string
+      /**
+       * Requested At
+       * Format: date-time
+       */
+      requested_at: string
+      /** Status */
+      status: string
+      /** Tool Input */
+      tool_input: {
+        [key: string]: unknown
+      }
+      /** Tool Key */
+      tool_key: string
+    }
+    /**
+     * McpChannelSettings
+     * @description Per-agent MCP channel: may external LLM clients talk to this agent?
+     *
+     *     ``approval_mode`` gates WRITE tools called over MCP (reads always run):
+     *     - ``ask_in_chat``: trust the client to confirm (descriptors carry destructive
+     *       hints + a "confirm with the user" suffix); executes server-side.
+     *     - ``ask_in_stept``: park the call as an ``McpToolApproval``; a teammate
+     *       approves in Stept and the client retries the same call.
+     *     - ``never_ask``: trusted automations — writes run unprompted.
+     *     - ``deny``: writes are rejected outright.
+     */
+    McpChannelSettings: {
+      /**
+       * Approval Mode
+       * @default ask_in_chat
+       * @enum {string}
+       */
+      approval_mode: 'ask_in_chat' | 'ask_in_stept' | 'never_ask' | 'deny'
+      /**
+       * Enabled
+       * @default false
+       */
+      enabled: boolean
     }
     /** MeResponse */
     MeResponse: {
@@ -12688,6 +12821,75 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['MacroRunOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_mcp_approvals_api_v1_w__workspace_id__mcp_approvals_get: {
+    parameters: {
+      query?: {
+        status?: string
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['McpApprovalOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  decide_mcp_approval_api_v1_w__workspace_id__mcp_approvals__approval_id__decide_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        approval_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['McpApprovalDecideRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['McpApprovalOut']
         }
       }
       /** @description Validation Error */

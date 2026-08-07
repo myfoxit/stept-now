@@ -68,3 +68,17 @@ export function makeApproval(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
+
+export function makeMcpApproval(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'm1',
+    agent_id: 'a1',
+    agent_name: 'Sage',
+    tool_key: 'action_create_ticket',
+    tool_input: { title: 'Bug report' },
+    status: 'pending',
+    requested_at: NOW,
+    expires_at: '2026-08-01T10:00:00Z',
+    ...overrides,
+  }
+}

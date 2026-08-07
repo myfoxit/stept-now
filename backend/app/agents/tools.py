@@ -44,7 +44,7 @@ from app.models.agent_run import AgentRun
 from app.models.contact import Contact
 from app.models.conversation import Conversation
 from app.models.tag import Tag
-from app.rag.context import DEFAULT_MAX_TOKENS, build_context
+from app.rag.context import DEFAULT_MAX_TOKENS, build_context, guard_retrieved
 from app.rag.retrieval import search_chunks
 from app.services import conversations as conversations_service
 from app.services.search_analytics import record_search
@@ -159,12 +159,15 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
         return ToolOutcome({"results": []})
     k, source_ids = _retrieval_settings(ctx.agent)
     history = await _recent_turns(ctx)
+    # Answer path: rerank is on (the pass self-gates to >5 fused candidates and
+    # degrades to the fused order on any failure — see app.rag.rerank).
     results = await search_chunks(
         ctx.session,
         ctx.workspace_id,
         query,
         k=k,
         source_ids=source_ids,
+        rerank=True,
         history=history,
     )
     await record_search(
@@ -180,7 +183,7 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
     # numbering the widget renders under the reply.
     context = build_context(results, query, max_tokens=_context_budget(ctx.agent))
     ctx.run.citations = context.citation_dicts()
-    payload = {
+    payload: dict[str, Any] = {
         "results": [
             {
                 "n": citation.n,
@@ -191,6 +194,10 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
             for citation in context.citations
         ]
     }
+    if context.context_text:
+        # The full budgeted text the model should ground on, wrapped once as
+        # untrusted material ("results" stays the compact [n] citation index).
+        payload["context"] = guard_retrieved(context.context_text)
     return ToolOutcome(payload)
 
 

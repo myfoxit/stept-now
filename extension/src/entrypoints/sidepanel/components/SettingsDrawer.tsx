@@ -1,4 +1,4 @@
-import { Boxes, Crosshair, LogOut, X } from 'lucide-react';
+import { Bot, Boxes, Crosshair, LogOut, X } from 'lucide-react';
 import { formatPicked } from '../../../api/client';
 import type { PanelState } from '../../../types';
 import { sendBg, useCopy } from '../lib';
@@ -105,6 +105,28 @@ export function SettingsDrawer({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="drawer-section">
+          <span className="section-title">Automation</span>
+          <p className="hint">
+            Allow AI clients connected to your workspace (over MCP) to open a tab in this browser,
+            drive it, and record tours. Turning this off disconnects immediately.
+          </p>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={state.remoteControl}
+              onChange={(e) => void sendBg({ type: 'set-remote-control', enabled: e.target.checked })}
+            />
+            <span>
+              <Bot size={13} /> Let Stept control this browser
+            </span>
+          </label>
+          <div className="kv">
+            <span>Status</span>
+            <b>{state.remoteConnected ? 'Connected' : 'Off'}</b>
+          </div>
         </div>
 
         <div className="drawer-section">

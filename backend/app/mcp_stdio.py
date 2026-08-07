@@ -17,7 +17,11 @@ logging.basicConfig(
     stream=sys.stderr,
 )
 
+from app.mcp.auth import enable_stdio_mode  # noqa: E402
 from app.mcp.server import mcp  # noqa: E402
 
 if __name__ == "__main__":
+    # Unlocks the STEPT_API_KEY fallback — over HTTP the key must arrive in the
+    # Authorization header, never from the server's own environment.
+    enable_stdio_mode()
     mcp.run(transport="stdio")

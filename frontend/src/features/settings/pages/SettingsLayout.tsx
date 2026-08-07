@@ -8,6 +8,7 @@ import { useHasPerm } from '@/stores/auth'
 import { ApiKeysPanel } from '../components/ApiKeysPanel'
 import { AuditPanel } from '../components/AuditPanel'
 import { ChannelsPanel } from '../components/ChannelsPanel'
+import { McpPanel } from '../components/McpPanel'
 import { MembersPanel } from '../components/MembersPanel'
 import { ProfilePanel } from '../components/ProfilePanel'
 import { RolesPanel } from '../components/RolesPanel'
@@ -22,6 +23,7 @@ const PANELS: Record<string, () => ReactElement> = {
   channels: () => <ChannelsPanel />,
   sla: () => <SlaPanel />,
   'api-keys': () => <ApiKeysPanel />,
+  mcp: () => <McpPanel />,
   audit: () => <AuditPanel />,
   profile: () => <ProfilePanel />,
 }

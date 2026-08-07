@@ -56,6 +56,10 @@ BM25_WEIGHT = 0.35
 BM25_K1, BM25_B = 1.5, 0.75
 #: Multiplier for a chunk whose document TITLE matches the question.
 TITLE_MATCH_BOOST = 1.25
+#: With ``rerank=True``, the LLM selection pass only engages when the widened
+#: fused candidate set is LARGER than this. Reordering ≤5 candidates cannot
+#: change an answer meaningfully and would spend an LLM call per message.
+MIN_RERANK_CANDIDATES = 5
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _STOPWORDS = frozenset(
@@ -98,7 +102,11 @@ async def search_chunks(
 
     With ``rerank=True`` a wider fused candidate set is passed through the LLM
     rerank/selection pass (`app.rag.rerank`) before truncating to k — graceful
-    fallback keeps the fused order on any rerank failure.
+    fallback keeps the fused order on any rerank failure, and the pass is
+    skipped entirely when the candidate set is ≤ MIN_RERANK_CANDIDATES.
+
+    Documents with ``ai_searchable=False`` never contribute chunks, on either
+    dialect path (retrieval opt-out; parity with the old repo's `rag_indexed`).
     """
     query = query.strip()
     if not query or k <= 0:
@@ -174,7 +182,7 @@ async def search_chunks(
         )
         for score, chunk, document_title in top
     ]
-    if rerank and results:
+    if rerank and len(results) > MIN_RERANK_CANDIDATES:
         results = await rerank_results(session, workspace_id, query, results, k=k)
     results = results[:k]
     if expand_neighbors and results:
@@ -217,13 +225,13 @@ async def _ranked_ids_python(
     source_ids: list[str] | None,
 ) -> tuple[list[str], list[str]]:
     """SQLite path: cosine + stopword-stripped token overlap, in python."""
-    stmt = select(Chunk.id, Chunk.embedding, Chunk.content).where(
-        Chunk.workspace_id == workspace_id
+    stmt = (
+        select(Chunk.id, Chunk.embedding, Chunk.content)
+        .join(Document, Document.id == Chunk.document_id)
+        .where(Chunk.workspace_id == workspace_id, Document.ai_searchable.is_(True))
     )
     if source_ids:
-        stmt = stmt.join(Document, Document.id == Chunk.document_id).where(
-            Document.source_id.in_(source_ids)
-        )
+        stmt = stmt.where(Document.source_id.in_(source_ids))
     rows = (await session.execute(stmt)).all()
 
     dense = sorted(
@@ -260,11 +268,11 @@ async def _ranked_ids_pg(
 ) -> tuple[list[str], list[str]]:
     """Postgres path: pgvector cosine distance + GIN-indexed full-text rank."""
     vector_literal = "[" + ",".join(f"{value:.8f}" for value in query_vector) + "]"
-    join_sql = filter_sql = ""
+    join_sql = "JOIN documents d ON d.id = c.document_id"
+    filter_sql = "AND d.ai_searchable = TRUE"
     params: dict[str, object] = {"ws": workspace_id, "depth": RETRIEVAL_DEPTH}
     if source_ids:
-        join_sql = "JOIN documents d ON d.id = c.document_id"
-        filter_sql = "AND d.source_id IN :source_ids"
+        filter_sql += " AND d.source_id IN :source_ids"
         params["source_ids"] = source_ids
 
     dense_stmt = text(
@@ -343,7 +351,9 @@ async def _title_leg(
     terms = set(_keywords(query))
     if not terms:
         return set()
-    stmt = select(Document.id, Document.title).where(Document.workspace_id == workspace_id)
+    stmt = select(Document.id, Document.title).where(
+        Document.workspace_id == workspace_id, Document.ai_searchable.is_(True)
+    )
     if source_ids:
         stmt = stmt.where(Document.source_id.in_(source_ids))
     rows = (await session.execute(stmt)).all()
@@ -414,7 +424,12 @@ async def _load_candidates(
     rows = await session.execute(
         select(Chunk, Document.title, Document.updated_at, Document.source_id)
         .join(Document, Document.id == Chunk.document_id)
-        .where(Chunk.workspace_id == workspace_id, Chunk.id.in_(chunk_ids))
+        .where(
+            Chunk.workspace_id == workspace_id,
+            Chunk.id.in_(chunk_ids),
+            # Backstop: no leg may hydrate a chunk from an opted-out document.
+            Document.ai_searchable.is_(True),
+        )
     )
     return [tuple(row) for row in rows.all()]  # type: ignore[misc]
 
@@ -449,7 +464,11 @@ async def _expand_neighbors(
     session: AsyncSession, workspace_id: str, results: list[RetrievedChunk]
 ) -> None:
     """Append ord±1 chunk content around each hit (in place), deduplicating so
-    no chunk's text appears twice across the returned results."""
+    no chunk's text appears twice across the returned results.
+
+    Neighbors are same-document by construction, but the read still filters on
+    ``Document.ai_searchable`` so an opted-out document can never leak content
+    into results regardless of how the surrounding query evolves."""
     used: set[tuple[str, int]] = {(result.document_id, result.ord) for result in results}
     wanted: list[tuple[str, int]] = []
     for result in results:
@@ -463,8 +482,12 @@ async def _expand_neighbors(
         for document_id, neighbor_ord in wanted
     ]
     rows = await session.execute(
-        select(Chunk.document_id, Chunk.ord, Chunk.content).where(
-            Chunk.workspace_id == workspace_id, or_(*conditions)
+        select(Chunk.document_id, Chunk.ord, Chunk.content)
+        .join(Document, Document.id == Chunk.document_id)
+        .where(
+            Chunk.workspace_id == workspace_id,
+            Document.ai_searchable.is_(True),
+            or_(*conditions),
         )
     )
     neighbors = {(document_id, ord_): content for document_id, ord_, content in rows.all()}

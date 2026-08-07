@@ -149,6 +149,104 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     widget 186, extension 100, dom-capture 107, e2e 21. `make verify` green,
     full e2e green.
 
+- [x] **W9 (MCP + remote browser drive)** — Stept is now an MCP server, so Claude Code /
+  Claude Desktop / Cursor / ChatGPT can search the knowledge base, ask questions with
+  citations, read tours and conversations, and **drive the user's real Chrome** through the
+  extension. Contracts: `docs/MCP-CONTRACTS.md`. User guide: `docs/MCP.md`. Session worktree:
+  `.claude/worktrees/mcp-parity` (branch `worktree-mcp-parity`). Ported from
+  `/Users/ahoehne/repos/stept` (`api/app/mcp_server.py`, `services/agent_mcp/*`,
+  `automation/src/gateway.ts`, `extension/src/{run-client,drive-controller,executor-extension}.ts`)
+  into stept-now's own architecture — no Node automation service, the FastAPI app owns the
+  extension WebSocket.
+  - **Two MCP surfaces.** `/mcp` (official `mcp` SDK v2, streamable HTTP, stateless, JSON
+    responses) with 28 tools; `/mcp/agents/{id}` (hand-rolled JSON-RPC — the tool list is
+    computed per request from the agent's config, which the SDK can't express). Both
+    authenticate with existing workspace API keys; a key with `agent_id` set is bound to one
+    agent and refused everywhere else (including REST). `python -m app.mcp_stdio` for clients
+    without HTTP.
+  - **Mount mechanics** (`app/mcp/mount.py`): an ASGI shim copies `Authorization` into a
+    contextvar because SDK tools run outside FastAPI's dependency graph; the scope is forwarded
+    **untouched** (modern Starlette strips the mount prefix via `root_path` — rewriting it 404s
+    everything); middleware rewrites bare `/mcp` → `/mcp/` because MCP clients don't follow the
+    Mount's 307; the mounted app's lifespan is run explicitly (mounted lifespans are a no-op).
+  - **Remote drive**: `WS /ws/extension` (extension token, per-workspace device registry,
+    supersede-on-reconnect with 4000, ctrl_id-correlated futures, contract timeouts 60/30/60/900s)
+    + `browser_*` tools. Extension side: WS run-client (3s reconnect, 20s ping, zombie-socket
+    guard), a drive controller (popup LIFO follow, op serialization, "no visible change"
+    advisory), a 16-op `stept-exec` content island on `@stept/dom-capture`, and CDP primitives
+    (viewport-clipped screenshots ≤1568px, chords with macOS commands, per-char trusted typing,
+    console/network ring buffers). Gated by a **"Let Stept control this browser"** switch;
+    password fields are never read or typed into.
+  - **Per-agent channel**: approval modes ask_in_chat / ask_in_stept / never_ask / deny, with
+    `McpToolApproval` rows keyed by (key, agent, tool, canonical params hash) and an approvals
+    UI. The old repo's Flask-tuple notification bug (`("", 204)` → HTTP 200 `["",204]`) is not
+    ported: notifications return a real 202 with an empty body.
+  - **One-click setup** (Settings → MCP · AI clients, and per agent): pick a client tab, press
+    create, and the snippet below it is filled with the **real key** — the old repo only ever
+    interpolated the key *prefix*, so its snippets never worked as pasted.
+  - **RAG closures** so retrieval ≥ old stept: rerank switched on in every answer path (agent
+    tool, copilot, both MCP ask paths; self-gates to >5 candidates, degrades to fused order),
+    `<retrieved_context>` prompt-injection hardening, per-document `ai_searchable` opt-out
+    (parity with the old `rag_indexed`), and PG prefix/trigram/short-query handling in global
+    search plus the trigram index that backs it.
+  - **Security review of the new surface** (keys, the contextvar carrying credentials, the
+    browser-driving socket, approval bypass) — every finding below was PROVEN with a test
+    before being fixed, and each fix ships with the test:
+    - a custom action named `get_*` but issuing a POST escaped `deny` mode and the approval
+      gate entirely — the action's author chose the name, and the caller is who we gate, so the
+      HTTP method now decides and the name only refines a read-shaped method;
+    - the agent endpoint never checked the key's scopes, so a `scopes=["read"]` key could fire
+      every custom action the agent had (its own test fixture handed back an empty permission
+      set, which is why nothing caught it);
+    - approvals hashed and stored only the non-underscore arguments, so a caller could get
+      `{subject}` approved and then run `{subject, _x}` — the executor substitutes `{_x}` into
+      an action's URL or body like any other parameter. What is approved is now what runs;
+    - the `STEPT_API_KEY` fallback applied to HTTP, not just stdio: an operator following our
+      own stdio instructions in the API process would have turned `/mcp` into an
+      unauthenticated, fully-scoped endpoint. It is now gated on the stdio entry point;
+    - the docs promised password fields are never typed into, but only the DOM island enforced
+      it — the drive path types through CDP and bypassed it. Both halves hold now;
+    - the extension's `device_id` is chosen by the client and was the whole registry key, so any
+      member could reuse a colleague's id: the victim's browser was closed as "superseded" and
+      subsequent drive ops (and the results the AI reads) went to the attacker's browser. Slots
+      are now namespaced by the authenticated user;
+    - `/ws/extension` re-validated membership but not `tours:manage`, which is what minting the
+      30-day token requires — a demoted member kept a working browser socket. Also: an ack now
+      has to come from the device the op was addressed to.
+    - Verified safe, with a kept regression test: the Authorization contextvar does NOT leak
+      between concurrent requests (two in-flight calls parked on a barrier between capture and
+      read each see only their own tenant; a deliberately-global variant fails the same test).
+  - **The remote drive did not work in the shipped topology** (found at integration, before
+    merge): the connected-browser registry was process-local while `deploy/docker-compose.prod.yml`
+    runs `STEPT_WEB_CONCURRENCY=4` — the extension's socket lands on one worker and tool calls
+    are balanced across all four, so ~3 of every 4 `browser_*` calls answered "no browser
+    extension is connected" while one was. Discovery and dispatch now cross workers over
+    `app.core.pubsub` (the same bus the realtime manager uses): a broadcast control topic for
+    hellos/discovery/supersede, a unicast inbox per worker for dispatches and acks so
+    screenshots never fan out, and a dispatch resolved to exactly one (node, device) before it
+    is sent. A lone worker short-circuits the bus entirely — asserted by a test that watches the
+    topic and proves no discovery frame is ever published. Supersede now works across workers
+    too (previously a reconnect landing elsewhere left the dead socket registered and routable).
+  - **Bugs found and fixed along the way**: the autogenerated migration added a NOT NULL column
+    with no server default (would fail on any non-empty `documents` table) and referenced
+    `app.core.db` without importing it; agent-bound MCP keys were accepted by the REST API,
+    silently widening "let Claude talk to this one agent" into full workspace access; the agent
+    card's tool-name preview slugified differently from the endpoint, so the UI could advertise
+    names the server doesn't expose.
+  - **Totals after W9:** **2072 tests** — backend 1148 (0 skipped with PG up), frontend 412,
+    extension 199, widget 186, dom-capture 107, e2e 21. `make verify` green; e2e green; migration
+    `a888d11bd47d` PG-validated up/down/up with a real backfill row, `alembic check` clean.
+  - **Known follow-ups** (reviewed, deliberately not in this wave): neither MCP surface is rate
+    limited — a leaked key can't read anything its scopes forbid, but `ask_agent` /
+    `ask_knowledge_base` are unmetered LLM spend and `browser_run_tour` parks a request for up
+    to 15 minutes; an approved MCP approval stays reusable for its 24h TTL with no revoke path;
+    `browser_open`/`browser_navigate` don't restrict scheme or host, so a key with
+    `tours:manage` can point the user's authenticated browser at an intranet address (Chrome
+    blocks the exotic schemes, we don't).
+  - **Verified live** (not just unit-tested): a running server answering real JSON-RPC on all
+    three transports — HTTP `/mcp`, the per-agent endpoint, and the stdio bridge — plus a full
+    remote-drive round trip with a fake extension on the real WebSocket (33 live assertions).
+
 - [ ] Post-build notes for user: **no git origin configured** — merged to local master only, not pushed (user decides re GitHub; gh is authed as `myfoxit`). Old stept containers on 8000/80/5173 are a PRIOR build — untouched. A `build-postgres-1` container is up on 54329 (used for PG validation; `docker compose down` to stop). Use `docker compose` (v2) — the v1 `docker-compose` is broken by a pyenv SSL issue.
 
 ### Agent-orchestration lessons (for future waves / resets)

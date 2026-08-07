@@ -28,12 +28,37 @@ export type ToolPolicy = 'auto' | 'require_approval' | 'disabled'
 export type AgentStatus = 'draft' | 'live' | 'off'
 export type ToolConfig = { key: string; policy: ToolPolicy }
 
+export type McpApprovalMode = 'ask_in_chat' | 'ask_in_stept' | 'never_ask' | 'deny'
+
+/** MCP channel config stored under settings.mcp (backend McpChannelSettings). */
+export interface McpChannelSettings {
+  enabled: boolean
+  approval_mode: McpApprovalMode
+}
+
 export interface AgentSettings {
   retrieval: { enabled: boolean; k: number; source_ids: string[] | null }
   handoff_message: string
   guardrails: { max_tool_calls: number; require_citations: boolean }
   /** In-app guidance: see the visitor's page, and (optionally) act on it. */
   page_control?: { enabled: boolean; allow_actions: boolean }
+  /** Expose this agent at /mcp/agents/{id} to external MCP clients. */
+  mcp?: McpChannelSettings
+}
+
+/**
+ * Pending write-tool call from an external MCP client (ask_in_stept mode).
+ * Local shape until schema.d.ts regenerates with the /mcp-approvals routes.
+ */
+export interface McpApproval {
+  id: string
+  agent_id: string
+  agent_name: string | null
+  tool_key: string
+  tool_input: Record<string, unknown>
+  status: 'pending' | 'approved' | 'denied' | 'expired'
+  requested_at: string
+  expires_at: string
 }
 
 export const aiKeys = {
@@ -50,6 +75,8 @@ export const aiKeys = {
   run: (workspaceId: string, id: string) => ['ai', workspaceId, 'run', id] as const,
   approvals: (workspaceId: string, status: string) =>
     ['ai', workspaceId, 'approvals', status] as const,
+  mcpApprovals: (workspaceId: string, status: string) =>
+    ['ai', workspaceId, 'mcp-approvals', status] as const,
 }
 
 export const aiApi = {
@@ -118,4 +145,10 @@ export const aiApi = {
     api.get<Approval[]>(ws('/ai/approvals'), { query: { status } }),
   decideApproval: (id: string, body: { approved: boolean; note?: string | null }) =>
     api.post<Approval>(ws(`/ai/approvals/${id}/decide`), body),
+
+  // --- MCP approvals (write tools awaiting a decision, ask_in_stept mode) ---
+  listMcpApprovals: (status: 'pending' | 'all' = 'pending') =>
+    api.get<McpApproval[]>(ws('/mcp-approvals'), { query: { status } }),
+  decideMcpApproval: (id: string, decision: 'approve' | 'deny') =>
+    api.post<McpApproval>(ws(`/mcp-approvals/${id}/decide`), { decision }),
 }

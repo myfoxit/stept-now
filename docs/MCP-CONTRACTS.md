@@ -120,15 +120,23 @@ Hand-rolled JSON-RPC POST route (registered before the mount; `include_in_schema
 - `WS /ws/extension?token=<extension-token>&device_id=<uuid>&name=<label>` — token type
   `extension` (claims ws+sub), invalid → close 4401. Same device_id reconnect supersedes: old
   socket closed code 4000 reason "superseded".
-- Registry (in-process): workspace_id → {device_id → Peer{user_id, name, ws, connected_at,
-  last_seen_at}}. Single-worker constraint documented (deploy runs 1 worker; note in PLAN).
+- Registry: sockets stay in the process that accepted them; discovery and dispatch cross
+  workers over `app.core.pubsub` (prod runs 4 uvicorn workers, so a process-local registry
+  would strand ~3 of every 4 tool calls). Topics: `drive:ctrl` (broadcast — node hellos,
+  discovery, supersede announcements) and `drive:node:{node_id}` (unicast inbox — discovery
+  replies, addressed dispatches, acks, so screenshots never fan out). A dispatch is resolved to
+  exactly one (node, device) before it is sent, so it executes once. Single-process dev/test
+  short-circuits the bus entirely and behaves exactly as before.
+- The device slot is `{user_id}:{device_id}` — the client picks its own `device_id`, so the
+  server namespaces it by the authenticated user; otherwise any member could supersede a
+  colleague's browser and receive their drive ops.
 - ext→srv: `{type:"ping"}` (→`{type:"pong"}`, bumps last_seen) · `{type:"exec-result", ctrl_id,
   ok, data?, error?}` · `{type:"record-ack", ctrl_id, ok, recording?, tour_id?, event_count?,
   error?}` · `{type:"run-result", ctrl_id, status: completed|failed|cancelled, error?}`
 - srv→ext: `{type:"pong"}` · `{type:"exec-op", ctrl_id, op, args}` · `{type:"record-start",
   ctrl_id, url?}` · `{type:"record-stop", ctrl_id, title, description?}` · `{type:"run-tour",
   ctrl_id, tour_id, mode:"driven"}`
-- `remote_drive` API: `list_browsers(ws)` · `exec_op(ws, op, args, device_id=None, timeout=60)`
+- `remote_drive` API: `await list_browsers(ws)` (async — discovery crosses workers) · `exec_op(ws, op, args, device_id=None, timeout=60)`
   · `record_start(ws, url?, 30s)` · `record_stop(ws, title, 60s)` · `run_tour(ws, tour_id,
   900s)`. ctrl_id = uuid7; futures resolved by ctrl_id; timeout → error "the browser did not
   respond in time". No browser → error "no browser extension is connected for this workspace —

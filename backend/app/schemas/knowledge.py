@@ -49,10 +49,13 @@ class TextDocumentCreate(BaseModel):
 
 
 class DocumentUpdate(BaseModel):
-    """Re-edit an authored (storage-backed text/markdown) document."""
+    """Re-edit an authored (storage-backed text/markdown) document, and/or
+    toggle `ai_searchable` (works on ANY document — it is a retrieval opt-out,
+    not an edit)."""
 
     title: str | None = Field(None, min_length=1, max_length=400)
     content: str | None = None
+    ai_searchable: bool | None = None
 
 
 class DocumentOut(ORMModel):
@@ -65,6 +68,7 @@ class DocumentOut(ORMModel):
     status: str
     error: str | None = None
     token_count: int
+    ai_searchable: bool = True
     meta: dict[str, Any]
     created_at: datetime
     updated_at: datetime
