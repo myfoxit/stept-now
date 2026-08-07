@@ -59,7 +59,7 @@ export function NotificationsBell() {
         <Button variant="ghost" size="icon" className="relative shrink-0" aria-label="Notifications">
           <Bell className="size-4" />
           {unread.length > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-brand-foreground">
               {unread.length > 9 ? '9+' : unread.length}
             </span>
           ) : null}
@@ -88,7 +88,7 @@ export function NotificationsBell() {
               >
                 <span className="flex items-center gap-2 text-sm">
                   {!notification.read_at ? (
-                    <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                    <span className="size-1.5 shrink-0 rounded-full bg-brand" />
                   ) : null}
                   <span className="truncate font-medium">{notification.title}</span>
                 </span>

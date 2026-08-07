@@ -29,7 +29,7 @@ export function ConversationRow({
       className={cn(
         'flex w-full items-start border-b transition-colors hover:bg-accent/50',
         active && 'bg-accent',
-        selected && 'bg-primary/10'
+        selected && 'bg-brand/10'
       )}
     >
       {selectable ? (
@@ -62,7 +62,7 @@ export function ConversationRow({
               {item.contact.name || 'Unknown'}
             </span>
             {item.status === 'pending' ? (
-              <span className="rounded bg-violet-500/15 px-1 text-[10px] font-semibold text-violet-600 dark:text-violet-300">
+              <span className="rounded bg-brand-soft px-1 text-[10px] font-semibold text-brand">
                 AI
               </span>
             ) : null}
@@ -86,7 +86,7 @@ export function ConversationRow({
 
           <div className="mt-1 flex items-center gap-2">
             {item.unread ? (
-              <span className="size-2 rounded-full bg-primary" aria-label="unread" />
+              <span className="size-2 rounded-full bg-brand" aria-label="unread" />
             ) : null}
             <PriorityFlag priority={item.priority} />
             {item.waiting_since ? (

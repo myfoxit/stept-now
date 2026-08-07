@@ -70,7 +70,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="text-primary underline underline-offset-2"
+            className="text-brand underline underline-offset-2"
           >
             {linkMatch[1]}
           </a>

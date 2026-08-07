@@ -83,7 +83,7 @@ const PROSE_CLASS = [
   '[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs',
   '[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em]',
   '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
-  '[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2',
+  '[&_a]:text-brand [&_a]:underline [&_a]:underline-offset-2',
   '[&_img]:max-w-full [&_img]:rounded-md',
   '[&_hr]:my-3 [&_hr]:border-border',
   // Placeholder: TipTap decorates the empty document with `.is-editor-empty`

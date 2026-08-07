@@ -56,7 +56,7 @@ export function StepFunnel({ steps }: { steps: TourStepStat[] }) {
                     {/* Widths are data — the one thing tokens cannot express. */}
                     <div className="flex h-full" style={{ width: `${(step.viewed / max) * 100}%` }}>
                       <div
-                        className="h-full bg-primary/70"
+                        className="h-full bg-brand/70"
                         style={{
                           width: step.viewed ? `${(retained / step.viewed) * 100}%` : '0%',
                         }}

@@ -60,7 +60,7 @@ function McpApprovalCard({ approval }: { approval: McpApproval }) {
   return (
     <Card>
       <CardHeader className="flex-row items-start gap-3 space-y-0">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
           <Plug className="size-4" />
         </div>
         <div className="min-w-0 flex-1">

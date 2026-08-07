@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router'
 
+import { StepMark } from '@/components/StepMark'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { CommandK } from '@/components/layout/CommandK'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -18,7 +19,8 @@ export function AppShell() {
         */}
         <div className="flex items-center gap-2 border-b px-3 py-2 md:hidden">
           <SidebarTrigger />
-          <span className="text-sm font-semibold">Stept</span>
+          <StepMark className="size-4 text-brand" />
+          <span className="text-sm font-semibold tracking-tight">Stept</span>
         </div>
         <div className="min-h-0 flex-1">
           <Outlet />

@@ -109,7 +109,7 @@ export function TagsEditor({
                     type="button"
                     onClick={() => create.mutate(query.trim())}
                     disabled={create.isPending}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-primary hover:bg-accent"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-brand hover:bg-accent"
                   >
                     <Plus className="size-3.5" />
                     Create “{query.trim()}”

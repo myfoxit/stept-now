@@ -57,7 +57,7 @@ export function Component() {
       footer={
         <p>
           No account?{' '}
-          <Link className="text-primary underline-offset-4 hover:underline" to="/signup">
+          <Link className="text-brand underline-offset-4 hover:underline" to="/signup">
             Sign up
           </Link>
         </p>

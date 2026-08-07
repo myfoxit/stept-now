@@ -203,7 +203,7 @@ export function BillingPanel() {
               <ul className="grid gap-1 text-sm text-muted-foreground">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-center gap-2">
-                    <Check className="size-3.5 shrink-0 text-primary" />
+                    <Check className="size-3.5 shrink-0 text-brand" />
                     {feature}
                   </li>
                 ))}

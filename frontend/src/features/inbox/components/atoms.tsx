@@ -84,7 +84,7 @@ const STATUS_META: Record<
   { label: string; icon: LucideIcon; variant: 'default' | 'secondary' | 'outline' | 'destructive'; className: string }
 > = {
   open: { label: 'Open', icon: Circle, variant: 'outline', className: 'text-blue-600 dark:text-blue-400' },
-  pending: { label: 'AI', icon: Bot, variant: 'secondary', className: 'text-violet-600 dark:text-violet-400' },
+  pending: { label: 'AI', icon: Bot, variant: 'secondary', className: 'text-brand' },
   snoozed: { label: 'Snoozed', icon: Clock, variant: 'outline', className: 'text-amber-600 dark:text-amber-400' },
   resolved: { label: 'Resolved', icon: CheckCircle2, variant: 'outline', className: 'text-emerald-600 dark:text-emerald-400' },
 }

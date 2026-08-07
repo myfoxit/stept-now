@@ -232,7 +232,7 @@ export function ConversationListPane({
             <Button variant="outline" size="sm" aria-label="Filters" className="relative">
               <Filter className="size-4" />
               {activeFilterCount ? (
-                <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-brand text-[10px] text-brand-foreground">
                   {activeFilterCount}
                 </span>
               ) : null}

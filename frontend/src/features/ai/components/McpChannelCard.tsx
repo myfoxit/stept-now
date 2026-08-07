@@ -194,7 +194,7 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
         <div className="flex min-w-0 items-start gap-2">
-          <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+          <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm bg-brand/10 text-brand">
             <Plug className="size-3.5" />
           </span>
           <div className="min-w-0">

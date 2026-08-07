@@ -61,7 +61,7 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
           </div>
           <Link
             to={`/contacts/${contact.id}`}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-brand hover:underline"
           >
             View full profile <ExternalLink className="size-3" />
           </Link>

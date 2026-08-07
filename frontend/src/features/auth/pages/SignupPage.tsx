@@ -53,7 +53,7 @@ export function Component() {
       footer={
         <p>
           Already have an account?{' '}
-          <Link className="text-primary underline-offset-4 hover:underline" to="/login">
+          <Link className="text-brand underline-offset-4 hover:underline" to="/login">
             Log in
           </Link>
         </p>

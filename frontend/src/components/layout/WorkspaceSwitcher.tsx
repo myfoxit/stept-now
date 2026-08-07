@@ -31,7 +31,7 @@ export function WorkspaceSwitcher() {
         <SidebarMenuButton size="lg" className="flex-1 data-[state=open]:bg-sidebar-accent">
           {/* The product mark, not a workspace initial — the sidebar is Stept's
               own chrome, and the workspace name sits right beside it. */}
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
             <StepMark className="size-5" title="Stept" />
           </div>
           <div className="grid flex-1 text-left leading-tight">

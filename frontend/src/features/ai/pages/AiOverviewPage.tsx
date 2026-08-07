@@ -88,7 +88,7 @@ export function Component() {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium">Your agents</h2>
-            <Link to="/ai/agents" className="text-sm text-primary hover:underline">
+            <Link to="/ai/agents" className="text-sm text-brand hover:underline">
               View all
             </Link>
           </div>
@@ -96,7 +96,7 @@ export function Component() {
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 No agents yet.{' '}
-                <Link to="/ai/agents" className="text-primary hover:underline">
+                <Link to="/ai/agents" className="text-brand hover:underline">
                   Create one
                 </Link>{' '}
                 to get started.

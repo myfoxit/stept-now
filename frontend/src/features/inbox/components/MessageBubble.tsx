@@ -165,7 +165,7 @@ export function MessageBubble({ message }: { message: Message }) {
   const bubbleClass = isNote
     ? 'bg-amber-100 text-amber-950 border border-amber-300/60 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800/50'
     : alignEnd
-      ? 'bg-primary text-primary-foreground'
+      ? 'bg-brand text-brand-foreground'
       : 'bg-muted text-foreground'
 
   return (
@@ -182,7 +182,7 @@ export function MessageBubble({ message }: { message: Message }) {
         ) : null}
         <span className="font-medium text-foreground/80">{message.author_name}</span>
         {isAgent ? (
-          <span className="inline-flex items-center gap-0.5 rounded bg-violet-500/15 px-1 py-px text-[10px] font-semibold text-violet-600 dark:text-violet-300">
+          <span className="inline-flex items-center gap-0.5 rounded bg-brand-soft px-1 py-px text-[10px] font-semibold text-brand">
             <Bot className="size-2.5" /> AI
           </span>
         ) : null}

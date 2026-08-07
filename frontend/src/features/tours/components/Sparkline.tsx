@@ -11,7 +11,7 @@ export function Sparkline({ values, className }: { values: number[]; className?:
       {values.map((value, index) => (
         <div
           key={index}
-          className="w-1.5 rounded-[1px] bg-primary/60"
+          className="w-1.5 rounded-[1px] bg-brand/60"
           style={{ height: `${Math.max(8, (value / max) * 100)}%` }}
         />
       ))}

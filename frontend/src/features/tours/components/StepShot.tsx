@@ -48,7 +48,7 @@ export function StepShot({
         <>
           <span
             aria-hidden
-            className="pointer-events-none absolute rounded-[3px] ring-2 ring-primary ring-offset-1 ring-offset-background/40"
+            className="pointer-events-none absolute rounded-[3px] ring-2 ring-brand ring-offset-1 ring-offset-background/40"
             style={{
               left: `${(box.x / box.vw) * 100}%`,
               top: `${(box.y / box.vh) * 100}%`,
@@ -58,7 +58,7 @@ export function StepShot({
           />
           <span
             aria-hidden
-            className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-background"
+            className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-2 ring-background"
             style={{
               left: `${((box.x + box.w / 2) / box.vw) * 100}%`,
               top: `${((box.y + box.h / 2) / box.vh) * 100}%`,

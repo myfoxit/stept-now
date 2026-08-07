@@ -8,7 +8,7 @@ export interface DistributionRow {
 
 /**
  * One measure (a count) across labelled buckets — a bar table rather than a
- * chart: one hue (the primary design token, so dark mode follows the theme), no
+ * chart: one hue (the brand design token, so dark mode follows the theme), no
  * legend (the row label names the category), and every value printed in ink.
  */
 export function DistributionBars({

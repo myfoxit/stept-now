@@ -31,7 +31,7 @@ export function Component() {
       title="Reset your password"
       subtitle="We'll email you a reset link"
       footer={
-        <Link className="text-primary underline-offset-4 hover:underline" to="/login">
+        <Link className="text-brand underline-offset-4 hover:underline" to="/login">
           Back to login
         </Link>
       }

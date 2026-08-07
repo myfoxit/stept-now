@@ -183,7 +183,7 @@ export function Component() {
                     href={result.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
+                    className="flex shrink-0 items-center gap-1 text-xs text-brand hover:underline"
                   >
                     Open <ExternalLink className="size-3" />
                   </a>
@@ -192,7 +192,7 @@ export function Component() {
               <div className="mb-2 flex items-center gap-2">
                 <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
                   <div
-                    className={cn('h-full rounded-full bg-primary')}
+                    className={cn('h-full rounded-full bg-brand')}
                     style={{ width: `${Math.max(6, (result.score / maxScore) * 100)}%` }}
                   />
                 </div>

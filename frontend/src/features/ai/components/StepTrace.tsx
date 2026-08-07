@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import type { AgentStep } from '../api'
 
 const KIND_META: Record<string, { label: string; icon: LucideIcon; className: string }> = {
-  llm_call: { label: 'LLM call', icon: Sparkles, className: 'text-violet-500' },
+  llm_call: { label: 'LLM call', icon: Sparkles, className: 'text-brand' },
   tool_call: { label: 'Tool call', icon: Wrench, className: 'text-blue-500' },
   tool_result: { label: 'Tool result', icon: ArrowLeftRight, className: 'text-blue-500' },
   approval_request: { label: 'Approval requested', icon: ShieldQuestion, className: 'text-amber-500' },

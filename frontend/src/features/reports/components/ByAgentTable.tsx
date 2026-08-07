@@ -39,7 +39,7 @@ export function ByAgentTable({ data }: { data: ReportByAgent[] }) {
                       <div className="flex items-center gap-2">
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                           <div
-                            className="h-full rounded-full bg-primary/60"
+                            className="h-full rounded-full bg-brand/60"
                             style={{ width: `${(row.resolved / max) * 100}%` }}
                           />
                         </div>

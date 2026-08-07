@@ -234,7 +234,7 @@ export function SandboxPlayer({
               data-testid="sandbox-highlight"
               className={cn(
                 'pointer-events-none absolute rounded-[3px] ring-2 ring-offset-2',
-                'ring-primary ring-offset-background/20'
+                'ring-brand ring-offset-background/20'
               )}
               style={{
                 left: `${box.left}%`,
