@@ -40,7 +40,11 @@ describe('SearchPlaygroundPage', () => {
 
     expect(await screen.findByText('Installing the widget')).toBeInTheDocument()
     expect(screen.getByText(/pasting the loader snippet/i)).toBeInTheDocument()
-    expect(screen.getByText('0.4200')).toBeInTheDocument()
+    // Shown relative to the best hit; the raw fused score lives in the tooltip
+    // because an RRF value like 0.0164 reads as "irrelevant" to a human.
+    const score = screen.getByText('100% of top hit')
+    expect(score).toBeInTheDocument()
+    expect(score).toHaveAttribute('title', 'Fused score 0.4200')
     await waitFor(() => expect(screen.getByText(/1 result in 12 ms/i)).toBeInTheDocument())
   })
 

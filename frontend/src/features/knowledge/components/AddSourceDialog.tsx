@@ -350,8 +350,11 @@ export function AddSourceDialog({
         </DialogHeader>
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as SourceType)}>
+          {/* h-auto must carry the same group-data variant as the base `h-9`,
+              otherwise tailwind-merge keeps both and the prefixed rule wins —
+              the 7 triggers then wrap out of a 36px box onto the fields below. */}
           {!editing ? (
-            <TabsList className="grid h-auto w-full grid-cols-4">
+            <TabsList className="grid h-auto w-full grid-cols-4 group-data-[orientation=horizontal]/tabs:h-auto">
               {TYPE_TABS.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value} className="flex-col gap-1 py-2">
                   <tab.icon className="size-4" /> {tab.label}

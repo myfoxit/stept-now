@@ -23,15 +23,30 @@ export function Component() {
   const sources = useSources()
   const search = useSearch()
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault()
+  function run(opts?: { rerank?: boolean }) {
     if (!query.trim()) return
+    const useRerank = opts?.rerank ?? rerank
     search.mutate({
       query: query.trim(),
       k,
       source_ids: scoped.length ? scoped : null,
-      ...(rerank ? { rerank: true } : {}),
+      ...(useRerank ? { rerank: true } : {}),
     })
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    run()
+  }
+
+  /**
+   * Re-run immediately. Toggling used to leave the previous results on screen
+   * unchanged, which reads as "reranking made no difference" when in fact
+   * nothing had been reranked.
+   */
+  function onRerankChange(next: boolean) {
+    setRerank(next)
+    if (search.data) run({ rerank: next })
   }
 
   function toggleSource(id: string) {
@@ -81,7 +96,7 @@ export function Component() {
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <div className="flex items-center gap-2">
-              <Switch id="rerank-toggle" checked={rerank} onCheckedChange={setRerank} />
+              <Switch id="rerank-toggle" checked={rerank} onCheckedChange={onRerankChange} />
               <Label htmlFor="rerank-toggle" className="text-sm font-medium">
                 Rerank with AI
               </Label>
@@ -181,8 +196,17 @@ export function Component() {
                     style={{ width: `${Math.max(6, (result.score / maxScore) * 100)}%` }}
                   />
                 </div>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {result.score.toFixed(4)}
+                {/*
+                  The raw number is a reciprocal-rank-fusion score (~1/(60+rank)),
+                  so the top hit reads as "0.0164" — indistinguishable from
+                  irrelevant. Show strength relative to the best hit instead and
+                  keep the raw value in the tooltip for debugging.
+                */}
+                <span
+                  className="text-xs tabular-nums text-muted-foreground"
+                  title={`Fused score ${result.score.toFixed(4)}`}
+                >
+                  {Math.round((result.score / maxScore) * 100)}% of top hit
                 </span>
               </div>
               <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted-foreground">

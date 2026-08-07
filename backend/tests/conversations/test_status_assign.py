@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.models.message import Message
 from app.models.workspace import Membership
 from app.services import conversations as convs
+from app.services.inboxes import DEFAULT_WIDGET_CONFIG
 from tests.conftest import get_session_factory
 from tests.conversations.conftest import (
     SYSTEM,
@@ -160,6 +161,22 @@ async def test_round_robin_auto_assign_distribution(svc: SvcCtx):
     distribution = Counter(assignees)
     assert set(distribution) == {svc.user.id, second.id}  # both members got work
     assert sorted(distribution.values()) == [1, 2]  # fair split of three
+
+
+async def test_default_widget_inbox_leaves_conversations_unassigned(svc: SvcCtx):
+    """A widget inbox created with the shipped defaults must not pre-claim work.
+
+    Regression guard: auto_assign used to default on, so every inbound
+    conversation was round-robined immediately and the Unassigned triage queue
+    was always empty — in a one-member workspace it all landed on that member.
+    """
+    inbox = await make_inbox(
+        svc.session, svc.workspace, channel_type="widget", config=DEFAULT_WIDGET_CONFIG
+    )
+    conversation = await convs.create_conversation(
+        svc.session, inbox=inbox, contact=svc.contact, actor=SYSTEM
+    )
+    assert conversation.assignee_user_id is None
 
 
 async def test_unavailable_members_are_skipped(svc: SvcCtx):

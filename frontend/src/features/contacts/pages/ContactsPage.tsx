@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { AlertCircle, Loader2, Search, Users } from 'lucide-react'
+import { AlertCircle, Loader2, Plus, Search, Users } from 'lucide-react'
 
 import { timeAgo } from '@/lib/format'
+import { useHasPerm } from '@/stores/auth'
+import { NewContactDialog } from '@/features/contacts/components/NewContactDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +30,8 @@ export function Component() {
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [segmentId, setSegmentId] = useState<string | undefined>()
+  const [creating, setCreating] = useState(false)
+  const canWrite = useHasPerm('contacts:write')
 
   const { data: segments = [] } = useSegments()
 
@@ -45,7 +49,18 @@ export function Component() {
       <div className="flex items-center gap-2 border-b px-6 py-4">
         <Users className="size-5" />
         <h1 className="text-lg font-semibold">Contacts</h1>
+        {canWrite ? (
+          <Button size="sm" className="ml-auto" onClick={() => setCreating(true)}>
+            <Plus className="size-4" /> New contact
+          </Button>
+        ) : null}
       </div>
+
+      <NewContactDialog
+        open={creating}
+        onOpenChange={setCreating}
+        onCreated={(c) => navigate(`/contacts/${c.id}`)}
+      />
 
       <div className="flex flex-wrap items-center gap-2 border-b px-6 py-3">
         <div className="relative max-w-sm flex-1">
@@ -96,11 +111,19 @@ export function Component() {
               </EmptyMedia>
               <EmptyTitle>No contacts found</EmptyTitle>
               <EmptyDescription>
-                {q || segmentId ? 'Try a different search or segment.' : 'Contacts appear here as people reach out.'}
+                {q || segmentId
+                  ? 'Try a different search or segment.'
+                  : 'Contacts appear here as people reach out — or add one yourself.'}
               </EmptyDescription>
             </EmptyHeader>
+            {!q && !segmentId && canWrite ? (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="size-4" /> New contact
+              </Button>
+            ) : null}
           </Empty>
         ) : (
+          <div className="px-6">
           <Table>
             <TableHeader>
               <TableRow>
@@ -114,8 +137,19 @@ export function Component() {
               {contacts.map((c) => (
                 <TableRow
                   key={c.id}
-                  className="cursor-pointer"
+                  className="cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                  // The row was a bare click handler: no keyboard access and
+                  // nothing announced to assistive tech.
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Open contact ${c.name || c.email || 'Unnamed'}`}
                   onClick={() => navigate(`/contacts/${c.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/contacts/${c.id}`)
+                    }
+                  }}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -149,6 +183,7 @@ export function Component() {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
 
         {hasNextPage ? (

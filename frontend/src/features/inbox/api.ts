@@ -94,7 +94,7 @@ export const listTeams = () => api.get<Team[]>(ws('/teams'))
 export const uploadFile = (file: File) => api.upload<FileOut>(ws('/files'), file)
 
 export const copilotSuggest = (conversationId: string) =>
-  api.post<CopilotResult>('/api/v1/ai/copilot/suggest', { conversation_id: conversationId })
+  api.post<CopilotResult>(ws('/ai/copilot/suggest'), { conversation_id: conversationId })
 
 export const approvalsApi = {
   listPending: () => api.get<Approval[]>(ws('/ai/approvals') + qs({ status: 'pending' })),

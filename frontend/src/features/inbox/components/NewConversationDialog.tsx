@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth'
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { contactsApi, type Contact } from '@/features/contacts/api'
+import { NewContactDialog } from '@/features/contacts/components/NewContactDialog'
 import { useInboxes } from '@/features/inbox/hooks'
 import { useCreateConversation } from '@/features/inbox/hooks'
 
@@ -36,19 +37,28 @@ export function NewConversationDialog({
   const [inboxId, setInboxId] = useState<string>('')
   const [subject, setSubject] = useState('')
   const [content, setContent] = useState('')
+  const [creating, setCreating] = useState(false)
 
   const { data: inboxes = [] } = useInboxes()
   const create = useCreateConversation()
 
-  const { data: results } = useQuery({
-    queryKey: ['contacts', workspaceId, 'picker', search],
+  // Debounced so typing "test" fires one request, not one per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const { data: results, isFetching } = useQuery({
+    queryKey: ['contacts', workspaceId, 'picker', debouncedSearch],
     enabled: open && !contact,
-    queryFn: () => contactsApi.list({ q: search || undefined, limit: 8 }),
+    queryFn: () => contactsApi.list({ q: debouncedSearch || undefined, limit: 8 }),
   })
 
   useEffect(() => {
     if (!open) {
       setSearch('')
+      setDebouncedSearch('')
       setContact(null)
       setInboxId('')
       setSubject('')
@@ -70,6 +80,12 @@ export function NewConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <NewContactDialog
+        open={creating}
+        onOpenChange={setCreating}
+        // Selecting it straight away keeps the outbound flow unbroken.
+        onCreated={(c) => setContact(c)}
+      />
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>New conversation</DialogTitle>
@@ -112,7 +128,26 @@ export function NewConversationDialog({
                     </li>
                   ))}
                 </ul>
-              ) : null}
+              ) : (
+                // Previously this branch rendered nothing at all, so an empty
+                // workspace gave no feedback and no way forward.
+                <div className="mt-1 rounded-md border px-3 py-3 text-sm text-muted-foreground">
+                  {isFetching ? (
+                    'Searching…'
+                  ) : (
+                    <div className="flex flex-col items-start gap-2">
+                      <span>
+                        {debouncedSearch
+                          ? `No contacts match “${debouncedSearch}”.`
+                          : 'No contacts yet.'}
+                      </span>
+                      <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+                        <Plus className="size-4" /> New contact
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -75,6 +75,19 @@ export function useTags() {
   })
 }
 
+export function useCreateContact() {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name?: string; email?: string | null; phone?: string | null }) =>
+      contactsApi.create(body),
+    onSuccess: (created: Contact) => {
+      qc.setQueryData([AREA, workspaceId, 'detail', created.id], created)
+      qc.invalidateQueries({ queryKey: [AREA, workspaceId, 'list'] })
+    },
+  })
+}
+
 export function useUpdateContact(contactId: string) {
   const workspaceId = useAuthStore((s) => s.workspaceId)
   const qc = useQueryClient()
