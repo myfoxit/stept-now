@@ -356,7 +356,7 @@ async def test_nonce_cookie_set_on_start_and_cleared_on_success(client):
         for header in response.headers.get_list("set-cookie")
         if header.lower().startswith("stept_oauth_nonce=")
     ]
-    assert cleared and 'max-age=0' in cleared[0].lower().replace('"', "")
+    assert cleared and "max-age=0" in cleared[0].lower().replace('"', "")
 
 
 async def test_user_denied_at_provider(client):

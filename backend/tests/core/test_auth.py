@@ -48,21 +48,64 @@ async def test_concurrent_refresh_within_grace_is_benign(client):
     rotated_cookie = client.cookies.get("stept_refresh")
     assert rotated_cookie and rotated_cookie != original_cookie
 
-    # Tab 2 replays the just-consumed token → sibling session, not a family wipe.
+    # Tab 2 replays the just-consumed token within grace → the chain is advanced,
+    # not wiped, and the session stays alive.
     client.cookies.delete("stept_refresh")
     client.cookies.set("stept_refresh", original_cookie, path="/api/v1/auth")
     replay = await client.post("/api/v1/auth/refresh")
     assert replay.status_code == 200
-    sibling_cookie = replay.cookies.get("stept_refresh")
-    assert sibling_cookie and sibling_cookie != original_cookie
+    latest = replay.cookies.get("stept_refresh")
+    assert latest and latest not in (original_cookie, rotated_cookie)
 
-    # Both live chains keep working.
+    # The family was not wiped: the newest token still refreshes.
     client.cookies.delete("stept_refresh")
-    client.cookies.set("stept_refresh", rotated_cookie, path="/api/v1/auth")
+    client.cookies.set("stept_refresh", latest, path="/api/v1/auth")
     assert (await client.post("/api/v1/auth/refresh")).status_code == 200
+
+
+async def test_token_forked_in_grace_is_still_detected_out_of_grace(client, session):
+    """The grace window must not let a stolen token live forever: replaying an old
+    token in grace advances the single chain (no independent fork), so the other
+    holder's next refresh — outside grace — still trips the family wipe."""
+    from datetime import timedelta
+
+    from sqlalchemy import update as sa_update
+
+    from app.core.db import utcnow
+    from app.models.user import RefreshToken
+
+    await signup(client, "fork@example.com")
+    r0 = client.cookies.get("stept_refresh")
+
+    first = await client.post("/api/v1/auth/refresh")  # r0 -> r1
+    assert first.status_code == 200
+    r1 = client.cookies.get("stept_refresh")
+
+    # "Attacker" replays the stolen r0 within grace → gets a token, no wipe.
     client.cookies.delete("stept_refresh")
-    client.cookies.set("stept_refresh", sibling_cookie, path="/api/v1/auth")
-    assert (await client.post("/api/v1/auth/refresh")).status_code == 200
+    client.cookies.set("stept_refresh", r0, path="/api/v1/auth")
+    attacker = await client.post("/api/v1/auth/refresh")
+    assert attacker.status_code == 200
+    attacker_cookie = attacker.cookies.get("stept_refresh")
+
+    # Time passes beyond the grace window.
+    await session.execute(
+        sa_update(RefreshToken)
+        .where(RefreshToken.revoked_at.is_not(None))
+        .values(revoked_at=utcnow() - timedelta(minutes=10))
+    )
+    await session.commit()
+
+    # The legitimate holder still has r1 (consumed by the attacker's replay) and
+    # refreshes out of grace → theft detected, whole family revoked.
+    client.cookies.delete("stept_refresh")
+    client.cookies.set("stept_refresh", r1, path="/api/v1/auth")
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 401
+
+    # The attacker's forked token is dead too.
+    client.cookies.delete("stept_refresh")
+    client.cookies.set("stept_refresh", attacker_cookie, path="/api/v1/auth")
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 401
 
 
 async def test_stale_reuse_still_revokes_family(client, session):

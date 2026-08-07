@@ -78,19 +78,29 @@ async def rotate_refresh_token(
         # A token consumed *by rotation* moments ago is almost always a benign
         # race — a second tab, a Set-Cookie response lost to a reload, a
         # back/forward-cache replay — not theft. Nuking the whole family here is
-        # what logged users out of every tab, so within the grace window we mint
-        # a sibling instead. Tokens revoked without a successor (logout, password
-        # change, admin revoke) never get grace.
+        # what logged users out of every tab.
+        #
+        # Within the grace window we advance the ONE existing chain from its live
+        # head rather than minting an independent sibling. That is the crucial
+        # difference: a sibling would fork a second chain that never shares a
+        # consumed token with the first, so a genuinely stolen token replayed
+        # here would live forever, invisible to reuse detection. By rotating the
+        # head instead, there is always a single chain — a stolen token replayed
+        # in grace still consumes the head, and the legitimate holder's next
+        # refresh (minutes later, well outside grace) presents that now-consumed
+        # token and trips the family wipe. Tokens revoked *without* a successor
+        # (logout, password change, admin revoke) never get grace.
         grace = timedelta(seconds=settings.refresh_rotation_grace_seconds)
         rotated_recently = (
             record.replaced_by is not None
             and record.revoked_at is not None
             and now - record.revoked_at <= grace
         )
-        if not rotated_recently:
-            # Reuse of a consumed token → assume theft, revoke everything for the
-            # user. Commit immediately: the request will end 401 and roll back
-            # otherwise.
+        head = await _live_chain_head(session, record) if rotated_recently else None
+        if head is None:
+            # Reuse of a consumed token outside grace (or a chain whose head was
+            # explicitly revoked) → assume theft, revoke everything for the user.
+            # Commit immediately: the request will end 401 and roll back otherwise.
             logger.warning("refresh token reuse detected for user %s", record.user_id)
             await session.execute(
                 update(RefreshToken)
@@ -99,6 +109,8 @@ async def rotate_refresh_token(
             )
             await session.commit()
             raise UnauthorizedError("Refresh token reuse detected; please log in again")
+        # Rotate the current head, not the replayed token — keeps one chain.
+        record = head
     if record.expires_at <= now:
         raise UnauthorizedError("Refresh token expired")
 
@@ -117,13 +129,28 @@ async def rotate_refresh_token(
             ip=ip,
         )
     )
-    if record.replaced_by is None:
-        record.replaced_by = new_jti
-        record.revoked_at = now
-    # else: grace-window sibling — the consumed record stays frozen so its
-    # revoked_at cannot be pushed forward to extend the window indefinitely.
+    record.replaced_by = new_jti
+    record.revoked_at = now
     await session.flush()
     return user, new_token
+
+
+async def _live_chain_head(session: AsyncSession, record: RefreshToken) -> RefreshToken | None:
+    """Follow ``replaced_by`` to the chain's current head. Returns None when the
+    chain was terminated (a link revoked without a successor — logout / reset /
+    admin revoke), which must NOT get grace. Bounded walk with a cycle guard."""
+    head = record
+    seen: set[str] = {head.id}
+    for _ in range(64):  # chains are short; this is a safety bound
+        if head.replaced_by is None:
+            # A head that was revoked without being rotated = terminated session.
+            return None if head.revoked_at is not None else head
+        nxt = await session.get(RefreshToken, head.replaced_by)
+        if nxt is None or nxt.id in seen:
+            return None
+        seen.add(nxt.id)
+        head = nxt
+    return None
 
 
 async def revoke_refresh_token(session: AsyncSession, raw_token: str) -> None:
