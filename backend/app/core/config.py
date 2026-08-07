@@ -53,6 +53,27 @@ class Settings(BaseSettings):
     smtp_tls: bool = False
     email_from: str = "Stept <no-reply@stept.local>"
 
+    # W11 integrations. Instance-wide OAuth app credentials (a workspace-scoped
+    # IntegrationAppCredential row overrides these). Absent ⇒ the provider shows
+    # as "needs setup" until a workspace credential is saved.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    microsoft_client_id: str | None = None
+    microsoft_client_secret: str | None = None
+    slack_client_id: str | None = None
+    slack_client_secret: str | None = None
+    slack_signing_secret: str | None = None
+    notion_client_id: str | None = None
+    notion_client_secret: str | None = None
+    confluence_client_id: str | None = None
+    confluence_client_secret: str | None = None
+    # Domain that receives forwarded support mail; each email inbox gets an
+    # auto-generated in-{hex}@{this} forward-to address when set.
+    inbound_email_domain: str | None = None
+    # Test/dev only: per-provider base-URL overrides ({"google": "http://…"})
+    # so OAuth round trips are provable against a local stub provider.
+    oauth_base_override: dict[str, str] = {}
+
     embedding_dim: int = 384
 
     # In-process periodic scheduler (source re-sync, SLA scans, campaign sends).

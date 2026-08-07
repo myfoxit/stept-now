@@ -26,6 +26,7 @@ class Perm(StrEnum):
     TOURS_MANAGE = "tours:manage"
     REPORTS_READ = "reports:read"
     CHANNELS_MANAGE = "channels:manage"
+    INTEGRATIONS_MANAGE = "integrations:manage"  # OAuth connections, app credentials
     MEMBERS_MANAGE = "members:manage"
     ROLES_MANAGE = "roles:manage"
     APIKEYS_MANAGE = "apikeys:manage"

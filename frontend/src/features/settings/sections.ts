@@ -1,4 +1,5 @@
 import {
+  Blocks,
   Bot,
   Building2,
   Clock,
@@ -26,6 +27,7 @@ export const SECTIONS: SectionDef[] = [
   { key: 'members', label: 'Members', icon: Users },
   { key: 'roles', label: 'Roles', icon: ShieldCheck, perm: 'roles:manage' },
   { key: 'channels', label: 'Channels', icon: Inbox, perm: 'conversations:read' },
+  { key: 'integrations', label: 'Integrations', icon: Blocks, perm: 'integrations:manage' },
   { key: 'sla', label: 'SLA', icon: Timer, perm: 'conversations:read' },
   { key: 'working-hours', label: 'Working hours', icon: Clock, perm: 'conversations:read' },
   { key: 'attributes', label: 'Custom attributes', icon: Tags, perm: 'contacts:read' },

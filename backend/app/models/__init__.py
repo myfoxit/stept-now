@@ -22,6 +22,7 @@ from app.models import (  # noqa: F401
     csat,
     custom_attribute,
     inbox,
+    integration,
     knowledge,
     macro,
     mcp_approval,
