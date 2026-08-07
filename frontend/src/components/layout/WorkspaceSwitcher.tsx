@@ -1,6 +1,7 @@
 import { Check, ChevronsUpDown, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
+import { StepMark } from '@/components/StepMark'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,8 +29,10 @@ export function WorkspaceSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton size="lg" className="flex-1 data-[state=open]:bg-sidebar-accent">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground">
-            {current?.name?.[0]?.toUpperCase() ?? 'S'}
+          {/* The product mark, not a workspace initial — the sidebar is Stept's
+              own chrome, and the workspace name sits right beside it. */}
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <StepMark className="size-5" title="Stept" />
           </div>
           <div className="grid flex-1 text-left leading-tight">
             <span className="truncate font-semibold">{current?.name ?? 'Stept'}</span>
