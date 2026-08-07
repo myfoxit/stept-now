@@ -28,6 +28,7 @@ from app.api.v1 import (
     files,
     health,
     inboxes,
+    integrations,
     knowledge,
     macros,
     mcp_approvals,
@@ -68,6 +69,7 @@ api_router.include_router(tags.router, prefix=WS, tags=["tags"])
 api_router.include_router(teams.router, prefix=WS, tags=["teams"])
 api_router.include_router(canned_responses.router, prefix=WS, tags=["canned-responses"])
 api_router.include_router(inboxes.router, prefix=WS, tags=["inboxes"])
+api_router.include_router(integrations.router, prefix=WS, tags=["integrations"])
 api_router.include_router(conversations.router, prefix=WS, tags=["conversations"])
 api_router.include_router(saved_views.router, prefix=WS, tags=["views"])
 api_router.include_router(search.router, prefix=WS, tags=["search"])

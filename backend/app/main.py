@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 import app as app_pkg
 from app.api.channels import channels_router
 from app.api.extension_assets import router as extension_assets_router
+from app.api.oauth_public import router as oauth_public_router
 from app.api.portal import router as portal_router
 from app.api.v1 import api_router
 from app.api.widget import widget_router
@@ -195,6 +196,12 @@ def create_app() -> FastAPI:
         portal_router,
         prefix="/portal",
         dependencies=[Depends(RateLimit("portal", times=240, seconds=60))],
+    )
+    # OAuth browser redirects (unauthenticated; workspace rides in signed state).
+    application.include_router(
+        oauth_public_router,
+        prefix="/api/integrations",
+        dependencies=[Depends(RateLimit("integrations_oauth", times=60, seconds=60))],
     )
     application.include_router(extension_assets_router, prefix="/extension-assets")
     application.include_router(app_ws_router)

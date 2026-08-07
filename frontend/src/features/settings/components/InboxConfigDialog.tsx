@@ -32,6 +32,7 @@ import { useAgents } from '@/features/ai/hooks'
 
 import type { Inbox, InboxUpdate } from '../api'
 import { useUpdateInbox } from '../hooks'
+import { EmailInboxWizard } from './EmailInboxWizard'
 
 /** Radix Select forbids an empty-string item value, so "none" needs a sentinel. */
 const NO_AGENT = '__none__'
@@ -169,10 +170,12 @@ export const CHANNEL_CONFIG_SPECS: Record<string, ChannelConfigSpec> = {
     ],
     hints: [{ label: 'Events path', path: () => '/api/channels/slack/events' }],
   },
+  // Email is configured through the 3-step EmailInboxWizard, not this flat
+  // spec — the entry stays so ChannelsPanel still offers the configure button.
   email: {
-    config: [{ key: 'address', label: 'Address', placeholder: 'support@yourcompany.com' }],
+    config: [],
     secrets: [],
-    hints: [{ label: 'Inbound POST path', path: () => '/api/channels/email/inbound' }],
+    hints: [],
   },
 }
 
@@ -215,6 +218,11 @@ export function InboxConfigDialog({
   }, [open, inbox])
 
   if (!inbox || !spec) return null
+
+  // Email gets the stepped transport wizard instead of the flat spec form.
+  if (inbox.channel_type === 'email') {
+    return <EmailInboxWizard open={open} onOpenChange={onOpenChange} inbox={inbox} />
+  }
 
   const requiredConfigOk = spec.config.every(
     (f) => !f.required || (configValues[f.key] ?? '').trim() !== ''

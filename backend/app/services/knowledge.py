@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 
@@ -34,13 +35,26 @@ from app.services.search_analytics import record_search
 ARTICLES_SOURCE_NAME = "Help center articles"
 
 # Source types that support scheduled re-sync via config.refresh_minutes.
-REFRESHABLE_TYPES = frozenset({"urls", "sitemap", "crawl", "github", "notion"})
+REFRESHABLE_TYPES = frozenset(
+    {"urls", "sitemap", "crawl", "github", "notion", "confluence", "gdrive", "zendesk"}
+)
 
 # Files in one batch upload request.
 MAX_BATCH_FILES = 20
 
 # Crawl include_patterns/exclude_patterns limits.
 MAX_CRAWL_PATTERNS = 20
+
+# Connector list-config limits.
+MAX_CONFLUENCE_SPACE_KEYS = 50
+MAX_GDRIVE_FOLDERS = 20
+
+# Drive folder ids are URL-safe tokens; enforcing that also keeps them inert
+# inside the files.list `q` expression the connector builds.
+_GDRIVE_FOLDER_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+# Bare Zendesk subdomain — never a host/path, so the connector-built URL
+# cannot be steered off {subdomain}.zendesk.com.
+_ZENDESK_SUBDOMAIN_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
 
 # Authored documents (uploaded/pasted plain text) can be edited in place.
 EDITABLE_SOURCE_TYPES = frozenset({"files", "text"})
@@ -97,6 +111,38 @@ def _clean_patterns(config: dict[str, Any], key: str) -> None:
     config[key] = patterns
 
 
+def _require_str(config: dict[str, Any], key: str, message: str) -> str:
+    """Require a non-empty string config value; strips and writes it back."""
+    value = config.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValidationFailure(message)
+    config[key] = value.strip()
+    return config[key]
+
+
+def _clean_str_list(config: dict[str, Any], key: str, *, limit: int) -> list[str]:
+    """Normalize an optional list-of-strings value (strip, drop empties, cap)."""
+    value = config.get(key)
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValidationFailure(f"config.{key} must be a list of strings")
+    items = [item.strip() for item in value if item.strip()]
+    if len(items) > limit:
+        raise ValidationFailure(f"config.{key} is limited to {limit} entries")
+    config[key] = items
+    return items
+
+
+def _connector_auth_mode(config: dict[str, Any]) -> str:
+    """ "oauth" | "token" (or whatever config.auth literally says — callers
+    validate): explicit config.auth wins, else a connection_id implies oauth."""
+    auth = config.get("auth")
+    if auth is None:
+        return "oauth" if str(config.get("connection_id") or "").strip() else "token"
+    return str(auth)
+
+
 def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]:
     config = dict(config)
     if source_type == "urls":
@@ -138,6 +184,61 @@ def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]
         ):
             raise ValidationFailure("config.root_page_id must be a non-empty string")
         _clamp_int(config, "max_pages", cap=300)
+        # OAuth mode is opt-in; plain token sources keep their config untouched.
+        if config.get("auth") is not None or config.get("connection_id"):
+            mode = _connector_auth_mode(config)
+            if mode not in ("oauth", "token"):
+                raise ValidationFailure('config.auth must be "oauth" or "token"')
+            config["auth"] = mode
+            if mode == "oauth":
+                _require_str(
+                    config, "connection_id", "notion oauth sources need config.connection_id"
+                )
+    elif source_type == "confluence":
+        mode = _connector_auth_mode(config)
+        if mode not in ("oauth", "token"):
+            raise ValidationFailure('config.auth must be "oauth" or "token"')
+        config["auth"] = mode
+        if mode == "oauth":
+            _require_str(
+                config, "connection_id", "confluence oauth sources need config.connection_id"
+            )
+            if config.get("cloud_id") is not None:
+                _require_str(config, "cloud_id", "config.cloud_id must be a non-empty string")
+        else:
+            base = _require_http_url(config, "base_url", source_type)
+            config["base_url"] = base.rstrip("/").removesuffix("/wiki")
+            _require_str(config, "email", "confluence token-auth sources need config.email")
+        _clean_str_list(config, "space_keys", limit=MAX_CONFLUENCE_SPACE_KEYS)
+        _clamp_int(config, "max_pages", cap=500)
+    elif source_type == "gdrive":
+        _require_str(config, "connection_id", "gdrive sources need config.connection_id")
+        folder_ids = _clean_str_list(config, "folder_ids", limit=MAX_GDRIVE_FOLDERS)
+        if not folder_ids:
+            raise ValidationFailure(
+                "gdrive sources need config.folder_ids: at least one Drive folder id"
+            )
+        for folder_id in folder_ids:
+            if not _GDRIVE_FOLDER_ID_RE.fullmatch(folder_id):
+                raise ValidationFailure(f"Invalid Drive folder id: {folder_id!r}")
+        _clamp_int(config, "max_files", cap=500)
+    elif source_type == "zendesk":
+        subdomain = _require_str(
+            config, "subdomain", "zendesk sources need config.subdomain"
+        ).lower()
+        config["subdomain"] = subdomain
+        if not _ZENDESK_SUBDOMAIN_RE.fullmatch(subdomain):
+            raise ValidationFailure(
+                "config.subdomain must be the bare Zendesk subdomain (letters/digits/hyphens)"
+            )
+        if config.get("locale") is not None:
+            locale = _require_str(config, "locale", "config.locale must be a non-empty string")
+            config["locale"] = locale.lower()
+        cursor = config.get("sync_cursor")  # internal watermark; survives config round-trips
+        if cursor is not None and (
+            isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0
+        ):
+            raise ValidationFailure("config.sync_cursor must be a non-negative integer")
     if source_type in REFRESHABLE_TYPES:
         refresh = config.get("refresh_minutes")
         if refresh is not None and (
@@ -150,14 +251,32 @@ def _validate_config(source_type: str, config: dict[str, Any]) -> dict[str, Any]
     return config
 
 
-def _validate_secrets(source_type: str, secrets: dict[str, Any] | None, *, creating: bool) -> None:
-    """notion requires an integration token; other types take secrets as-is."""
-    if source_type != "notion":
+def _validate_secrets(
+    source_type: str,
+    secrets: dict[str, Any] | None,
+    *,
+    config: dict[str, Any],
+    creating: bool,
+) -> None:
+    """Per-type credential requirements. OAuth-mode sources need none (the
+    integrations token seam supplies access tokens); other types take secrets
+    as-is. Called with the already-validated effective config."""
+    if source_type in ("notion", "confluence") and _connector_auth_mode(config) == "oauth":
         return
-    if secrets is None and not creating:  # PATCH without secrets keeps the stored token
+    if secrets is None and not creating:  # PATCH without secrets keeps the stored ones
         return
-    if not str((secrets or {}).get("token") or "").strip():
-        raise ValidationFailure("notion sources need secrets.token (internal integration token)")
+    if source_type == "notion":
+        if not str((secrets or {}).get("token") or "").strip():
+            raise ValidationFailure(
+                "notion sources need secrets.token (internal integration token)"
+            )
+    elif source_type == "confluence":
+        if not str((secrets or {}).get("api_token") or "").strip():
+            raise ValidationFailure("confluence token-auth sources need secrets.api_token")
+    elif source_type == "zendesk":
+        for key in ("email", "api_token"):
+            if not str((secrets or {}).get(key) or "").strip():
+                raise ValidationFailure("zendesk sources need secrets.email and secrets.api_token")
 
 
 async def _document_counts(session: AsyncSession, workspace_id: str) -> dict[str, int]:
@@ -198,12 +317,13 @@ async def create_source(
 ) -> KnowledgeSource:
     if type == "articles":
         raise BadRequestError("The articles source is managed automatically")
-    _validate_secrets(type, secrets, creating=True)
+    validated = _validate_config(type, config or {})
+    _validate_secrets(type, secrets, config=validated, creating=True)
     source = KnowledgeSource(
         workspace_id=workspace_id,
         type=type,
         name=name.strip(),
-        config=_validate_config(type, config or {}),
+        config=validated,
     )
     set_source_secrets(source, secrets)
     session.add(source)
@@ -251,7 +371,7 @@ async def update_source(
     if config is not None:
         source.config = _validate_config(source.type, config)
     if secrets is not None:  # {} clears, non-empty re-encrypts
-        _validate_secrets(source.type, secrets, creating=False)
+        _validate_secrets(source.type, secrets, config=source.config or {}, creating=False)
         set_source_secrets(source, secrets)
     await session.flush()
     await audit.record(

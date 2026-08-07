@@ -1,4 +1,4 @@
-"""Knowledge connectors: sitemap, recursive crawl, GitHub, Notion.
+"""Knowledge connectors: sitemap, crawl, GitHub, Notion, Confluence, Drive, Zendesk.
 
 Each connector turns remote content into `FetchedDoc`s; the sync task in
 `app.rag.tasks` upserts them into Documents by (source_id, uri) and ingests.
@@ -11,17 +11,25 @@ refetching unchanged pages. Crawls honor robots.txt `User-agent: *` rules
 (unless respect_robots=false), filter discovered links through include/exclude
 path globs (exclude wins), and fetch each depth level concurrently
 (Semaphore(4)) with a per-fetch politeness delay.
+
+OAuth-connected sources (Notion/Confluence "oauth" mode, Google Drive) resolve
+bearer tokens through the `app.integrations.tokens` seam — the sync task plumbs
+its (session, workspace_id) into the fetch for that. Every FetchedDoc.uri is
+the human web URL (webui link / webViewLink / html_url): citations point users
+there, never at an API endpoint. 429 responses are retried after the provider's
+Retry-After, capped so a sync worker is never parked for minutes.
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import importlib
 import re
 from collections import deque
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urldefrag, urljoin, urlsplit
 from xml.etree import ElementTree
 
@@ -30,7 +38,17 @@ import httpx
 from app.core.net import UnsafeUrlError, assert_public_url
 from app.rag import parsers
 from app.rag.parsers import ParseError
-from app.rag.tasks import URL_FETCH_TIMEOUT_SECONDS, FetchError, fetch_html_bytes
+from app.rag.tasks import (
+    URL_FETCH_MAX_BYTES,
+    URL_FETCH_TIMEOUT_SECONDS,
+    FetchError,
+    fetch_html_bytes,
+)
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models.integration import IntegrationConnection
 
 GITHUB_API = "https://api.github.com"
 NOTION_API = "https://api.notion.com/v1"
@@ -67,6 +85,39 @@ GITHUB_WELL_KNOWN_FILES = frozenset(
 GITHUB_DENIED_SEGMENTS = frozenset(
     {".git", "node_modules", "vendor", "dist", "build", ".venv", "__pycache__"}
 )
+
+CONFLUENCE_CLOUD_API = "https://api.atlassian.com/ex/confluence"
+CONFLUENCE_DEFAULT_MAX_PAGES = 100
+CONFLUENCE_MAX_PAGES_CAP = 500
+CONFLUENCE_PAGE_LIMIT = 100  # per-request limit for v2 space/page listings
+
+GDRIVE_API = "https://www.googleapis.com/drive/v3"
+GDRIVE_DEFAULT_MAX_FILES = 100
+GDRIVE_MAX_FILES_CAP = 500
+GDRIVE_RAW_MAX_BYTES = URL_FETCH_MAX_BYTES  # raw .md/.txt/.html download cap
+GDRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
+GDRIVE_LIST_FIELDS = "nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,size)"
+# Google-native types exported server-side: source mimeType → export mimeType.
+GDRIVE_EXPORTS = {
+    "application/vnd.google-apps.document": "text/markdown",
+    "application/vnd.google-apps.spreadsheet": "text/csv",
+    "application/vnd.google-apps.presentation": "text/plain",
+}
+GDRIVE_RAW_TEXT_MIMES = frozenset({"text/markdown", "text/plain", "text/html"})
+GDRIVE_RAW_TEXT_EXTENSIONS = (".md", ".markdown", ".txt", ".html", ".htm")
+# Recorded-skip types this wave: reusing the pdf/docx parsers is a follow-up.
+GDRIVE_SKIPPED_MIMES = {
+    "application/pdf": "PDF",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
+}
+
+ZENDESK_DEFAULT_LOCALE = "en-us"
+ZENDESK_SUBDOMAIN_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
+ZENDESK_MAX_SYNC_PAGES = 20  # incremental pages per sync (up to 1000 articles each)
+
+RATE_LIMIT_MAX_RETRIES = 2  # extra attempts after a 429 before giving up
+RATE_LIMIT_MAX_SLEEP_SECONDS = 30.0  # Retry-After is honored, but never longer than this
+RATE_LIMIT_DEFAULT_SLEEP_SECONDS = 1.0  # missing/unparseable Retry-After
 
 
 @dataclass
@@ -612,12 +663,27 @@ async def _github_prs(client: httpx.AsyncClient, owner: str, repo: str) -> list[
 # ---------------------------------------------------------------------------
 
 
-async def fetch_notion(config: dict[str, Any], secrets: dict[str, Any]) -> list[FetchedDoc]:
+async def fetch_notion(
+    config: dict[str, Any],
+    secrets: dict[str, Any],
+    *,
+    session: AsyncSession | None = None,
+    workspace_id: str | None = None,
+) -> list[FetchedDoc]:
     """Fetch Notion pages (search API, or traversal from root_page_id) and
-    render their blocks to markdown-ish text."""
-    token = str((secrets or {}).get("token") or "").strip()
-    if not token:
-        raise FetchError("notion sources need secrets.token (internal integration token)")
+    render their blocks to markdown-ish text.
+
+    Auth modes: "token" (secrets.token, internal integration — the default) or
+    "oauth" (config.connection_id, bearer via the integrations token seam).
+    """
+    if _connector_auth_mode(config) == "oauth":
+        token, _ = await _connection_access_token(
+            session, workspace_id, str(config.get("connection_id") or "").strip(), provider="notion"
+        )
+    else:
+        token = str((secrets or {}).get("token") or "").strip()
+        if not token:
+            raise FetchError("notion sources need secrets.token (internal integration token)")
     max_pages = int(config.get("max_pages") or NOTION_DEFAULT_MAX_PAGES)
     root_page_id = str(config.get("root_page_id") or "").strip()
     headers = {"Authorization": f"Bearer {token}", "Notion-Version": NOTION_VERSION}
@@ -809,3 +875,520 @@ def _notion_plain_text(rich_text: Any) -> str:
     return "".join(
         str(part.get("plain_text") or "") for part in rich_text if isinstance(part, dict)
     ).strip()
+
+
+# ---------------------------------------------------------------------------
+# shared connector plumbing: auth modes, token seam, rate limits, html→text
+# ---------------------------------------------------------------------------
+
+
+def _connector_auth_mode(config: dict[str, Any]) -> str:
+    """ "oauth" | "token": explicit config.auth wins, else a connection_id
+    implies oauth. Unvalidated configs may return other strings — callers that
+    care validate in `app.services.knowledge`."""
+    auth = config.get("auth")
+    if auth is None:
+        return "oauth" if str(config.get("connection_id") or "").strip() else "token"
+    return str(auth)
+
+
+async def _connection_access_token(
+    session: AsyncSession | None,
+    workspace_id: str | None,
+    connection_id: str,
+    *,
+    provider: str,
+) -> tuple[str, IntegrationConnection]:
+    """Resolve a live access token for an OAuth-connected source through the
+    `app.integrations.tokens` seam (late-bound import: BE-A owns the module,
+    tests monkeypatch its functions). Never log the returned token."""
+    if not connection_id:
+        raise FetchError(f"{provider} OAuth sources need config.connection_id")
+    if session is None or not workspace_id:
+        raise FetchError("OAuth-connected sources can only sync inside a workspace sync task")
+    tokens: Any = importlib.import_module("app.integrations.tokens")
+    connection: IntegrationConnection = await tokens.get_connection(
+        session, workspace_id, connection_id
+    )
+    if connection.provider != provider:
+        raise FetchError(
+            f"Connection {connection_id} is a {connection.provider!r} connection; "
+            f"this source needs {provider!r}"
+        )
+    token = str(await tokens.get_valid_access_token(session, connection))
+    return token, connection
+
+
+def retry_after_seconds(response: httpx.Response) -> float:
+    """Sleep budget for a 429: the Retry-After header, capped — a provider
+    asking for a 15-minute pause must not park the sync worker that long."""
+    raw = str(response.headers.get("retry-after") or "").strip()
+    try:
+        seconds = float(raw)
+    except ValueError:
+        seconds = RATE_LIMIT_DEFAULT_SLEEP_SECONDS
+    return max(0.0, min(seconds, RATE_LIMIT_MAX_SLEEP_SECONDS))
+
+
+async def _request_with_retry(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    api_name: str,
+    params: dict[str, str] | None = None,
+) -> httpx.Response:
+    """One API request that waits out 429s (Retry-After, capped) before failing.
+    Transport errors and terminal 429s raise FetchError; other statuses are the
+    caller's to judge."""
+    attempts = RATE_LIMIT_MAX_RETRIES + 1
+    for attempt in range(attempts):
+        try:
+            response = await client.request(method, url, params=params)
+        except httpx.HTTPError as exc:
+            raise FetchError(f"{api_name} error: {exc.__class__.__name__}: {exc}") from exc
+        if response.status_code != 429:
+            return response
+        if attempt + 1 < attempts:
+            await asyncio.sleep(retry_after_seconds(response))
+    raise FetchError(f"{api_name} rate limited (HTTP 429) — will retry on the next sync")
+
+
+def _html_fragment_text(name: str, html: str) -> str:
+    """HTML fragment → text via the same extractor the crawl connector uses
+    (Confluence storage-format XHTML, Zendesk article bodies, Drive .html)."""
+    if not html.strip():
+        return ""
+    try:
+        return parsers.extract(f"{name or 'page'}.html", html.encode("utf-8"), "text/html").text
+    except ParseError:
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# Confluence
+# ---------------------------------------------------------------------------
+
+
+async def fetch_confluence(
+    config: dict[str, Any],
+    secrets: dict[str, Any],
+    *,
+    session: AsyncSession | None = None,
+    workspace_id: str | None = None,
+) -> list[FetchedDoc]:
+    """Fetch Confluence Cloud pages (v2 API) as text documents.
+
+    Auth modes: "oauth" (Atlassian 3LO connection via the token seam, API base
+    api.atlassian.com/ex/confluence/{cloud_id}) or "token" (config.base_url +
+    config.email + secrets.api_token Basic auth). Global spaces are enumerated,
+    filtered to config.space_keys when set, and each page's storage-format
+    XHTML is converted with the crawl connector's HTML→text extractor.
+    Incremental sync stays content-hash based (no CQL lastmod watermark this
+    wave). FetchedDoc.uri is the page's absolute webui URL.
+    """
+    max_pages = min(
+        int(config.get("max_pages") or CONFLUENCE_DEFAULT_MAX_PAGES), CONFLUENCE_MAX_PAGES_CAP
+    )
+    space_keys = {
+        key.strip().lower()
+        for key in config.get("space_keys") or []
+        if isinstance(key, str) and key.strip()
+    }
+    auth: tuple[str, str] | None = None
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if _connector_auth_mode(config) == "oauth":
+        token, connection = await _connection_access_token(
+            session,
+            workspace_id,
+            str(config.get("connection_id") or "").strip(),
+            provider="confluence",
+        )
+        meta = connection.meta or {}
+        cloud_id = str(config.get("cloud_id") or meta.get("cloud_id") or "").strip()
+        if not cloud_id:
+            raise FetchError(
+                "confluence oauth sources need a site: set config.cloud_id "
+                "(the connection can access several sites)"
+            )
+        api_root = f"{CONFLUENCE_CLOUD_API}/{cloud_id}"
+        web_base = _confluence_site_url(meta, cloud_id)
+        headers["Authorization"] = f"Bearer {token}"
+    else:
+        base_url = str(config.get("base_url") or "").strip().rstrip("/").removesuffix("/wiki")
+        email = str(config.get("email") or "").strip()
+        api_token = str((secrets or {}).get("api_token") or "").strip()
+        if not base_url or not email or not api_token:
+            raise FetchError(
+                "confluence token-auth sources need config.base_url, config.email "
+                "and secrets.api_token"
+            )
+        check_public_url(base_url)
+        api_root = base_url
+        web_base = base_url
+        auth = (email, api_token)
+
+    docs: list[FetchedDoc] = []
+    async with httpx.AsyncClient(
+        timeout=URL_FETCH_TIMEOUT_SECONDS, follow_redirects=True, headers=headers, auth=auth
+    ) as client:
+        spaces = await _confluence_list(
+            client,
+            api_root,
+            "/wiki/api/v2/spaces",
+            params={"type": "global", "limit": str(CONFLUENCE_PAGE_LIMIT)},
+        )
+        for space in spaces:
+            key = str(space.get("key") or "")
+            if space_keys and key.lower() not in space_keys:
+                continue
+            if len(docs) >= max_pages:
+                break
+            pages = await _confluence_list(
+                client,
+                api_root,
+                f"/wiki/api/v2/spaces/{space.get('id')}/pages",
+                params={"body-format": "storage", "limit": str(CONFLUENCE_PAGE_LIMIT)},
+                cap=max_pages - len(docs),
+            )
+            for page in pages:
+                docs.append(_confluence_doc(page, web_base=web_base, space_key=key))
+    return docs
+
+
+def _confluence_site_url(meta: dict[str, Any], cloud_id: str) -> str:
+    """Human site URL for webui links: meta.site_url, else the matching entry
+    in meta.sites (multi-site connections store the accessible-resources list)."""
+    site_url = str(meta.get("site_url") or "").strip()
+    if not site_url:
+        for site in meta.get("sites") or []:
+            if isinstance(site, dict) and str(site.get("id") or "") == cloud_id:
+                site_url = str(site.get("url") or "").strip()
+                break
+    if not site_url:
+        raise FetchError(
+            "The Confluence connection has no site URL for this cloud_id — reconnect it"
+        )
+    return site_url.rstrip("/").removesuffix("/wiki")
+
+
+def _confluence_doc(page: dict[str, Any], *, web_base: str, space_key: str) -> FetchedDoc:
+    title = str(page.get("title") or "Untitled")
+    body = page.get("body") or {}
+    storage = body.get("storage") if isinstance(body, dict) else None
+    value = str(storage.get("value") or "") if isinstance(storage, dict) else ""
+    links = page.get("_links") or {}
+    webui = str(links.get("webui") or "") if isinstance(links, dict) else ""
+    if webui.startswith(("http://", "https://")):
+        uri = webui
+    elif webui:
+        uri = f"{web_base}/wiki{webui}"
+    else:  # v2 always sends webui; keep upserts collision-free if it ever misses
+        uri = f"{web_base}/wiki/pages/{page.get('id')}"
+    return FetchedDoc(
+        title=title,
+        text=_html_fragment_text(title, value),
+        uri=uri,
+        mime="text/html",
+        meta={"space": space_key} if space_key else {},
+    )
+
+
+async def _confluence_list(
+    client: httpx.AsyncClient,
+    api_root: str,
+    path: str,
+    *,
+    params: dict[str, str] | None,
+    cap: int = CONFLUENCE_MAX_PAGES_CAP,
+) -> list[dict[str, Any]]:
+    """GET a v2 collection, following `_links.next` cursor links up to `cap`.
+    Absolute next links are only followed when they stay on the API host."""
+    results: list[dict[str, Any]] = []
+    url: str | None = api_root + path
+    while url and len(results) < cap:
+        response = await _request_with_retry(
+            client, "GET", url, api_name="Confluence API", params=params
+        )
+        params = None  # `_links.next` embeds the cursor query
+        if response.status_code in (401, 403):
+            raise FetchError(
+                f"Confluence API {response.status_code}: check the credentials and scopes"
+            )
+        if response.status_code != 200:
+            raise FetchError(
+                f"Confluence API {response.status_code}: {response.text[:200] or 'request failed'}"
+            )
+        data = response.json()
+        next_link = ""
+        if isinstance(data, dict):
+            results.extend(item for item in data.get("results") or [] if isinstance(item, dict))
+            links = data.get("_links") or {}
+            next_link = str(links.get("next") or "") if isinstance(links, dict) else ""
+        if not next_link:
+            break
+        if next_link.startswith(("http://", "https://")):
+            url = next_link if next_link.startswith(api_root) else None
+        else:
+            url = api_root + next_link
+    return results[:cap]
+
+
+# ---------------------------------------------------------------------------
+# Google Drive
+# ---------------------------------------------------------------------------
+
+
+async def fetch_gdrive(
+    config: dict[str, Any],
+    secrets: dict[str, Any],
+    *,
+    session: AsyncSession | None = None,
+    workspace_id: str | None = None,
+) -> tuple[list[FetchedDoc], list[str]]:
+    """Fetch files from the configured Drive folders (recursing subfolders)
+    via an OAuth google connection. Returns (docs, skip notes).
+
+    Export routing: Google Docs → markdown, Sheets → CSV (rendered as the same
+    markdown table the CSV upload parser makes), Slides → plain text; raw
+    .md/.txt/.html files ≤2MB are downloaded directly. PDF/DOCX and oversized
+    raw files are skipped with a note — returned separately so the sync records
+    them in the source error summary without treating the folder listing as
+    incomplete. uri = webViewLink.
+    """
+    folder_ids = [item.strip() for item in config.get("folder_ids") or [] if isinstance(item, str)]
+    folder_ids = [item for item in folder_ids if item]
+    if not folder_ids:
+        raise FetchError("gdrive sources need config.folder_ids (at least one Drive folder id)")
+    max_files = min(int(config.get("max_files") or GDRIVE_DEFAULT_MAX_FILES), GDRIVE_MAX_FILES_CAP)
+    token, _ = await _connection_access_token(
+        session, workspace_id, str(config.get("connection_id") or "").strip(), provider="google"
+    )
+
+    docs: list[FetchedDoc] = []
+    notes: list[str] = []
+    queue: deque[str] = deque(folder_ids)
+    visited: set[str] = set(folder_ids)
+    async with httpx.AsyncClient(
+        timeout=URL_FETCH_TIMEOUT_SECONDS,
+        follow_redirects=True,
+        headers={"Authorization": f"Bearer {token}"},
+    ) as client:
+        while queue and len(docs) < max_files:
+            folder_id = queue.popleft()
+            for file in await _gdrive_list_folder(client, folder_id):
+                mime = str(file.get("mimeType") or "")
+                file_id = str(file.get("id") or "")
+                if mime == GDRIVE_FOLDER_MIME:
+                    if file_id and file_id not in visited:
+                        visited.add(file_id)
+                        queue.append(file_id)
+                    continue
+                if len(docs) >= max_files:
+                    break
+                doc, note = await _gdrive_file_doc(client, file, mime)
+                if doc is not None:
+                    docs.append(doc)
+                if note:
+                    notes.append(note)
+    return docs, notes
+
+
+async def _gdrive_list_folder(client: httpx.AsyncClient, folder_id: str) -> list[dict[str, Any]]:
+    """files.list for one folder, following nextPageToken."""
+    escaped = folder_id.replace("\\", "\\\\").replace("'", "\\'")
+    files: list[dict[str, Any]] = []
+    page_token = ""
+    while True:
+        params = {
+            "q": f"'{escaped}' in parents and trashed=false",
+            "fields": GDRIVE_LIST_FIELDS,
+            "pageSize": "100",
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        response = await _request_with_retry(
+            client, "GET", f"{GDRIVE_API}/files", api_name="Google Drive API", params=params
+        )
+        if response.status_code in (401, 403):
+            raise FetchError(
+                f"Google Drive API {response.status_code}: reconnect Google in "
+                "Settings → Integrations (drive.readonly scope required)"
+            )
+        if response.status_code != 200:
+            raise FetchError(
+                f"Google Drive API {response.status_code}: "
+                f"{response.text[:200] or 'request failed'}"
+            )
+        data = response.json()
+        files.extend(item for item in data.get("files") or [] if isinstance(item, dict))
+        page_token = str(data.get("nextPageToken") or "")
+        if not page_token:
+            return files
+
+
+async def _gdrive_file_doc(
+    client: httpx.AsyncClient, file: dict[str, Any], mime: str
+) -> tuple[FetchedDoc | None, str | None]:
+    """One Drive file → (doc, skip note). Non-indexable types (images, zips…)
+    yield neither; PDF/DOCX/oversized yield a note; export/download failures
+    raise (they mean the listing cannot be trusted as complete)."""
+    file_id = str(file.get("id") or "")
+    name = str(file.get("name") or "Untitled")
+    uri = str(file.get("webViewLink") or "") or f"https://drive.google.com/file/d/{file_id}/view"
+    meta: dict[str, Any] = {}
+    if file.get("modifiedTime"):
+        meta["modified"] = str(file["modifiedTime"])
+
+    export_mime = GDRIVE_EXPORTS.get(mime)
+    if export_mime is not None:
+        response = await _request_with_retry(
+            client,
+            "GET",
+            f"{GDRIVE_API}/files/{file_id}/export",
+            api_name="Google Drive API",
+            params={"mimeType": export_mime},
+        )
+        if response.status_code != 200:
+            raise FetchError(f"Google Drive export failed for {name}: HTTP {response.status_code}")
+        text = _sheet_markdown(name, response.text) if export_mime == "text/csv" else response.text
+        return FetchedDoc(title=name, text=text, uri=uri, mime=export_mime, meta=meta), None
+
+    lowered = name.lower()
+    if mime in GDRIVE_RAW_TEXT_MIMES or lowered.endswith(GDRIVE_RAW_TEXT_EXTENSIONS):
+        if int(file.get("size") or 0) > GDRIVE_RAW_MAX_BYTES:
+            return None, f"Skipped {name}: exceeds the 2MB raw file limit"
+        response = await _request_with_retry(
+            client,
+            "GET",
+            f"{GDRIVE_API}/files/{file_id}",
+            api_name="Google Drive API",
+            params={"alt": "media"},
+        )
+        if response.status_code != 200:
+            raise FetchError(
+                f"Google Drive download failed for {name}: HTTP {response.status_code}"
+            )
+        if len(response.content) > GDRIVE_RAW_MAX_BYTES:
+            return None, f"Skipped {name}: exceeds the 2MB raw file limit"
+        raw = response.content.decode("utf-8", errors="replace")
+        if mime == "text/html" or lowered.endswith((".html", ".htm")):
+            return FetchedDoc(
+                title=name,
+                text=_html_fragment_text(name, raw),
+                uri=uri,
+                mime="text/html",
+                meta=meta,
+            ), None
+        doc_mime = "text/markdown" if lowered.endswith((".md", ".markdown")) else "text/plain"
+        return FetchedDoc(title=name, text=raw, uri=uri, mime=doc_mime, meta=meta), None
+
+    skipped = GDRIVE_SKIPPED_MIMES.get(mime)
+    if skipped is not None:
+        return None, f"Skipped {name}: {skipped} files are not indexed yet"
+    return None, None
+
+
+def _sheet_markdown(name: str, csv_text: str) -> str:
+    """Sheets CSV export → the markdown table the CSV upload parser produces."""
+    try:
+        return parsers.extract(f"{name or 'sheet'}.csv", csv_text.encode("utf-8"), "text/csv").text
+    except ParseError:
+        return csv_text
+
+
+# ---------------------------------------------------------------------------
+# Zendesk help center
+# ---------------------------------------------------------------------------
+
+
+async def fetch_zendesk(
+    config: dict[str, Any],
+    secrets: dict[str, Any],
+    *,
+    session: AsyncSession | None = None,
+    workspace_id: str | None = None,
+) -> tuple[list[FetchedDoc], list[str]]:
+    """Incrementally fetch Help Center articles changed since config.sync_cursor.
+
+    Uses the incremental articles API (Basic auth `email/token:api_token`,
+    rate-limited to 10 req/min — 429s are waited out) and writes the returned
+    end_time back into config["sync_cursor"]; the sync task persists the
+    mutated config. Only the configured locale is kept, drafts are skipped,
+    and archived articles come back as the second element so the sync prunes
+    exactly those — unchanged articles are absent from an incremental listing,
+    so full-listing pruning must never run for this type. uri = html_url.
+    """
+    subdomain = str(config.get("subdomain") or "").strip().lower()
+    if not ZENDESK_SUBDOMAIN_RE.fullmatch(subdomain):
+        raise FetchError("zendesk sources need config.subdomain (letters/digits/hyphens only)")
+    email = str((secrets or {}).get("email") or "").strip()
+    api_token = str((secrets or {}).get("api_token") or "").strip()
+    if not email or not api_token:
+        raise FetchError("zendesk sources need secrets.email and secrets.api_token")
+    locale = str(config.get("locale") or ZENDESK_DEFAULT_LOCALE).strip().lower()
+    cursor = config.get("sync_cursor")
+    start_time = cursor if isinstance(cursor, int) and not isinstance(cursor, bool) else 0
+    start_time = max(start_time, 0)
+    base = f"https://{subdomain}.zendesk.com"
+    check_public_url(base)
+
+    docs: list[FetchedDoc] = []
+    archived: list[str] = []
+    end_time = start_time
+    url = f"{base}/api/v2/help_center/incremental/articles"
+    params: dict[str, str] | None = {"start_time": str(start_time)}
+    async with httpx.AsyncClient(
+        timeout=URL_FETCH_TIMEOUT_SECONDS,
+        follow_redirects=True,
+        auth=(f"{email}/token", api_token),
+    ) as client:
+        for _ in range(ZENDESK_MAX_SYNC_PAGES):
+            response = await _request_with_retry(
+                client, "GET", url, api_name="Zendesk API", params=params
+            )
+            params = None  # next_page embeds the query
+            if response.status_code in (401, 403):
+                raise FetchError(
+                    f"Zendesk API {response.status_code}: check secrets.email/api_token "
+                    "and that API token access is enabled"
+                )
+            if response.status_code != 200:
+                raise FetchError(
+                    f"Zendesk API {response.status_code}: {response.text[:200] or 'failed'}"
+                )
+            data = response.json()
+            if not isinstance(data, dict):
+                raise FetchError("Zendesk API returned an unexpected payload")
+            articles = [a for a in data.get("articles") or [] if isinstance(a, dict)]
+            for article in articles:
+                if str(article.get("locale") or "").lower() != locale:
+                    continue
+                uri = str(article.get("html_url") or "")
+                if not uri:
+                    continue
+                if article.get("archived"):
+                    archived.append(uri)
+                    continue
+                if article.get("draft"):
+                    continue
+                title = str(article.get("title") or "Untitled")
+                docs.append(
+                    FetchedDoc(
+                        title=title,
+                        text=_html_fragment_text(title, str(article.get("body") or "")),
+                        uri=uri,
+                        mime="text/html",
+                    )
+                )
+            raw_end = data.get("end_time")
+            if isinstance(raw_end, int) and not isinstance(raw_end, bool):
+                end_time = max(end_time, raw_end)
+            next_page = str(data.get("next_page") or "")
+            # Only follow same-host continuation links the API hands back.
+            if not articles or not next_page.startswith(base):
+                break
+            url = next_page
+    if end_time != start_time:
+        config["sync_cursor"] = end_time
+    return docs, archived

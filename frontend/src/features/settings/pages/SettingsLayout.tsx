@@ -9,6 +9,7 @@ import { ApiKeysPanel } from '../components/ApiKeysPanel'
 import { AttributesPanel } from '../components/AttributesPanel'
 import { AuditPanel } from '../components/AuditPanel'
 import { ChannelsPanel } from '../components/ChannelsPanel'
+import { IntegrationsPanel } from '../components/IntegrationsPanel'
 import { McpPanel } from '../components/McpPanel'
 import { MembersPanel } from '../components/MembersPanel'
 import { ProfilePanel } from '../components/ProfilePanel'
@@ -23,6 +24,7 @@ const PANELS: Record<string, () => ReactElement> = {
   members: () => <MembersPanel />,
   roles: () => <RolesPanel />,
   channels: () => <ChannelsPanel />,
+  integrations: () => <IntegrationsPanel />,
   sla: () => <SlaPanel />,
   'working-hours': () => <WorkingHoursPanel />,
   attributes: () => <AttributesPanel />,
@@ -39,6 +41,7 @@ export function Component() {
   const permMap: Record<string, boolean> = {
     'roles:manage': useHasPerm('roles:manage'),
     'conversations:read': useHasPerm('conversations:read'),
+    'integrations:manage': useHasPerm('integrations:manage'),
     'apikeys:manage': useHasPerm('apikeys:manage'),
     'audit:read': useHasPerm('audit:read'),
   }

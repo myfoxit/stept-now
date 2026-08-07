@@ -40,6 +40,7 @@ import { useHasPerm } from '@/stores/auth'
 
 import type { Inbox, InboxCreate } from '../api'
 import { useCreateInbox, useDeleteInbox, useInboxes, useUpdateInbox } from '../hooks'
+import { EmailInboxWizard } from './EmailInboxWizard'
 import { CHANNEL_CONFIG_SPECS, InboxConfigDialog } from './InboxConfigDialog'
 
 const CHANNEL_TYPES = [
@@ -76,9 +77,19 @@ export function ChannelsPanel() {
   const [channelType, setChannelType] = useState('widget')
   const [deleting, setDeleting] = useState<Inbox | null>(null)
   const [configuring, setConfiguring] = useState<Inbox | null>(null)
+  // Email inboxes are created through the transport wizard; null = closed.
+  const [emailWizardName, setEmailWizardName] = useState<string | null>(null)
 
   async function submit() {
     if (!name.trim()) return
+    if (channelType === 'email') {
+      // Hand off to the 3-step wizard — it performs the create itself.
+      setEmailWizardName(name.trim())
+      setCreateOpen(false)
+      setName('')
+      setChannelType('widget')
+      return
+    }
     const body: InboxCreate = {
       name: name.trim(),
       channel_type: channelType as InboxCreate['channel_type'],
@@ -237,7 +248,11 @@ export function ChannelsPanel() {
               Cancel
             </Button>
             <Button onClick={submit} disabled={!name.trim() || createInbox.isPending}>
-              {createInbox.isPending ? 'Creating…' : 'Create channel'}
+              {channelType === 'email'
+                ? 'Continue'
+                : createInbox.isPending
+                  ? 'Creating…'
+                  : 'Create channel'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -247,6 +262,12 @@ export function ChannelsPanel() {
         inbox={configuring}
         open={configuring !== null}
         onOpenChange={(open) => !open && setConfiguring(null)}
+      />
+
+      <EmailInboxWizard
+        open={emailWizardName !== null}
+        onOpenChange={(open) => !open && setEmailWizardName(null)}
+        defaultName={emailWizardName ?? 'Email'}
       />
 
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>

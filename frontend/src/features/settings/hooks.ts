@@ -4,17 +4,21 @@ import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
 import { currentWorkspaceId } from '@/stores/auth'
 
+import { assignLocation } from './components/integrations/redirect'
 import {
   apiKeysApi,
   attributesApi,
   auditApi,
   channelsApi,
+  integrationsApi,
+  integrationsKeys,
   membersApi,
   profileApi,
   rolesApi,
   slasApi,
   workspaceApi,
   type ApiKeyCreate,
+  type CredentialIn,
   type CustomAttributeUpdate,
   type InboxCreate,
   type InboxUpdate,
@@ -245,6 +249,75 @@ export function useDeleteInbox() {
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete channel')),
+  })
+}
+
+// --- integrations (docs/INTEGRATIONS-CONTRACTS.md) ---------------------------
+
+export function useIntegrations() {
+  return useQuery({
+    queryKey: integrationsKeys.all(currentWorkspaceId()),
+    queryFn: integrationsApi.list,
+  })
+}
+
+/** POST connect → hand the browser to the provider's authorize URL. */
+export function useConnectIntegration() {
+  return useMutation({
+    mutationFn: ({ provider, returnTo }: { provider: string; returnTo?: string }) =>
+      integrationsApi.connect(provider, returnTo),
+    onSuccess: (data) => assignLocation(data.authorize_url),
+    onError: (error) => toast.error(errMessage(error, 'Could not start the connection')),
+  })
+}
+
+/** Reauthorize an existing connection in place (same OAuth round trip). */
+export function useReconnectConnection() {
+  return useMutation({
+    mutationFn: ({ connectionId, returnTo }: { connectionId: string; returnTo?: string }) =>
+      integrationsApi.reconnect(connectionId, returnTo),
+    onSuccess: (data) => assignLocation(data.authorize_url),
+    onError: (error) => toast.error(errMessage(error, 'Could not start the reconnection')),
+  })
+}
+
+export function useDisconnectConnection() {
+  const queryClient = useQueryClient()
+  const key = integrationsKeys.all(currentWorkspaceId())
+  return useMutation({
+    mutationFn: (connectionId: string) => integrationsApi.disconnect(connectionId),
+    onSuccess: () => {
+      toast.success('Disconnected')
+      void queryClient.invalidateQueries({ queryKey: key })
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not disconnect')),
+  })
+}
+
+export function usePutCredentials() {
+  const queryClient = useQueryClient()
+  const key = integrationsKeys.all(currentWorkspaceId())
+  return useMutation({
+    mutationFn: ({ provider, body }: { provider: string; body: CredentialIn }) =>
+      integrationsApi.putCredentials(provider, body),
+    onSuccess: () => {
+      toast.success('App credentials saved')
+      void queryClient.invalidateQueries({ queryKey: key })
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not save credentials')),
+  })
+}
+
+export function useDeleteCredentials() {
+  const queryClient = useQueryClient()
+  const key = integrationsKeys.all(currentWorkspaceId())
+  return useMutation({
+    mutationFn: (provider: string) => integrationsApi.deleteCredentials(provider),
+    onSuccess: () => {
+      toast.success('Workspace credentials removed')
+      void queryClient.invalidateQueries({ queryKey: key })
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not remove credentials')),
   })
 }
 
