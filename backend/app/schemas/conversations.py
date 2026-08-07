@@ -100,6 +100,9 @@ class ConversationPatch(BaseModel):
     priority: PriorityLiteral | None = None
     assignee_user_id: str | None = None
     team_id: str | None = None
+    # Merged into the existing attributes (a key set to null is removed);
+    # values are coerced against any matching custom attribute definition.
+    attributes: dict[str, Any] | None = None
 
 
 class TagRequest(BaseModel):

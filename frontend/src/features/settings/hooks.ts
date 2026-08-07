@@ -6,6 +6,7 @@ import { currentWorkspaceId } from '@/stores/auth'
 
 import {
   apiKeysApi,
+  attributesApi,
   auditApi,
   channelsApi,
   membersApi,
@@ -14,6 +15,7 @@ import {
   slasApi,
   workspaceApi,
   type ApiKeyCreate,
+  type CustomAttributeUpdate,
   type InboxCreate,
   type InboxUpdate,
   type InvitationCreate,
@@ -307,5 +309,64 @@ export function useChangePassword() {
       profileApi.changePassword(body),
     onSuccess: () => toast.success('Password changed'),
     onError: (error) => toast.error(errMessage(error, 'Could not change password')),
+  })
+}
+
+// --- custom attribute definitions -------------------------------------------
+
+export function useCustomAttributes(attributeModel?: string) {
+  return useQuery({
+    queryKey: useKey('custom-attributes', attributeModel ?? 'all'),
+    queryFn: () => attributesApi.list(attributeModel),
+  })
+}
+
+function useAttributesInvalidator() {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({
+      queryKey: ['settings', currentWorkspaceId(), 'custom-attributes'],
+    })
+    // The inbox filter builder renders from the same definitions.
+    void queryClient.invalidateQueries({
+      queryKey: ['inbox', currentWorkspaceId(), 'filter-catalog'],
+    })
+  }
+}
+
+export function useCreateAttribute() {
+  const invalidate = useAttributesInvalidator()
+  return useMutation({
+    mutationFn: attributesApi.create,
+    onSuccess: () => {
+      invalidate()
+      toast.success('Attribute created')
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not create the attribute')),
+  })
+}
+
+export function useUpdateAttribute() {
+  const invalidate = useAttributesInvalidator()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: CustomAttributeUpdate }) =>
+      attributesApi.update(id, body),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Attribute updated')
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not update the attribute')),
+  })
+}
+
+export function useDeleteAttribute() {
+  const invalidate = useAttributesInvalidator()
+  return useMutation({
+    mutationFn: attributesApi.remove,
+    onSuccess: () => {
+      invalidate()
+      toast.success('Attribute deleted — stored values are untouched')
+    },
+    onError: (error) => toast.error(errMessage(error, 'Could not delete the attribute')),
   })
 }

@@ -5,14 +5,23 @@ The empty router is pre-registered; add routes here, never touch the registry.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile
+from fastapi.responses import Response
 
 from app.core.deps import Db, Member, Principal, require_perm
+from app.core.errors import ValidationFailure
 from app.core.events import Actor
 from app.core.pagination import CursorPage
 from app.core.permissions import Perm
 from app.models.contact import Contact
 from app.models.tag import Tag
+from app.schemas.bulk import (
+    ContactBlockRequest,
+    ContactImportOut,
+    ContactImportPreview,
+    ContactImportStart,
+    ContactMergeRequest,
+)
 from app.schemas.common import Msg
 from app.schemas.contacts import (
     ContactCreate,
@@ -26,6 +35,8 @@ from app.schemas.contacts import (
     CsatResponseOut,
 )
 from app.schemas.tags import TagOut
+from app.services import contact_import as import_service
+from app.services import contact_merge as contact_merge_service
 from app.services import contacts as contacts_service
 from app.services import csat as csat_service
 
@@ -40,6 +51,131 @@ def _contact_out(contact: Contact, tags: list[Tag] | None = None) -> ContactOut:
     out = ContactOut.model_validate(contact)
     out.tags = [TagOut.model_validate(t) for t in tags or []]
     return out
+
+
+# ---------------------------------------------------------------------------
+# merge, block, CSV import/export (docs/CHATWOOT-BACKLOG.md §1.7)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/contacts/{contact_id}/merge",
+    response_model=ContactOut,
+    dependencies=[Depends(require_perm(Perm.CONTACTS_WRITE))],
+)
+async def merge_contacts(
+    contact_id: str, body: ContactMergeRequest, principal: Member, session: Db
+) -> ContactOut:
+    """Fold `loser_id` into this contact. The loser row survives as a tombstone
+    so old links and channel source_ids keep resolving."""
+    winner = await contact_merge_service.merge(
+        session,
+        principal.workspace.id,
+        actor=_actor(principal),
+        winner_id=contact_id,
+        loser_id=body.loser_id,
+    )
+    tags = await contacts_service.list_contact_tags(session, principal.workspace.id, winner.id)
+    return _contact_out(winner, tags)
+
+
+@router.post(
+    "/contacts/{contact_id}/block",
+    response_model=ContactOut,
+    dependencies=[Depends(require_perm(Perm.CONTACTS_WRITE))],
+)
+async def block_contact(
+    contact_id: str, body: ContactBlockRequest, principal: Member, session: Db
+) -> ContactOut:
+    contact = await contact_merge_service.set_blocked(
+        session,
+        principal.workspace.id,
+        contact_id,
+        actor=_actor(principal),
+        blocked=body.blocked,
+    )
+    tags = await contacts_service.list_contact_tags(session, principal.workspace.id, contact.id)
+    return _contact_out(contact, tags)
+
+
+@router.get(
+    "/contacts/export",
+    dependencies=[Depends(require_perm(Perm.CONTACTS_READ))],
+)
+async def export_contacts(principal: Member, session: Db) -> Response:
+    csv_text = await import_service.export_rows(session, principal.workspace.id)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="contacts.csv"'},
+    )
+
+
+@router.get(
+    "/contacts/imports",
+    response_model=list[ContactImportOut],
+    dependencies=[Depends(require_perm(Perm.CONTACTS_READ))],
+)
+async def list_contact_imports(principal: Member, session: Db) -> list[ContactImportOut]:
+    rows = await import_service.list_imports(session, principal.workspace.id)
+    return [ContactImportOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/contacts/imports",
+    response_model=ContactImportPreview,
+    status_code=201,
+    dependencies=[Depends(require_perm(Perm.CONTACTS_WRITE))],
+)
+async def upload_contact_import(
+    principal: Member, session: Db, file: UploadFile
+) -> ContactImportPreview:
+    """Upload a CSV and get back the detected headers, a suggested column
+    mapping and a few sample rows. Nothing is written until `/start`."""
+    raw = await file.read()
+    if not raw:
+        raise ValidationFailure("The uploaded file is empty")
+    record, headers, sample = await import_service.create_import(
+        session,
+        principal.workspace.id,
+        actor=_actor(principal),
+        user_id=principal.user.id if principal.user is not None else None,
+        filename=file.filename or "contacts.csv",
+        raw=raw,
+    )
+    return ContactImportPreview(
+        contact_import=ContactImportOut.model_validate(record),
+        headers=headers,
+        sample_rows=sample,
+    )
+
+
+@router.get(
+    "/contacts/imports/{import_id}",
+    response_model=ContactImportOut,
+    dependencies=[Depends(require_perm(Perm.CONTACTS_READ))],
+)
+async def get_contact_import(import_id: str, principal: Member, session: Db) -> ContactImportOut:
+    record = await import_service.get_import(session, principal.workspace.id, import_id)
+    return ContactImportOut.model_validate(record)
+
+
+@router.post(
+    "/contacts/imports/{import_id}/start",
+    response_model=ContactImportOut,
+    dependencies=[Depends(require_perm(Perm.CONTACTS_WRITE))],
+)
+async def start_contact_import(
+    import_id: str, body: ContactImportStart, principal: Member, session: Db
+) -> ContactImportOut:
+    record = await import_service.start_import(
+        session,
+        principal.workspace.id,
+        import_id,
+        actor=_actor(principal),
+        mapping=body.mapping,
+    )
+    return ContactImportOut.model_validate(record)
 
 
 @router.get(

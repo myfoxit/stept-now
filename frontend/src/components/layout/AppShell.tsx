@@ -2,14 +2,27 @@ import { Outlet } from 'react-router'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { CommandK } from '@/components/layout/CommandK'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 export function AppShell() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="h-svh overflow-hidden">
-        <Outlet />
+      <SidebarInset className="flex h-svh flex-col overflow-hidden">
+        {/*
+          Below 768px the sidebar collapses into a sheet that only opens from a
+          SidebarTrigger. Only the Knowledge and AI shells rendered one, so on a
+          phone every other route (inbox, contacts, reports, settings…) lost the
+          navigation entirely with no way to get it back. This bar gives every
+          route a trigger; the per-feature ones stay for desktop collapsing.
+        */}
+        <div className="flex items-center gap-2 border-b px-3 py-2 md:hidden">
+          <SidebarTrigger />
+          <span className="text-sm font-semibold">Stept</span>
+        </div>
+        <div className="min-h-0 flex-1">
+          <Outlet />
+        </div>
       </SidebarInset>
       <CommandK />
     </SidebarProvider>

@@ -219,9 +219,10 @@ export class CdpSession {
   }
 
   // -------------------------------------------------------------------------
-  // Remote-drive surface (W9). SIGNATURE STUBS — bodies are wave EXT-1's
-  // (docs/MCP-CONTRACTS.md); the remote drive-controller (EXT-2) compiles
-  // against these. Local drive above is untouched by any of it.
+  // Remote-drive surface (docs/MCP-CONTRACTS.md): what the drive controller
+  // needs beyond local drive — screenshots, page evaluation, navigation,
+  // chords, drag, per-character typing, and console/network telemetry. The
+  // local-drive methods above are untouched by any of it.
   // -------------------------------------------------------------------------
 
   /** Like `attach`, but a refusal THROWS: a remote caller must get the real

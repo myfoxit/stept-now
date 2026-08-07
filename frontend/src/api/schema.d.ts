@@ -1149,6 +1149,79 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/contacts/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Export Contacts */
+    get: operations['export_contacts_api_v1_w__workspace_id__contacts_export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/contacts/imports': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Contact Imports */
+    get: operations['list_contact_imports_api_v1_w__workspace_id__contacts_imports_get']
+    put?: never
+    /**
+     * Upload Contact Import
+     * @description Upload a CSV and get back the detected headers, a suggested column
+     *     mapping and a few sample rows. Nothing is written until `/start`.
+     */
+    post: operations['upload_contact_import_api_v1_w__workspace_id__contacts_imports_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/contacts/imports/{import_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Contact Import */
+    get: operations['get_contact_import_api_v1_w__workspace_id__contacts_imports__import_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/contacts/imports/{import_id}/start': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Start Contact Import */
+    post: operations['start_contact_import_api_v1_w__workspace_id__contacts_imports__import_id__start_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/contacts/{contact_id}': {
     parameters: {
       query?: never
@@ -1166,6 +1239,23 @@ export interface paths {
     head?: never
     /** Update Contact */
     patch: operations['update_contact_api_v1_w__workspace_id__contacts__contact_id__patch']
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/contacts/{contact_id}/block': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Block Contact */
+    post: operations['block_contact_api_v1_w__workspace_id__contacts__contact_id__block_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/v1/w/{workspace_id}/contacts/{contact_id}/csat': {
@@ -1200,6 +1290,27 @@ export interface paths {
      * @description Track a timeline event. Also usable by API keys with the write scope.
      */
     post: operations['track_event_api_v1_w__workspace_id__contacts__contact_id__events_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/contacts/{contact_id}/merge': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Merge Contacts
+     * @description Fold `loser_id` into this contact. The loser row survives as a tombstone
+     *     so old links and channel source_ids keep resolving.
+     */
+    post: operations['merge_contacts_api_v1_w__workspace_id__contacts__contact_id__merge_post']
     delete?: never
     options?: never
     head?: never
@@ -1282,7 +1393,11 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** List Conversations */
+    /**
+     * List Conversations
+     * @description `view_id` layers a saved view's filter document on top of the query
+     *     params, so a view can be combined with an ad-hoc status/assignee narrowing.
+     */
     get: operations['list_conversations_api_v1_w__workspace_id__conversations_get']
     put?: never
     /**
@@ -1290,6 +1405,27 @@ export interface paths {
      * @description Outbound start: open a conversation with a contact and send the first message.
      */
     post: operations['create_conversation_api_v1_w__workspace_id__conversations_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/conversations/bulk': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Bulk Action
+     * @description Apply one action to many conversations. Per-conversation failures are
+     *     reported rather than rolling the batch back.
+     */
+    post: operations['bulk_action_api_v1_w__workspace_id__conversations_bulk_post']
     delete?: never
     options?: never
     head?: never
@@ -1307,6 +1443,27 @@ export interface paths {
     get: operations['conversation_counts_api_v1_w__workspace_id__conversations_counts_get']
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/conversations/search': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Search Conversations
+     * @description Run an ad-hoc filter document without saving it as a view — the endpoint
+     *     the filter builder previews against and report drill-down links to.
+     */
+    post: operations['search_conversations_api_v1_w__workspace_id__conversations_search_post']
     delete?: never
     options?: never
     head?: never
@@ -1366,6 +1523,41 @@ export interface paths {
     /** Submit Message Feedback */
     post: operations['submit_message_feedback_api_v1_w__workspace_id__conversations__conversation_id__messages__message_id__feedback_post']
     delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/conversations/{conversation_id}/participants': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Participants */
+    get: operations['list_participants_api_v1_w__workspace_id__conversations__conversation_id__participants_get']
+    put?: never
+    /** Add Participant */
+    post: operations['add_participant_api_v1_w__workspace_id__conversations__conversation_id__participants_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/conversations/{conversation_id}/participants/{user_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Remove Participant */
+    delete: operations['remove_participant_api_v1_w__workspace_id__conversations__conversation_id__participants__user_id__delete']
     options?: never
     head?: never
     patch?: never
@@ -1441,6 +1633,42 @@ export interface paths {
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/custom-attributes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Definitions */
+    get: operations['list_definitions_api_v1_w__workspace_id__custom_attributes_get']
+    put?: never
+    /** Create Definition */
+    post: operations['create_definition_api_v1_w__workspace_id__custom_attributes_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/custom-attributes/{definition_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Delete Definition */
+    delete: operations['delete_definition_api_v1_w__workspace_id__custom_attributes__definition_id__delete']
+    options?: never
+    head?: never
+    /** Update Definition */
+    patch: operations['update_definition_api_v1_w__workspace_id__custom_attributes__definition_id__patch']
     trace?: never
   }
   '/api/v1/w/{workspace_id}/files': {
@@ -1533,6 +1761,28 @@ export interface paths {
     head?: never
     /** Update Inbox */
     patch: operations['update_inbox_api_v1_w__workspace_id__inboxes__inbox_id__patch']
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/inboxes/{inbox_id}/working-hours': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Working Hours */
+    get: operations['get_working_hours_api_v1_w__workspace_id__inboxes__inbox_id__working_hours_get']
+    /**
+     * Set Working Hours
+     * @description Replace the whole week. `days: []` clears the schedule, which makes the
+     *     inbox always-open regardless of the `enabled` switch.
+     */
+    put: operations['set_working_hours_api_v1_w__workspace_id__inboxes__inbox_id__working_hours_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/v1/w/{workspace_id}/invitations': {
@@ -1889,6 +2139,43 @@ export interface paths {
     patch: operations['update_member_api_v1_w__workspace_id__members__member_id__patch']
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/mentions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Mentions
+     * @description The signed-in user's mentions. API-key principals have none by definition.
+     */
+    get: operations['list_mentions_api_v1_w__workspace_id__mentions_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/mentions/read': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Mark Mentions Read */
+    post: operations['mark_mentions_read_api_v1_w__workspace_id__mentions_read_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/notifications': {
     parameters: {
       query?: never
@@ -1940,6 +2227,43 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/w/{workspace_id}/reports/breakdown': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Reports Breakdown
+     * @description Volume + speed grouped by agent, team, inbox, tag or channel.
+     */
+    get: operations['reports_breakdown_api_v1_w__workspace_id__reports_breakdown_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/reports/breakdown.csv': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Reports Breakdown Csv */
+    get: operations['reports_breakdown_csv_api_v1_w__workspace_id__reports_breakdown_csv_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/w/{workspace_id}/reports/overview': {
     parameters: {
       query?: never
@@ -1949,6 +2273,60 @@ export interface paths {
     }
     /** Reports Overview */
     get: operations['reports_overview_api_v1_w__workspace_id__reports_overview_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/reports/overview.csv': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Reports Overview Csv */
+    get: operations['reports_overview_csv_api_v1_w__workspace_id__reports_overview_csv_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/reports/sla': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Reports Sla
+     * @description SLA attainment per policy, plus a breakdown of which target was missed.
+     */
+    get: operations['reports_sla_api_v1_w__workspace_id__reports_sla_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/reports/sla.csv': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Reports Sla Csv */
+    get: operations['reports_sla_csv_api_v1_w__workspace_id__reports_sla_csv_get']
     put?: never
     post?: never
     delete?: never
@@ -2500,6 +2878,63 @@ export interface paths {
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/views': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Views */
+    get: operations['list_views_api_v1_w__workspace_id__views_get']
+    put?: never
+    /** Create View */
+    post: operations['create_view_api_v1_w__workspace_id__views_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/views/catalog': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Filter Catalog
+     * @description Every filterable field with its allowed operators — including the
+     *     workspace's own conversation attributes, so the builder needs no hardcoding.
+     */
+    get: operations['filter_catalog_api_v1_w__workspace_id__views_catalog_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/w/{workspace_id}/views/{view_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Delete View */
+    delete: operations['delete_view_api_v1_w__workspace_id__views__view_id__delete']
+    options?: never
+    head?: never
+    /** Update View */
+    patch: operations['update_view_api_v1_w__workspace_id__views__view_id__patch']
     trace?: never
   }
   '/api/v1/w/{workspace_id}/webhooks': {
@@ -3978,6 +4413,11 @@ export interface components {
       /** Text Color */
       text_color?: string | null
     }
+    /** Body_upload_contact_import_api_v1_w__workspace_id__contacts_imports_post */
+    Body_upload_contact_import_api_v1_w__workspace_id__contacts_imports_post: {
+      /** File */
+      file: string
+    }
     /** Body_upload_file_api_v1_w__workspace_id__files_post */
     Body_upload_file_api_v1_w__workspace_id__files_post: {
       /** File */
@@ -4011,6 +4451,34 @@ export interface components {
       visitor_id?: string | null
       /** Widget Key */
       widget_key: string
+    }
+    /**
+     * BulkActionRequest
+     * @description Targets are either explicit ids or a filter document — never both.
+     */
+    BulkActionRequest: {
+      /** Action */
+      action: string
+      /** Conversation Ids */
+      conversation_ids?: string[] | null
+      /** Params */
+      params?: {
+        [key: string]: unknown
+      }
+      query?: components['schemas']['FilterQuery'] | null
+    }
+    /** BulkActionResult */
+    BulkActionResult: {
+      /** Errors */
+      errors?: {
+        [key: string]: string
+      }[]
+      /** Failed */
+      failed: number
+      /** Requested */
+      requested: number
+      /** Succeeded */
+      succeeded: number
     }
     /** CampaignCreate */
     CampaignCreate: {
@@ -4486,6 +4954,14 @@ export interface components {
       /** Value */
       value?: unknown
     }
+    /** ContactBlockRequest */
+    ContactBlockRequest: {
+      /**
+       * Blocked
+       * @default true
+       */
+      blocked: boolean
+    }
     /** ContactCreate */
     ContactCreate: {
       /** Attributes */
@@ -4561,6 +5037,71 @@ export interface components {
       /** Name */
       name: string
     }
+    /** ContactImportOut */
+    ContactImportOut: {
+      /** Completed At */
+      completed_at?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Created Count */
+      created_count: number
+      /** Errors */
+      errors: unknown[]
+      /** Failed Count */
+      failed_count: number
+      /** Filename */
+      filename: string
+      /** Id */
+      id: string
+      /** Mapping */
+      mapping: {
+        [key: string]: unknown
+      }
+      /** Processed Rows */
+      processed_rows: number
+      /** Started At */
+      started_at?: string | null
+      /** Status */
+      status: string
+      /** Total Rows */
+      total_rows: number
+      /** Updated Count */
+      updated_count: number
+    }
+    /**
+     * ContactImportPreview
+     * @description What the upload returns: the stored run plus what the mapper needs.
+     */
+    ContactImportPreview: {
+      contact_import: components['schemas']['ContactImportOut']
+      /** Headers */
+      headers: string[]
+      /** Sample Rows */
+      sample_rows: {
+        [key: string]: string
+      }[]
+    }
+    /**
+     * ContactImportStart
+     * @description Column → target. Omit to accept the auto-detected mapping.
+     */
+    ContactImportStart: {
+      /** Mapping */
+      mapping?: {
+        [key: string]: string
+      } | null
+    }
+    /**
+     * ContactMergeRequest
+     * @description `loser_id` is folded into the contact in the path.
+     */
+    ContactMergeRequest: {
+      /** Loser Id */
+      loser_id: string
+    }
     /** ContactNoteCreate */
     ContactNoteCreate: {
       /** Body */
@@ -4591,6 +5132,11 @@ export interface components {
       /** Avatar Url */
       avatar_url?: string | null
       /**
+       * Blocked
+       * @default false
+       */
+      blocked: boolean
+      /**
        * Created At
        * Format: date-time
        */
@@ -4605,6 +5151,8 @@ export interface components {
       id: string
       /** Last Seen At */
       last_seen_at?: string | null
+      /** Merged Into Id */
+      merged_into_id?: string | null
       /** Name */
       name: string
       /** Phone */
@@ -4803,6 +5351,10 @@ export interface components {
     ConversationPatch: {
       /** Assignee User Id */
       assignee_user_id?: string | null
+      /** Attributes */
+      attributes?: {
+        [key: string]: unknown
+      } | null
       /** Priority */
       priority?: ('none' | 'low' | 'medium' | 'high' | 'urgent') | null
       /** Snoozed Until */
@@ -5008,6 +5560,102 @@ export interface components {
       timeout_s?: number | null
       /** Url */
       url?: string | null
+    }
+    /** CustomAttributeCreate */
+    CustomAttributeCreate: {
+      /** Attribute Model */
+      attribute_model: string
+      /**
+       * Attribute Type
+       * @default text
+       */
+      attribute_type: string
+      /** Default Value */
+      default_value?: unknown
+      /** Description */
+      description?: string | null
+      /** Display Name */
+      display_name: string
+      /** Key */
+      key: string
+      /** Options */
+      options?: unknown[]
+      /**
+       * Ord
+       * @default 0
+       */
+      ord: number
+      /** Regex Cue */
+      regex_cue?: string | null
+      /** Regex Pattern */
+      regex_pattern?: string | null
+      /**
+       * Shown On Front
+       * @default true
+       */
+      shown_on_front: boolean
+    }
+    /** CustomAttributeOut */
+    CustomAttributeOut: {
+      /** Attribute Model */
+      attribute_model: string
+      /** Attribute Type */
+      attribute_type: string
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Default Value */
+      default_value?: unknown
+      /** Description */
+      description?: string | null
+      /** Display Name */
+      display_name: string
+      /** Id */
+      id: string
+      /** Key */
+      key: string
+      /** Options */
+      options: unknown[]
+      /** Ord */
+      ord: number
+      /** Regex Cue */
+      regex_cue?: string | null
+      /** Regex Pattern */
+      regex_pattern?: string | null
+      /** Shown On Front */
+      shown_on_front: boolean
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+    }
+    /**
+     * CustomAttributeUpdate
+     * @description `key` and `attribute_model` are immutable — changing either would orphan
+     *     every stored value.
+     */
+    CustomAttributeUpdate: {
+      /** Attribute Type */
+      attribute_type?: string | null
+      /** Default Value */
+      default_value?: unknown
+      /** Description */
+      description?: string | null
+      /** Display Name */
+      display_name?: string | null
+      /** Options */
+      options?: unknown[] | null
+      /** Ord */
+      ord?: number | null
+      /** Regex Cue */
+      regex_cue?: string | null
+      /** Regex Pattern */
+      regex_pattern?: string | null
+      /** Shown On Front */
+      shown_on_front?: boolean | null
     }
     /** DapAuthCheckOut */
     DapAuthCheckOut: {
@@ -5246,6 +5894,48 @@ export interface components {
       size: number
       /** Url */
       url: string
+    }
+    /** FilterCatalogOut */
+    FilterCatalogOut: {
+      /** Fields */
+      fields: components['schemas']['FilterFieldOut'][]
+    }
+    /** FilterCondition */
+    FilterCondition: {
+      /** Field */
+      field: string
+      /** Op */
+      op: string
+      /** Value */
+      value?: unknown
+    }
+    /**
+     * FilterFieldOut
+     * @description One entry of the filter catalog the frontend builds its UI from.
+     */
+    FilterFieldOut: {
+      /** Field */
+      field: string
+      /** Label */
+      label: string
+      /** Ops */
+      ops: string[]
+      /** Options */
+      options?: {
+        [key: string]: unknown
+      }[]
+      /** Value Type */
+      value_type: string
+    }
+    /** FilterQuery */
+    FilterQuery: {
+      /** Conditions */
+      conditions?: components['schemas']['FilterCondition'][]
+      /**
+       * Match
+       * @default all
+       */
+      match: string
     }
     /** GuardrailSettings */
     GuardrailSettings: {
@@ -5640,6 +6330,52 @@ export interface components {
       /** Workspace Id */
       workspace_id: string
     }
+    /** MentionOut */
+    MentionOut: {
+      /**
+       * Author Name
+       * @default
+       */
+      author_name: string
+      /** Conversation Id */
+      conversation_id: string
+      /** Conversation Number */
+      conversation_number?: number | null
+      /** Conversation Subject */
+      conversation_subject?: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Excerpt
+       * @default
+       */
+      excerpt: string
+      /** Id */
+      id: string
+      /** Message Id */
+      message_id: string
+      /** Read At */
+      read_at?: string | null
+    }
+    /**
+     * MentionReadRequest
+     * @description Null conversation_id marks every unread mention read.
+     */
+    MentionReadRequest: {
+      /** Conversation Id */
+      conversation_id?: string | null
+    }
+    /** MentionReadResult */
+    MentionReadResult: {
+      /**
+       * Marked
+       * @description How many mentions were flipped to read
+       */
+      marked: number
+    }
     /** MessageCreate */
     MessageCreate: {
       /** Attachments */
@@ -5889,6 +6625,27 @@ export interface components {
        */
       enabled: boolean
     }
+    /** ParticipantAdd */
+    ParticipantAdd: {
+      /** User Id */
+      user_id: string
+    }
+    /** ParticipantOut */
+    ParticipantOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Id */
+      id: string
+      /** Muted */
+      muted: boolean
+      /** Reason */
+      reason: string
+      /** User Id */
+      user_id: string
+    }
     /** PasswordResetConfirm */
     PasswordResetConfirm: {
       /** New Password */
@@ -6085,6 +6842,15 @@ export interface components {
       /** Ordered Ids */
       ordered_ids: string[]
     }
+    /** ReportBreakdown */
+    ReportBreakdown: {
+      /** Days */
+      days: number
+      /** Dimension */
+      dimension: string
+      /** Rows */
+      rows: components['schemas']['ReportDimensionRow'][]
+    }
     /** ReportByAgent */
     ReportByAgent: {
       /** Median First Response Minutes */
@@ -6109,6 +6875,31 @@ export interface components {
       date: string
       /** New */
       new: number
+      /** Resolved */
+      resolved: number
+    }
+    /**
+     * ReportDimensionRow
+     * @description One row of a breakdown. `filter` is a conversation filter document that
+     *     reproduces exactly this row's population — the drill-down payload.
+     */
+    ReportDimensionRow: {
+      /** Filter */
+      filter: {
+        [key: string]: unknown
+      }
+      /** Key */
+      key: string
+      /** Label */
+      label: string
+      /** Median First Response Minutes */
+      median_first_response_minutes?: number | null
+      /** Median Resolution Minutes */
+      median_resolution_minutes?: number | null
+      /** New */
+      new: number
+      /** Resolution Rate */
+      resolution_rate: number
       /** Resolved */
       resolved: number
     }
@@ -6210,6 +7001,72 @@ export interface components {
       name?: string | null
       /** Permissions */
       permissions?: string[] | null
+    }
+    /** SavedViewCreate */
+    SavedViewCreate: {
+      /** Icon */
+      icon?: string | null
+      /**
+       * Kind
+       * @default conversation
+       */
+      kind: string
+      /** Name */
+      name: string
+      /**
+       * Ord
+       * @default 0
+       */
+      ord: number
+      query?: components['schemas']['FilterQuery']
+      /**
+       * Visibility
+       * @default personal
+       */
+      visibility: string
+    }
+    /** SavedViewOut */
+    SavedViewOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Created By */
+      created_by?: string | null
+      /** Icon */
+      icon?: string | null
+      /** Id */
+      id: string
+      /** Kind */
+      kind: string
+      /** Name */
+      name: string
+      /** Ord */
+      ord: number
+      /** Query */
+      query: {
+        [key: string]: unknown
+      }
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** Visibility */
+      visibility: string
+    }
+    /** SavedViewUpdate */
+    SavedViewUpdate: {
+      /** Icon */
+      icon?: string | null
+      /** Name */
+      name?: string | null
+      /** Ord */
+      ord?: number | null
+      query?: components['schemas']['FilterQuery'] | null
+      /** Visibility */
+      visibility?: string | null
     }
     /** ScreenshotOut */
     ScreenshotOut: {
@@ -6387,6 +7244,29 @@ export interface components {
         [key: string]: unknown
       }
     }
+    /** SlaPolicyAttainment */
+    SlaPolicyAttainment: {
+      /** Active */
+      active: number
+      /** Applied */
+      applied: number
+      /** Attainment Rate */
+      attainment_rate: number
+      /** Frt Breaches */
+      frt_breaches: number
+      /** Hit */
+      hit: number
+      /** Missed */
+      missed: number
+      /** Name */
+      name: string
+      /** Nrt Breaches */
+      nrt_breaches: number
+      /** Rt Breaches */
+      rt_breaches: number
+      /** Sla Policy Id */
+      sla_policy_id: string
+    }
     /** SlaPolicyCreate */
     SlaPolicyCreate: {
       /** Description */
@@ -6397,6 +7277,11 @@ export interface components {
       name: string
       /** Next Response Minutes */
       next_response_minutes?: number | null
+      /**
+       * Only During Business Hours
+       * @default false
+       */
+      only_during_business_hours: boolean
       /** Resolution Minutes */
       resolution_minutes?: number | null
     }
@@ -6417,6 +7302,11 @@ export interface components {
       name: string
       /** Next Response Minutes */
       next_response_minutes?: number | null
+      /**
+       * Only During Business Hours
+       * @default false
+       */
+      only_during_business_hours: boolean
       /** Resolution Minutes */
       resolution_minutes?: number | null
       /**
@@ -6439,8 +7329,18 @@ export interface components {
       name?: string | null
       /** Next Response Minutes */
       next_response_minutes?: number | null
+      /** Only During Business Hours */
+      only_during_business_hours?: boolean | null
       /** Resolution Minutes */
       resolution_minutes?: number | null
+    }
+    /** SlaReport */
+    SlaReport: {
+      /** By Policy */
+      by_policy: components['schemas']['SlaPolicyAttainment'][]
+      /** Days */
+      days: number
+      totals: components['schemas']['SlaPolicyAttainment']
     }
     /**
      * SnapshotOut
@@ -7631,6 +8531,83 @@ export interface components {
       theme: components['schemas']['TourTheme']
       /** Version */
       version: number
+    }
+    /** WorkingHourIn */
+    WorkingHourIn: {
+      /**
+       * Close Minute
+       * @default 1020
+       */
+      close_minute: number
+      /**
+       * Closed All Day
+       * @default false
+       */
+      closed_all_day: boolean
+      /**
+       * Day Of Week
+       * @description 0=Monday … 6=Sunday
+       */
+      day_of_week: number
+      /**
+       * Open All Day
+       * @default false
+       */
+      open_all_day: boolean
+      /**
+       * Open Minute
+       * @default 540
+       */
+      open_minute: number
+    }
+    /** WorkingHourOut */
+    WorkingHourOut: {
+      /** Close Minute */
+      close_minute: number
+      /** Closed All Day */
+      closed_all_day: boolean
+      /** Day Of Week */
+      day_of_week: number
+      /** Open All Day */
+      open_all_day: boolean
+      /** Open Minute */
+      open_minute: number
+    }
+    /** WorkingHoursOut */
+    WorkingHoursOut: {
+      /**
+       * Currently Open
+       * @default true
+       */
+      currently_open: boolean
+      /** Days */
+      days?: components['schemas']['WorkingHourOut'][]
+      /**
+       * Enabled
+       * @default false
+       */
+      enabled: boolean
+      /** Out Of Office Message */
+      out_of_office_message?: string | null
+      /**
+       * Timezone
+       * @default UTC
+       */
+      timezone: string
+    }
+    /**
+     * WorkingHoursUpdate
+     * @description Full weekly replacement plus the inbox-level switches.
+     */
+    WorkingHoursUpdate: {
+      /** Days */
+      days?: components['schemas']['WorkingHourIn'][]
+      /** Enabled */
+      enabled?: boolean | null
+      /** Out Of Office Message */
+      out_of_office_message?: string | null
+      /** Timezone */
+      timezone?: string | null
     }
     /** WorkspaceCreate */
     WorkspaceCreate: {
@@ -10944,6 +11921,171 @@ export interface operations {
       }
     }
   }
+  export_contacts_api_v1_w__workspace_id__contacts_export_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_contact_imports_api_v1_w__workspace_id__contacts_imports_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ContactImportOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  upload_contact_import_api_v1_w__workspace_id__contacts_imports_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_contact_import_api_v1_w__workspace_id__contacts_imports_post']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ContactImportPreview']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_contact_import_api_v1_w__workspace_id__contacts_imports__import_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ContactImportOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  start_contact_import_api_v1_w__workspace_id__contacts_imports__import_id__start_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ContactImportStart']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ContactImportOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   get_contact_api_v1_w__workspace_id__contacts__contact_id__get: {
     parameters: {
       query?: never
@@ -11021,6 +12163,42 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['ContactUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ContactOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  block_contact_api_v1_w__workspace_id__contacts__contact_id__block_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        contact_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ContactBlockRequest']
       }
     }
     responses: {
@@ -11133,6 +12311,42 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ContactEventOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  merge_contacts_api_v1_w__workspace_id__contacts__contact_id__merge_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        contact_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ContactMergeRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ContactOut']
         }
       }
       /** @description Validation Error */
@@ -11327,6 +12541,7 @@ export interface operations {
         tag_id?: string | null
         priority?: string | null
         q?: string | null
+        view_id?: string | null
         cursor?: string | null
         limit?: number | null
       }
@@ -11393,6 +12608,41 @@ export interface operations {
       }
     }
   }
+  bulk_action_api_v1_w__workspace_id__conversations_bulk_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BulkActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BulkActionResult']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   conversation_counts_api_v1_w__workspace_id__conversations_counts_get: {
     parameters: {
       query?: never
@@ -11411,6 +12661,44 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ConversationCounts']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  search_conversations_api_v1_w__workspace_id__conversations_search_post: {
+    parameters: {
+      query?: {
+        cursor?: string | null
+        limit?: number | null
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FilterQuery']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CursorPage_ConversationListItem_']
         }
       }
       /** @description Validation Error */
@@ -11633,6 +12921,107 @@ export interface operations {
       }
     }
   }
+  list_participants_api_v1_w__workspace_id__conversations__conversation_id__participants_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ParticipantOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  add_participant_api_v1_w__workspace_id__conversations__conversation_id__participants_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ParticipantAdd']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ParticipantOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  remove_participant_api_v1_w__workspace_id__conversations__conversation_id__participants__user_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        conversation_id: string
+        user_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   mark_read_api_v1_w__workspace_id__conversations__conversation_id__read_post: {
     parameters: {
       query?: never
@@ -11789,6 +13178,142 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ConversationOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_definitions_api_v1_w__workspace_id__custom_attributes_get: {
+    parameters: {
+      query?: {
+        attribute_model?: string | null
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CustomAttributeOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_definition_api_v1_w__workspace_id__custom_attributes_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomAttributeCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CustomAttributeOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_definition_api_v1_w__workspace_id__custom_attributes__definition_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        definition_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_definition_api_v1_w__workspace_id__custom_attributes__definition_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        definition_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomAttributeUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CustomAttributeOut']
         }
       }
       /** @description Validation Error */
@@ -12055,6 +13580,74 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['InboxOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_working_hours_api_v1_w__workspace_id__inboxes__inbox_id__working_hours_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkingHoursOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  set_working_hours_api_v1_w__workspace_id__inboxes__inbox_id__working_hours_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        inbox_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorkingHoursUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkingHoursOut']
         }
       }
       /** @description Validation Error */
@@ -13002,6 +14595,75 @@ export interface operations {
       }
     }
   }
+  list_mentions_api_v1_w__workspace_id__mentions_get: {
+    parameters: {
+      query?: {
+        unread_only?: boolean
+        limit?: number | null
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MentionOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  mark_mentions_read_api_v1_w__workspace_id__mentions_read_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MentionReadRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MentionReadResult']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_notifications_api_v1_w__workspace_id__notifications_get: {
     parameters: {
       query?: {
@@ -13098,6 +14760,75 @@ export interface operations {
       }
     }
   }
+  reports_breakdown_api_v1_w__workspace_id__reports_breakdown_get: {
+    parameters: {
+      query?: {
+        /** @description one of ('agent', 'team', 'inbox', 'tag', 'channel') */
+        dimension?: string
+        days?: number
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportBreakdown']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reports_breakdown_csv_api_v1_w__workspace_id__reports_breakdown_csv_get: {
+    parameters: {
+      query?: {
+        dimension?: string
+        days?: number
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   reports_overview_api_v1_w__workspace_id__reports_overview_get: {
     parameters: {
       query?: {
@@ -13118,6 +14849,105 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ReportOverview']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reports_overview_csv_api_v1_w__workspace_id__reports_overview_csv_get: {
+    parameters: {
+      query?: {
+        days?: number
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reports_sla_api_v1_w__workspace_id__reports_sla_get: {
+    parameters: {
+      query?: {
+        days?: number
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SlaReport']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reports_sla_csv_api_v1_w__workspace_id__reports_sla_csv_get: {
+    parameters: {
+      query?: {
+        days?: number
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
         }
       }
       /** @description Validation Error */
@@ -14644,6 +16474,173 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['TourStats']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_views_api_v1_w__workspace_id__views_get: {
+    parameters: {
+      query?: {
+        kind?: string | null
+      }
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SavedViewOut'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_view_api_v1_w__workspace_id__views_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SavedViewCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SavedViewOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  filter_catalog_api_v1_w__workspace_id__views_catalog_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FilterCatalogOut']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_view_api_v1_w__workspace_id__views__view_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        view_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Msg']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_view_api_v1_w__workspace_id__views__view_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        view_id: string
+        workspace_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SavedViewUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SavedViewOut']
         }
       }
       /** @description Validation Error */

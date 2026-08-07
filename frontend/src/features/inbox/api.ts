@@ -52,6 +52,8 @@ export interface ConversationFilters {
   tag_id?: string
   priority?: string
   q?: string
+  /** Layers a saved view's filter document on top of the params above. */
+  view_id?: string
 }
 
 export interface ConversationPatch {
@@ -94,7 +96,7 @@ export const listTeams = () => api.get<Team[]>(ws('/teams'))
 export const uploadFile = (file: File) => api.upload<FileOut>(ws('/files'), file)
 
 export const copilotSuggest = (conversationId: string) =>
-  api.post<CopilotResult>('/api/v1/ai/copilot/suggest', { conversation_id: conversationId })
+  api.post<CopilotResult>(ws('/ai/copilot/suggest'), { conversation_id: conversationId })
 
 export const approvalsApi = {
   listPending: () => api.get<Approval[]>(ws('/ai/approvals') + qs({ status: 'pending' })),
@@ -134,4 +136,116 @@ export function messageCitations(message: Pick<Message, 'meta'>): Citation[] {
 export function fileUrl(key: string): string {
   const id = useAuthStore.getState().workspaceId
   return id ? `/api/v1/w/${id}/files/${key}` : `#${key}`
+}
+
+// ---------------------------------------------------------------------------
+// Saved views + filter DSL (docs/CHATWOOT-BACKLOG.md §1.3)
+// ---------------------------------------------------------------------------
+
+export type SavedView = components['schemas']['SavedViewOut']
+export type FilterCatalog = components['schemas']['FilterCatalogOut']
+export type FilterField = components['schemas']['FilterFieldOut']
+
+export interface FilterCondition {
+  field: string
+  op: string
+  value?: unknown
+}
+
+export interface FilterQuery {
+  match: 'all' | 'any'
+  conditions: FilterCondition[]
+}
+
+export const EMPTY_QUERY: FilterQuery = { match: 'all', conditions: [] }
+
+export const viewsApi = {
+  catalog: () => api.get<FilterCatalog>(ws('/views/catalog')),
+  list: (kind = 'conversation') => api.get<SavedView[]>(ws('/views') + qs({ kind })),
+  create: (body: {
+    name: string
+    kind?: string
+    visibility?: 'personal' | 'shared'
+    query: FilterQuery
+    icon?: string | null
+  }) => api.post<SavedView>(ws('/views'), body),
+  update: (
+    id: string,
+    body: Partial<{ name: string; visibility: string; query: FilterQuery; icon: string | null }>
+  ) => api.patch<SavedView>(ws(`/views/${id}`), body),
+  remove: (id: string) => api.delete<{ message: string }>(ws(`/views/${id}`)),
+  /** Ad-hoc filter run — powers the builder preview and report drill-down. */
+  search: (query: FilterQuery, cursor?: string, limit?: number) =>
+    api.post<CursorPage<ConversationListItem>>(
+      ws('/conversations/search') + qs({ cursor, limit }),
+      query
+    ),
+}
+
+// ---------------------------------------------------------------------------
+// Bulk actions (§1.4)
+// ---------------------------------------------------------------------------
+
+export type BulkAction =
+  'set_status' | 'set_priority' | 'assign_user' | 'assign_team' | 'add_tag' | 'remove_tag'
+
+export type BulkResult = components['schemas']['BulkActionResult']
+
+export const bulkApi = {
+  run: (body: {
+    action: BulkAction
+    params?: Record<string, unknown>
+    conversation_ids?: string[]
+    query?: FilterQuery
+  }) => api.post<BulkResult>(ws('/conversations/bulk'), body),
+}
+
+// ---------------------------------------------------------------------------
+// Participants + mentions (§1.2)
+// ---------------------------------------------------------------------------
+
+export type Participant = components['schemas']['ParticipantOut']
+export type Mention = components['schemas']['MentionOut']
+
+export const collaborationApi = {
+  listParticipants: (conversationId: string) =>
+    api.get<Participant[]>(ws(`/conversations/${conversationId}/participants`)),
+  addParticipant: (conversationId: string, userId: string) =>
+    api.post<Participant[]>(ws(`/conversations/${conversationId}/participants`), {
+      user_id: userId,
+    }),
+  removeParticipant: (conversationId: string, userId: string) =>
+    api.delete<{ message: string }>(ws(`/conversations/${conversationId}/participants/${userId}`)),
+  listMentions: (unreadOnly = false) =>
+    api.get<Mention[]>(ws('/mentions') + qs({ unread_only: unreadOnly })),
+  markMentionsRead: (conversationId?: string | null) =>
+    api.post<{ marked: number }>(ws('/mentions/read'), {
+      conversation_id: conversationId ?? null,
+    }),
+}
+
+// ---------------------------------------------------------------------------
+// Working hours (§1.1)
+// ---------------------------------------------------------------------------
+
+export type WorkingHours = components['schemas']['WorkingHoursOut']
+export type WorkingHourDay = components['schemas']['WorkingHourOut']
+
+export const workingHoursApi = {
+  get: (inboxId: string) => api.get<WorkingHours>(ws(`/inboxes/${inboxId}/working-hours`)),
+  set: (
+    inboxId: string,
+    body: {
+      days: Array<{
+        day_of_week: number
+        closed_all_day?: boolean
+        open_all_day?: boolean
+        open_minute?: number
+        close_minute?: number
+      }>
+      enabled?: boolean
+      timezone?: string
+      out_of_office_message?: string | null
+    }
+  ) => api.put<WorkingHours>(ws(`/inboxes/${inboxId}/working-hours`), body),
 }

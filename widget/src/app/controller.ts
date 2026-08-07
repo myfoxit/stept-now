@@ -5,7 +5,14 @@
  * hook.
  */
 
-import { ApiError, sendMessageFeedback, triggerCampaign, WidgetApi, widgetWsUrl } from '../api'
+import {
+  ApiError,
+  errorCode,
+  sendMessageFeedback,
+  triggerCampaign,
+  WidgetApi,
+  widgetWsUrl,
+} from '../api'
 import { MSG } from '../protocol'
 import type {
   ArticleDetail,
@@ -683,6 +690,9 @@ export class Controller {
   private describe(err: unknown): string {
     if (err instanceof ApiError) {
       if (err.status === 404) return 'This chat widget is unavailable.'
+      // A blocked visitor gets the same neutral wording as an unavailable
+      // widget: telling them they're blocked is hostile and confirms the block.
+      if (errorCode(err) === 'contact_blocked') return 'Chat is unavailable right now.'
       return err.message || 'Something went wrong.'
     }
     return 'Unable to reach the chat service.'

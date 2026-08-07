@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { useHasPerm } from '@/stores/auth'
 
 import { ApiKeysPanel } from '../components/ApiKeysPanel'
+import { AttributesPanel } from '../components/AttributesPanel'
 import { AuditPanel } from '../components/AuditPanel'
 import { ChannelsPanel } from '../components/ChannelsPanel'
 import { McpPanel } from '../components/McpPanel'
@@ -14,6 +15,7 @@ import { ProfilePanel } from '../components/ProfilePanel'
 import { RolesPanel } from '../components/RolesPanel'
 import { SlaPanel } from '../components/SlaPanel'
 import { WorkspacePanel } from '../components/WorkspacePanel'
+import { WorkingHoursPanel } from '../components/WorkingHoursPanel'
 import { SECTIONS } from '../sections'
 
 const PANELS: Record<string, () => ReactElement> = {
@@ -22,6 +24,8 @@ const PANELS: Record<string, () => ReactElement> = {
   roles: () => <RolesPanel />,
   channels: () => <ChannelsPanel />,
   sla: () => <SlaPanel />,
+  'working-hours': () => <WorkingHoursPanel />,
+  attributes: () => <AttributesPanel />,
   'api-keys': () => <ApiKeysPanel />,
   mcp: () => <McpPanel />,
   audit: () => <AuditPanel />,
@@ -56,7 +60,10 @@ export function Component() {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-[200px_1fr]">
-          <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible" aria-label="Settings sections">
+          <nav
+            className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible"
+            aria-label="Settings sections"
+          >
             {visible.map((item) => {
               const Icon = item.icon
               const active = item.key === section

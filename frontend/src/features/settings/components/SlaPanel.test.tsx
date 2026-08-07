@@ -36,6 +36,7 @@ function policy(overrides: Partial<SlaPolicy> = {}): SlaPolicy {
     first_response_minutes: 15,
     next_response_minutes: null,
     resolution_minutes: 240,
+    only_during_business_hours: false,
     created_at: ISO,
     updated_at: ISO,
     ...overrides,
@@ -88,6 +89,7 @@ describe('SlaPanel', () => {
       first_response_minutes: 30,
       next_response_minutes: null,
       resolution_minutes: null,
+      only_during_business_hours: false,
     })
   })
 

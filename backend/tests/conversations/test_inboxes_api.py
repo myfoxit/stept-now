@@ -16,7 +16,10 @@ async def test_default_widget_inbox_created_with_workspace(client, workspace_ctx
     assert inbox["enabled"] is True
     assert inbox["widget_key"].startswith("wk_")
     assert inbox["config"]["greeting"] == "Hi! How can we help?"
-    assert inbox["config"]["auto_assign"] is True
+    # Off by default: inbound conversations belong in Unassigned until a human
+    # picks them up. Turning it on pre-claims every conversation, which in a
+    # single-member workspace leaves the triage queue permanently empty.
+    assert inbox["config"]["auto_assign"] is False
     assert inbox["has_secrets"] is False
 
 

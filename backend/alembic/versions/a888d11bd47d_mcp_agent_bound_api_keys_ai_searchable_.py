@@ -16,7 +16,7 @@ import app.core.db  # portable column types referenced below
 
 
 revision: str = 'a888d11bd47d'
-down_revision: str | Sequence[str] | None = 'bdc4e4b7de36'
+down_revision: str | Sequence[str] | None = 'e133372bfc35'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

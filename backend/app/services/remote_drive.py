@@ -1,4 +1,4 @@
-"""Extension remote-drive gateway (docs/MCP-CONTRACTS.md, W9).
+"""Extension remote-drive gateway (docs/MCP-CONTRACTS.md, W10).
 
 Each signed-in Chrome extension holds one outbound WebSocket (``/ws/extension``,
 NAT-friendly). The MCP browser tools dispatch ``ctrl_id``-correlated control

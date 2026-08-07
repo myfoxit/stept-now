@@ -20,15 +20,32 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { useAgents } from '@/features/ai/hooks'
 
 import type { Inbox, InboxUpdate } from '../api'
 import { useUpdateInbox } from '../hooks'
+
+/** Radix Select forbids an empty-string item value, so "none" needs a sentinel. */
+const NO_AGENT = '__none__'
 
 interface FieldDef {
   key: string
   label: string
   required?: boolean
   placeholder?: string
+  /** Defaults to 'text'. Non-text kinds render a dedicated control. */
+  type?: 'text' | 'color' | 'boolean' | 'agent'
+  /** Seed used when the inbox config has no value for this key yet. */
+  defaultValue?: string
+  help?: string
 }
 
 interface HintDef {
@@ -44,6 +61,35 @@ export interface ChannelConfigSpec {
 
 /** Which fields each channel type needs (mirrors backend channel adapters). */
 export const CHANNEL_CONFIG_SPECS: Record<string, ChannelConfigSpec> = {
+  // The widget already honours these server-side (DEFAULT_WIDGET_CONFIG); they
+  // just had no UI, so the launcher colour, greeting and triage behaviour were
+  // unreachable once an inbox existed.
+  widget: {
+    config: [
+      {
+        key: 'ai_agent_id',
+        label: 'AI agent',
+        type: 'agent',
+        help: 'A live agent answers new conversations on this channel before a teammate picks them up. The engine already keys off this — until it is set, agents never see real traffic.',
+      },
+      {
+        key: 'greeting',
+        label: 'Greeting',
+        placeholder: 'Hi! How can we help?',
+        defaultValue: 'Hi! How can we help?',
+      },
+      { key: 'accent_color', label: 'Accent colour', type: 'color', defaultValue: '#6366f1' },
+      {
+        key: 'auto_assign',
+        label: 'Auto-assign new conversations',
+        type: 'boolean',
+        defaultValue: 'false',
+        help: 'Off means new conversations land in Unassigned for the team to triage. On round-robins them to the member with the lightest open load.',
+      },
+    ],
+    secrets: [],
+    hints: [],
+  },
   whatsapp: {
     config: [
       { key: 'phone_number_id', label: 'Phone number ID', required: true },
@@ -151,6 +197,9 @@ export function InboxConfigDialog({
   const updateInbox = useUpdateInbox()
   const [configValues, setConfigValues] = useState<Record<string, string>>({})
   const [secretValues, setSecretValues] = useState<Record<string, string>>({})
+  const { data: agents = [] } = useAgents()
+  // Only a live agent can pick up traffic — the engine ignores draft/off ones.
+  const liveAgents = agents.filter((a) => a.status === 'live')
 
   const spec = inbox ? CHANNEL_CONFIG_SPECS[inbox.channel_type] : undefined
 
@@ -159,7 +208,7 @@ export function InboxConfigDialog({
     const seeded: Record<string, string> = {}
     for (const field of CHANNEL_CONFIG_SPECS[inbox.channel_type]?.config ?? []) {
       const value = (inbox.config as Record<string, unknown>)?.[field.key]
-      seeded[field.key] = value == null ? '' : String(value)
+      seeded[field.key] = value == null ? (field.defaultValue ?? '') : String(value)
     }
     setConfigValues(seeded)
     setSecretValues({})
@@ -179,7 +228,13 @@ export function InboxConfigDialog({
     if (!inbox || !spec) return
     const config: Record<string, unknown> = { ...(inbox.config as Record<string, unknown>) }
     for (const field of spec.config) {
-      const value = (configValues[field.key] ?? '').trim()
+      const raw = configValues[field.key] ?? ''
+      if (field.type === 'boolean') {
+        // Always write booleans — "off" is a real value, not an absent one.
+        config[field.key] = raw === 'true'
+        continue
+      }
+      const value = raw.trim()
       if (value === '') delete config[field.key]
       else config[field.key] = value
     }
@@ -211,22 +266,83 @@ export function InboxConfigDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {spec.config.map((field) => (
-            <div key={field.key} className="grid gap-1.5">
-              <Label htmlFor={`cfg-${field.key}`}>
-                {field.label}
-                {field.required ? <span className="text-destructive"> *</span> : null}
-              </Label>
-              <Input
-                id={`cfg-${field.key}`}
-                placeholder={field.placeholder}
-                value={configValues[field.key] ?? ''}
-                onChange={(e) =>
-                  setConfigValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                }
-              />
-            </div>
-          ))}
+          {spec.config.map((field) =>
+            field.type === 'agent' ? (
+              <div key={field.key} className="grid gap-1.5">
+                <Label htmlFor={`cfg-${field.key}`}>{field.label}</Label>
+                <Select
+                  value={configValues[field.key] || NO_AGENT}
+                  onValueChange={(v) =>
+                    setConfigValues((prev) => ({ ...prev, [field.key]: v === NO_AGENT ? '' : v }))
+                  }
+                >
+                  <SelectTrigger id={`cfg-${field.key}`} className="w-full">
+                    <SelectValue placeholder="No AI agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_AGENT}>No AI agent</SelectItem>
+                    {liveAgents.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.avatar_emoji ? `${a.avatar_emoji} ` : ''}
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
+                {liveAgents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No live agents yet — set an agent to “Live” under AI Agents first.
+                  </p>
+                ) : null}
+              </div>
+            ) : field.type === 'boolean' ? (
+              <div key={field.key} className="flex items-start justify-between gap-4">
+                <div className="grid gap-1">
+                  <Label htmlFor={`cfg-${field.key}`}>{field.label}</Label>
+                  {field.help ? (
+                    <p className="text-xs text-muted-foreground">{field.help}</p>
+                  ) : null}
+                </div>
+                <Switch
+                  id={`cfg-${field.key}`}
+                  checked={configValues[field.key] === 'true'}
+                  onCheckedChange={(checked) =>
+                    setConfigValues((prev) => ({ ...prev, [field.key]: checked ? 'true' : 'false' }))
+                  }
+                />
+              </div>
+            ) : (
+              <div key={field.key} className="grid gap-1.5">
+                <Label htmlFor={`cfg-${field.key}`}>
+                  {field.label}
+                  {field.required ? <span className="text-destructive"> *</span> : null}
+                </Label>
+                <div className="flex items-center gap-2">
+                  {field.type === 'color' ? (
+                    <Input
+                      type="color"
+                      aria-label={`${field.label} swatch`}
+                      className="h-9 w-14 shrink-0 p-1"
+                      value={configValues[field.key] || field.defaultValue || '#6366f1'}
+                      onChange={(e) =>
+                        setConfigValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                      }
+                    />
+                  ) : null}
+                  <Input
+                    id={`cfg-${field.key}`}
+                    placeholder={field.placeholder}
+                    value={configValues[field.key] ?? ''}
+                    onChange={(e) =>
+                      setConfigValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                  />
+                </div>
+                {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
+              </div>
+            )
+          )}
 
           {spec.secrets.map((field) => (
             <div key={field.key} className="grid gap-1.5">

@@ -149,7 +149,39 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     widget 186, extension 100, dom-capture 107, e2e 21. `make verify` green,
     full e2e green.
 
-- [x] **W9 (MCP + remote browser drive)** — Stept is now an MCP server, so Claude Code /
+- [x] **W9 (Chatwoot P0 inbox parity)** — the operational middle Chatwoot was ahead on, from
+  the fresh gap analysis in `docs/CHATWOOT-BACKLOG.md` (chatwoot@0f3bb640, 2026-08-07).
+  Worktree: `../stept-now-p0` (branch `feature/p0-inbox-parity`).
+  - **Business hours** (§1.1): `app/core/business_hours.py` — DST-correct schedule maths;
+    `working_hours` per inbox; `sla_policies.only_during_business_hours` so a Friday-evening
+    ticket no longer breaches by Monday. Wall-clock stays the default.
+  - **Participants + @mentions** (§1.2): implicit watchers (assignee, note author), `@name`
+    resolution against members, notify + subscribe, leave-as-mute, `/mentions` feed.
+  - **Filter DSL + saved views** (§1.3): one engine (`app/services/filters.py`) behind the
+    conversation list, saved views, bulk targeting and report drill-down; server-driven field
+    catalog so workspace attributes appear in the builder automatically.
+  - **Bulk actions** (§1.4): `POST /conversations/bulk` looping the normal service functions;
+    per-row failures reported, batch never rolled back.
+  - **Reports** (§1.5): per-agent/team/inbox/tag/channel breakdowns, SLA attainment off the
+    existing `sla_events`, CSV export, and drill-down where the row's own filter reproduces
+    the number.
+  - **Typed custom attributes** (§1.6): definitions + coercion, additive (undefined keys still
+    pass through), feeding the filter catalog.
+  - **Contact merge / block / CSV import+export** (§1.7): the migration-in door. Merge keeps a
+    tombstone; block is enforced at widget boot and channel ingress.
+  - **Bugs found and fixed along the way**: `is_open()` compared an un-normalised naive datetime
+    against a localised window (so a naive `now` was read in the server's zone, not UTC); the
+    422 handler serialised Pydantic's raw error list, so any `@model_validator` failure became a
+    500 — now sanitised, and `input` is dropped so a rejected payload can't echo credentials
+    back; jsdom lacks the Pointer Capture API, so no Radix `Select` was reachable in tests
+    (polyfilled in `src/test/setup.ts` — this had silently blocked select-driven UI tests).
+  - Migration `e133372bfc35`, PG-validated up/down/up with `alembic check` clean (needed
+    `server_default` + an explicit drop so the DB matches the model).
+  - **Measured after W9:** backend **1131** passed (+2 pg-only), frontend **424**, widget **187**
+    — up from 934 / 383 / 186 at W8. The extension, dom-capture and e2e suites were unchanged by
+    this wave and ran green as part of `make verify`, which passed end to end.
+
+- [x] **W10 (MCP + remote browser drive)** — Stept is now an MCP server, so Claude Code /
   Claude Desktop / Cursor / ChatGPT can search the knowledge base, ask questions with
   citations, read tours and conversations, and **drive the user's real Chrome** through the
   extension. Contracts: `docs/MCP-CONTRACTS.md`. User guide: `docs/MCP.md`. Session worktree:
@@ -233,9 +265,16 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     silently widening "let Claude talk to this one agent" into full workspace access; the agent
     card's tool-name preview slugified differently from the endpoint, so the UI could advertise
     names the server doesn't expose.
-  - **Totals after W9:** **2072 tests** — backend 1148 (0 skipped with PG up), frontend 412,
-    extension 199, widget 186, dom-capture 107, e2e 21. `make verify` green; e2e green; migration
-    `a888d11bd47d` PG-validated up/down/up with a real backfill row, `alembic check` clean.
+  - **Measured after W10** (on the merged tree, so these include W9): backend **1294** passed
+    with PG up (0 skipped), frontend **443**, extension **199**, widget **187**, dom-capture
+    **107**, e2e **21**. This wave itself added 154 backend, 19 frontend and 99 extension tests.
+    `make verify` green; e2e green.
+  - **Merged after W9 landed in parallel**, which needed real reconciliation rather than a
+    text merge: both waves added a migration off `bdc4e4b7de36`, so `alembic upgrade head`
+    would have failed on two heads — `a888d11bd47d` is re-parented onto `e133372bfc35` and the
+    combined chain is PG-validated up/down/up (with a pre-existing document row, to prove the
+    `ai_searchable` backfill) with `alembic check` clean. Only `docs/PLAN.md` conflicted in
+    text; this entry was renumbered W9 → W10.
   - **Known follow-ups** (reviewed, deliberately not in this wave): neither MCP surface is rate
     limited — a leaked key can't read anything its scopes forbid, but `ask_agent` /
     `ask_knowledge_base` are unmetered LLM spend and `browser_run_tour` parks a request for up
@@ -247,7 +286,15 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     three transports — HTTP `/mcp`, the per-agent endpoint, and the stdio bridge — plus a full
     remote-drive round trip with a fake extension on the real WebSocket (33 live assertions).
 
-- [ ] Post-build notes for user: **no git origin configured** — merged to local master only, not pushed (user decides re GitHub; gh is authed as `myfoxit`). Old stept containers on 8000/80/5173 are a PRIOR build — untouched. A `build-postgres-1` container is up on 54329 (used for PG validation; `docker compose down` to stop). Use `docker compose` (v2) — the v1 `docker-compose` is broken by a pyenv SSL issue.
+- [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
+  `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
+  untouched. Postgres containers used for migration validation may still be up on 54329
+  (`docker compose down` to stop). Use `docker compose` (v2) — the v1 `docker-compose` is broken
+  by a pyenv SSL issue.
+- [ ] **Waves can land in parallel now.** W9 and W10 were built simultaneously in separate
+  worktrees and collided on the alembic head and on `docs/PLAN.md`. If you start a wave while
+  another is in flight: branch from the current `origin/master`, and before merging re-check
+  `alembic heads` (a second head means re-parent, not a merge revision) and the wave numbering.
 
 ### Agent-orchestration lessons (for future waves / resets)
 - Agent completion notifications are reliable; a mid-task **silent stall** (~600s watchdog) sometimes doesn't self-report — when suspicious, check transcript freshness with `stat -L -f %m` on `<tasks>/<id>.output` (it's a SYMLINK; without -L you read the stale symlink mtime). Resume a stalled agent with SendMessage (its context is intact) or, if its work is already on disk, stop it and integrate yourself.

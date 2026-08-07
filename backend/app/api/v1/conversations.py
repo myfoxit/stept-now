@@ -7,17 +7,25 @@ conversations / marking read → conversations:write, workflow mutations
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import Db, Member, Principal, require_perm
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, ValidationFailure
 from app.core.events import Actor
 from app.core.pagination import CursorPage
 from app.core.permissions import Perm
 from app.models.contact import Contact
 from app.models.message import AuthorType, MessageDirection
+from app.schemas.bulk import BulkActionRequest, BulkActionResult
+from app.schemas.collaboration import (
+    MentionOut,
+    MentionReadRequest,
+    MentionReadResult,
+    ParticipantAdd,
+    ParticipantOut,
+)
 from app.schemas.common import Msg
 from app.schemas.conversations import (
     ConversationCounts,
@@ -28,8 +36,13 @@ from app.schemas.conversations import (
     TagRequest,
 )
 from app.schemas.messages import MessageCreate, MessageOut
+from app.schemas.saved_views import FilterQuery
+from app.services import bulk as bulk_service
+from app.services import collaboration as collaboration_service
 from app.services import conversations as conversations_service
+from app.services import custom_attributes as attrs_service
 from app.services import inboxes as inboxes_service
+from app.services import saved_views as views_service
 
 router = APIRouter()
 
@@ -61,9 +74,21 @@ async def list_conversations(
     tag_id: str | None = None,
     priority: str | None = None,
     q: str | None = None,
+    view_id: str | None = None,
     cursor: str | None = None,
     limit: int | None = None,
 ) -> CursorPage[ConversationListItem]:
+    """`view_id` layers a saved view's filter document on top of the query
+    params, so a view can be combined with an ad-hoc status/assignee narrowing."""
+    view_query: dict[str, Any] | None = None
+    if view_id:
+        view = await views_service.get_view(
+            session,
+            principal.workspace.id,
+            view_id,
+            user_id=principal.user.id if principal.user is not None else None,
+        )
+        view_query = dict(view.query or {})
     items, next_cursor = await conversations_service.list_conversations(
         session,
         principal.workspace.id,
@@ -75,6 +100,32 @@ async def list_conversations(
         tag_id=tag_id,
         priority=priority,
         q=q,
+        view_query=view_query,
+        cursor=cursor,
+        limit=limit,
+        current_user_id=principal.user.id if principal.user is not None else None,
+    )
+    return CursorPage(items=items, next_cursor=next_cursor)
+
+
+@router.post(
+    "/conversations/search",
+    response_model=CursorPage[ConversationListItem],
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def search_conversations(
+    body: FilterQuery,
+    principal: Member,
+    session: Db,
+    cursor: str | None = None,
+    limit: int | None = None,
+) -> CursorPage[ConversationListItem]:
+    """Run an ad-hoc filter document without saving it as a view — the endpoint
+    the filter builder previews against and report drill-down links to."""
+    items, next_cursor = await conversations_service.list_conversations(
+        session,
+        principal.workspace.id,
+        view_query=body.model_dump(),
         cursor=cursor,
         limit=limit,
         current_user_id=principal.user.id if principal.user is not None else None,
@@ -175,6 +226,18 @@ async def update_conversation(
             team_id=(body.team_id if "team_id" in provided else conversations_service.UNSET),
             actor=actor,
         )
+    if body.attributes is not None:
+        coerced = await attrs_service.validate_attributes(
+            session, principal.workspace.id, "conversation", body.attributes
+        )
+        merged = dict(conversation.attributes or {})
+        for key, value in coerced.items():
+            if value is None:
+                merged.pop(key, None)
+            else:
+                merged[key] = value
+        conversation.attributes = merged
+        await session.flush()
     return await conversations_service.conversation_out(session, conversation)
 
 
@@ -272,3 +335,142 @@ async def mark_read(conversation_id: str, principal: Member, session: Db) -> Msg
     )
     await conversations_service.mark_read(session, conversation)
     return Msg(message="Conversation marked read")
+
+
+# ---------------------------------------------------------------------------
+# bulk actions (docs/CHATWOOT-BACKLOG.md §1.4)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/conversations/bulk",
+    response_model=BulkActionResult,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_MANAGE))],
+)
+async def bulk_action(body: BulkActionRequest, principal: Member, session: Db) -> BulkActionResult:
+    """Apply one action to many conversations. Per-conversation failures are
+    reported rather than rolling the batch back."""
+    result = await bulk_service.run(
+        session,
+        principal.workspace.id,
+        actor=_actor(principal),
+        actor_user_id=principal.user.id if principal.user is not None else None,
+        action=body.action,
+        params=body.params,
+        conversation_ids=body.conversation_ids,
+        query=body.query.model_dump() if body.query is not None else None,
+    )
+    return BulkActionResult(
+        requested=result.requested,
+        succeeded=result.succeeded,
+        failed=result.failed,
+        errors=result.errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# participants & mentions (docs/CHATWOOT-BACKLOG.md §1.2)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/conversations/{conversation_id}/participants",
+    response_model=list[ParticipantOut],
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def list_participants(
+    conversation_id: str, principal: Member, session: Db
+) -> list[ParticipantOut]:
+    await collaboration_service.assert_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    rows = await collaboration_service.list_participants(
+        session, principal.workspace.id, conversation_id
+    )
+    return [ParticipantOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/conversations/{conversation_id}/participants",
+    response_model=list[ParticipantOut],
+    status_code=201,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_WRITE))],
+)
+async def add_participant(
+    conversation_id: str, body: ParticipantAdd, principal: Member, session: Db
+) -> list[ParticipantOut]:
+    await collaboration_service.assert_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    added = await collaboration_service.add_participant(
+        session,
+        principal.workspace.id,
+        conversation_id,
+        body.user_id,
+        reason="manual",
+        force=True,
+    )
+    if added is None:
+        raise ValidationFailure("That user is not a member of this workspace")
+    rows = await collaboration_service.list_participants(
+        session, principal.workspace.id, conversation_id
+    )
+    return [ParticipantOut.model_validate(r) for r in rows]
+
+
+@router.delete(
+    "/conversations/{conversation_id}/participants/{user_id}",
+    response_model=Msg,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_WRITE))],
+)
+async def remove_participant(
+    conversation_id: str, user_id: str, principal: Member, session: Db
+) -> Msg:
+    await collaboration_service.assert_conversation(
+        session, principal.workspace.id, conversation_id
+    )
+    await collaboration_service.remove_participant(
+        session, principal.workspace.id, conversation_id, user_id
+    )
+    return Msg(message="Left the conversation")
+
+
+@router.get(
+    "/mentions",
+    response_model=list[MentionOut],
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def list_mentions(
+    principal: Member,
+    session: Db,
+    unread_only: bool = Query(False),
+    limit: int | None = None,
+) -> list[MentionOut]:
+    """The signed-in user's mentions. API-key principals have none by definition."""
+    if principal.user is None:
+        return []
+    rows = await collaboration_service.list_mentions(
+        session,
+        principal.workspace.id,
+        principal.user.id,
+        unread_only=unread_only,
+        limit=limit,
+    )
+    payload = await collaboration_service.mention_payload(session, rows)
+    return [MentionOut.model_validate(item) for item in payload]
+
+
+@router.post(
+    "/mentions/read",
+    response_model=MentionReadResult,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def mark_mentions_read(
+    body: MentionReadRequest, principal: Member, session: Db
+) -> MentionReadResult:
+    if principal.user is None:
+        return MentionReadResult(marked=0)
+    marked = await collaboration_service.mark_mentions_read(
+        session, principal.workspace.id, principal.user.id, body.conversation_id
+    )
+    return MentionReadResult(marked=marked)

@@ -16,10 +16,12 @@
 	default_sni {$SERVER_IP}
 }
 
-# Transport-level headers only. The app sets nosniff, framing, referrer and
-# permissions per response — it knows which paths are meant to be embedded in a
-# customer's site (the widget iframe, the help-center portal) and must not be
-# sent a blanket framing ban from out here.
+# Transport-level headers only. Framing, referrer, nosniff and permissions are
+# set by whoever actually produces the response, because only they know whether
+# the path is meant to be embedded in a customer's site (the widget iframe, the
+# help-center portal) — a blanket framing ban from out here would break those.
+# API/portal responses: backend/app/main.py (security_headers_for).
+# SPA + static responses: deploy/nginx.conf (per-location, see note there).
 (transport_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"

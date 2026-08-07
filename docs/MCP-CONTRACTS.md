@@ -1,4 +1,4 @@
-# W9 — MCP server, remote browser drive, one-click client setup (contracts)
+# W10 — MCP server, remote browser drive, one-click client setup (contracts)
 
 > Parity target: `/Users/ahoehne/repos/stept` (old stept). Its MCP surface = flat FastMCP at
 > `/mcp` + hand-rolled per-agent JSON-RPC at `/mcp/agents/{id}` + Node automation gateway owning

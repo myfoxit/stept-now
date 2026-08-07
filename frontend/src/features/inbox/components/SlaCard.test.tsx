@@ -35,6 +35,7 @@ function policy(overrides: Partial<SlaPolicy> = {}): SlaPolicy {
     first_response_minutes: 15,
     next_response_minutes: null,
     resolution_minutes: null,
+    only_during_business_hours: false,
     created_at: ISO,
     updated_at: ISO,
     ...overrides,
@@ -88,10 +89,15 @@ describe('SlaCard', () => {
     setupAuth()
     let putBody: Record<string, unknown> | null = null
     mockFetch({
-      ...mockSla({ policy: null, status: null, events: [] }, [policy(), policy({ id: 'p2', name: 'Standard' })]),
+      ...mockSla({ policy: null, status: null, events: [] }, [
+        policy(),
+        policy({ id: 'p2', name: 'Standard' }),
+      ]),
       'PUT /api/v1/w/ws1/conversations/c1/sla': (init) => {
         putBody = JSON.parse(init!.body as string)
-        return { body: { policy: policy({ id: 'p2', name: 'Standard' }), status: 'active', events: [] } }
+        return {
+          body: { policy: policy({ id: 'p2', name: 'Standard' }), status: 'active', events: [] },
+        }
       },
     })
 

@@ -66,7 +66,7 @@ describe('Composer', () => {
   it('inserts a copilot suggestion with citation chips', async () => {
     mockFetch({
       'GET /api/v1/w/ws1/canned-responses': () => ({ body: [] }),
-      'POST /api/v1/ai/copilot/suggest': () => ({
+      'POST /api/v1/w/ws1/ai/copilot/suggest': () => ({
         body: { content: 'Drafted reply from AI', citations: [{ n: 1, title: 'Refund policy', url: null }] },
       }),
     })

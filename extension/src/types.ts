@@ -212,7 +212,7 @@ export interface DriveState {
 // remote drive (MCP → backend gateway → this extension)
 // ---------------------------------------------------------------------------
 
-/** One op the server may ask the driven tab to perform (W9 contract). */
+/** One op the server may ask the driven tab to perform (W10 contract). */
 export interface DriveOp {
   op:
     | 'open'

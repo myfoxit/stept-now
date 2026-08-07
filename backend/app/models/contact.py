@@ -32,8 +32,13 @@ class Contact(TimestampMixin, WorkspaceScopedMixin, Base):
     attributes: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
     # True once identity was verified via HMAC (widget identity verification).
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Blocked contacts are dropped at channel ingress and cannot open new
+    # conversations from the widget (app.services.contacts.assert_not_blocked).
+    blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     first_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Set when this contact was merged away; the row is kept so old links resolve.
+    merged_into_id: Mapped[str | None] = mapped_column(GUID, index=True)
 
 
 class ContactNote(TimestampMixin, WorkspaceScopedMixin, Base):

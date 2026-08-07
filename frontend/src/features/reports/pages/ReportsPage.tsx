@@ -10,6 +10,8 @@ import { ByAgentTable } from '../components/ByAgentTable'
 import { ByChannelChart } from '../components/ByChannelChart'
 import { ByDayChart } from '../components/ByDayChart'
 import { KpiTiles } from '../components/KpiTiles'
+import { BreakdownTable } from '@/features/reports/components/BreakdownTable'
+import { SlaAttainmentTable } from '@/features/reports/components/SlaAttainmentTable'
 import { useReportOverview } from '../hooks'
 import { DAY_RANGES } from '../lib'
 
@@ -81,6 +83,8 @@ export function Component() {
                 <ByChannelChart data={overview.data.by_channel} />
                 <ByAgentTable data={overview.data.by_agent} />
               </div>
+              <BreakdownTable days={days} />
+              <SlaAttainmentTable days={days} />
             </>
           ) : null}
         </div>

@@ -16,6 +16,7 @@ class SlaPolicyCreate(BaseModel):
     first_response_minutes: int | None = Field(None, ge=1)
     next_response_minutes: int | None = Field(None, ge=1)
     resolution_minutes: int | None = Field(None, ge=1)
+    only_during_business_hours: bool = False
 
 
 class SlaPolicyUpdate(BaseModel):
@@ -27,6 +28,7 @@ class SlaPolicyUpdate(BaseModel):
     first_response_minutes: int | None = Field(None, ge=1)
     next_response_minutes: int | None = Field(None, ge=1)
     resolution_minutes: int | None = Field(None, ge=1)
+    only_during_business_hours: bool | None = None
 
 
 class SlaPolicyOut(ORMModel):
@@ -36,6 +38,7 @@ class SlaPolicyOut(ORMModel):
     first_response_minutes: int | None = None
     next_response_minutes: int | None = None
     resolution_minutes: int | None = None
+    only_during_business_hours: bool = False
     created_at: datetime
     updated_at: datetime
 

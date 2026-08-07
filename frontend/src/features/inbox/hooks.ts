@@ -22,6 +22,8 @@ import type { CursorPage } from '@/features/contacts/api'
 import { macrosApi, type MacroRunOut } from '@/features/automation/api'
 import {
   approvalsApi,
+  bulkApi,
+  collaborationApi,
   copilotSuggest,
   feedbackApi,
   inboxApi,
@@ -30,15 +32,23 @@ import {
   listMembers,
   listTeams,
   slaApi,
+  viewsApi,
+  workingHoursApi,
   type AttachmentRef,
   type Conversation,
   type ConversationFilters,
   type ConversationListItem,
   type ConversationPatch,
+  type FilterQuery,
   type Message,
 } from '@/features/inbox/api'
 
 const AREA = 'inbox'
+
+/** Surface the API's own message when there is one; fall back otherwise. */
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback
+}
 
 type MsgInfinite = { pages: CursorPage<Message>[]; pageParams: unknown[] }
 type ListInfinite = { pages: CursorPage<ConversationListItem>[]; pageParams: unknown[] }
@@ -54,13 +64,19 @@ export function useCounts() {
   })
 }
 
-export function useConversationsList(filters: ConversationFilters) {
+/**
+ * The conversation feed. An inline `query` (a report drill-down) routes to
+ * `POST /conversations/search` instead of the list endpoint, so the drilled
+ * list is produced by exactly the query the report row counted.
+ */
+export function useConversationsList(filters: ConversationFilters, query?: FilterQuery | null) {
   const workspaceId = useAuthStore((s) => s.workspaceId)
   return useInfiniteQuery({
-    queryKey: [AREA, workspaceId, 'conversations', filters],
+    queryKey: [AREA, workspaceId, 'conversations', filters, query ?? null],
     enabled: !!workspaceId,
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => inboxApi.listConversations(filters, pageParam),
+    queryFn: ({ pageParam }) =>
+      query ? viewsApi.search(query, pageParam) : inboxApi.listConversations(filters, pageParam),
     getNextPageParam: (last) => last.next_cursor ?? undefined,
   })
 }
@@ -87,22 +103,38 @@ export function useMessages(conversationId: string | undefined) {
 
 export function useInboxes() {
   const workspaceId = useAuthStore((s) => s.workspaceId)
-  return useQuery({ queryKey: [AREA, workspaceId, 'inboxes'], enabled: !!workspaceId, queryFn: listInboxes })
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'inboxes'],
+    enabled: !!workspaceId,
+    queryFn: listInboxes,
+  })
 }
 
 export function useCanned() {
   const workspaceId = useAuthStore((s) => s.workspaceId)
-  return useQuery({ queryKey: [AREA, workspaceId, 'canned'], enabled: !!workspaceId, queryFn: listCanned })
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'canned'],
+    enabled: !!workspaceId,
+    queryFn: listCanned,
+  })
 }
 
 export function useMembers() {
   const workspaceId = useAuthStore((s) => s.workspaceId)
-  return useQuery({ queryKey: [AREA, workspaceId, 'members'], enabled: !!workspaceId, queryFn: listMembers })
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'members'],
+    enabled: !!workspaceId,
+    queryFn: listMembers,
+  })
 }
 
 export function useTeams() {
   const workspaceId = useAuthStore((s) => s.workspaceId)
-  return useQuery({ queryKey: [AREA, workspaceId, 'teams'], enabled: !!workspaceId, queryFn: listTeams })
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'teams'],
+    enabled: !!workspaceId,
+    queryFn: listTeams,
+  })
 }
 
 export function usePendingApprovals() {
@@ -189,7 +221,10 @@ export function useRunMacro(conversationId: string) {
 
 // --- message feedback -------------------------------------------------------
 
-export function useMessageFeedback(message: Pick<Message, 'id' | 'conversation_id'>, enabled: boolean) {
+export function useMessageFeedback(
+  message: Pick<Message, 'id' | 'conversation_id'>,
+  enabled: boolean
+) {
   const workspaceId = useAuthStore((s) => s.workspaceId)
   return useQuery({
     queryKey: [AREA, workspaceId, 'feedback', message.id],
@@ -210,7 +245,10 @@ export function useSubmitMessageFeedback(message: Pick<Message, 'id' | 'conversa
 /** Newest-page-first pages → a single ascending list for the timeline. */
 export function flattenMessages(data: MsgInfinite | undefined): Message[] {
   if (!data) return []
-  return data.pages.slice().reverse().flatMap((p) => p.items)
+  return data.pages
+    .slice()
+    .reverse()
+    .flatMap((p) => p.items)
 }
 
 // --- cache mutation helpers -------------------------------------------------
@@ -427,8 +465,11 @@ export function useSendMessage(conversationId: string) {
   const key = [AREA, workspaceId, 'messages', conversationId]
 
   return useMutation({
-    mutationFn: (body: { content: string; visibility: 'public' | 'note'; attachments?: AttachmentRef[] }) =>
-      inboxApi.sendMessage(conversationId, body),
+    mutationFn: (body: {
+      content: string
+      visibility: 'public' | 'note'
+      attachments?: AttachmentRef[]
+    }) => inboxApi.sendMessage(conversationId, body),
     onMutate: async (body) => {
       await qc.cancelQueries({ queryKey: key })
       const previous = qc.getQueryData<MsgInfinite>(key)
@@ -548,13 +589,18 @@ export function useCreateConversation() {
   const qc = useQueryClient()
   const workspaceId = useAuthStore((s) => s.workspaceId)
   return useMutation({
-    mutationFn: (body: { contact_id: string; inbox_id: string; content: string; subject?: string }) =>
-      inboxApi.create(body),
+    mutationFn: (body: {
+      contact_id: string
+      inbox_id: string
+      content: string
+      subject?: string
+    }) => inboxApi.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [AREA, workspaceId, 'conversations'] })
       qc.invalidateQueries({ queryKey: [AREA, workspaceId, 'counts'] })
     },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not start conversation'),
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not start conversation'),
   })
 }
 
@@ -577,5 +623,185 @@ export function useDecideApproval() {
       toast.success(vars.approved ? 'Approved' : 'Rejected')
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Decision failed'),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Saved views + filter DSL (docs/CHATWOOT-BACKLOG.md §1.3)
+// ---------------------------------------------------------------------------
+
+export function useFilterCatalog() {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'filter-catalog'],
+    enabled: !!workspaceId,
+    queryFn: viewsApi.catalog,
+    // The catalog only changes when someone edits an attribute definition.
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useSavedViews(kind = 'conversation') {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'views', kind],
+    enabled: !!workspaceId,
+    queryFn: () => viewsApi.list(kind),
+  })
+}
+
+function useViewsInvalidator() {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useCallback(
+    () => queryClient.invalidateQueries({ queryKey: [AREA, workspaceId, 'views'] }),
+    [queryClient, workspaceId]
+  )
+}
+
+export function useCreateView() {
+  const invalidate = useViewsInvalidator()
+  return useMutation({
+    mutationFn: viewsApi.create,
+    onSuccess: async (view) => {
+      await invalidate()
+      toast.success(`View “${view.name}” saved`)
+    },
+    onError: (error) => toast.error(errorMessage(error, 'Could not save the view')),
+  })
+}
+
+export function useUpdateView() {
+  const invalidate = useViewsInvalidator()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof viewsApi.update>[1] }) =>
+      viewsApi.update(id, body),
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error, 'Could not update the view')),
+  })
+}
+
+export function useDeleteView() {
+  const invalidate = useViewsInvalidator()
+  return useMutation({
+    mutationFn: viewsApi.remove,
+    onSuccess: async () => {
+      await invalidate()
+      toast.success('View deleted')
+    },
+    onError: (error) => toast.error(errorMessage(error, 'Could not delete the view')),
+  })
+}
+
+/** Ad-hoc filter run — the builder's live preview and report drill-down. */
+export function useFilterPreview(query: FilterQuery, enabled: boolean) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'filter-preview', query],
+    enabled: enabled && !!workspaceId,
+    queryFn: () => viewsApi.search(query, undefined, 25),
+    retry: false,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Bulk actions (§1.4)
+// ---------------------------------------------------------------------------
+
+export function useBulkAction() {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: bulkApi.run,
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: [AREA, workspaceId] })
+      if (result.failed > 0) {
+        toast.warning(`${result.succeeded} updated, ${result.failed} failed`, {
+          description: result.errors?.[0]?.error,
+        })
+      } else {
+        toast.success(
+          `${result.succeeded} conversation${result.succeeded === 1 ? '' : 's'} updated`
+        )
+      }
+    },
+    onError: (error) => toast.error(errorMessage(error, 'Bulk action failed')),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Participants + mentions (§1.2)
+// ---------------------------------------------------------------------------
+
+export function useParticipants(conversationId: string | null) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'participants', conversationId],
+    enabled: !!workspaceId && !!conversationId,
+    queryFn: () => collaborationApi.listParticipants(conversationId as string),
+  })
+}
+
+export function useToggleParticipant(conversationId: string) {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: async ({ userId, join }: { userId: string; join: boolean }) => {
+      if (join) await collaborationApi.addParticipant(conversationId, userId)
+      else await collaborationApi.removeParticipant(conversationId, userId)
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: [AREA, workspaceId, 'participants', conversationId],
+      }),
+    onError: (error) => toast.error(errorMessage(error, 'Could not update watchers')),
+  })
+}
+
+export function useMentions(unreadOnly = false) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'mentions', unreadOnly],
+    enabled: !!workspaceId,
+    queryFn: () => collaborationApi.listMentions(unreadOnly),
+  })
+}
+
+export function useMarkMentionsRead() {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: (conversationId?: string | null) =>
+      collaborationApi.markMentionsRead(conversationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [AREA, workspaceId, 'mentions'] }),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Working hours (§1.1)
+// ---------------------------------------------------------------------------
+
+export function useWorkingHours(inboxId: string | null) {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'working-hours', inboxId],
+    enabled: !!workspaceId && !!inboxId,
+    queryFn: () => workingHoursApi.get(inboxId as string),
+  })
+}
+
+export function useSaveWorkingHours(inboxId: string) {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: (body: Parameters<typeof workingHoursApi.set>[1]) =>
+      workingHoursApi.set(inboxId, body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [AREA, workspaceId, 'working-hours', inboxId],
+      })
+      toast.success('Working hours saved')
+    },
+    onError: (error) => toast.error(errorMessage(error, 'Could not save working hours')),
   })
 }

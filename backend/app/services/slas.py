@@ -2,9 +2,10 @@
 
 Chatwoot-style SLA semantics (docs/research/chatwoot-gaps.md §3):
 
-- Policies carry frt/nrt/rt thresholds in wall-clock minutes. Business-hours
-  awareness is deliberately NOT in v1 — every deadline is computed on the wall
-  clock.
+- Policies carry frt/nrt/rt thresholds in minutes. By default those are
+  wall-clock minutes; with `only_during_business_hours` the deadline is computed
+  over the inbox's weekly schedule (`app.core.business_hours`) so nights and
+  weekends don't manufacture breaches.
 - One `AppliedSla` per conversation (applied manually via the API or
   auto-applied from `inbox.config["sla_policy_id"]` on conversation.created).
 - The `sla_scan` scheduler job records breach `SlaEvent`s: frt/rt fire once per
@@ -18,12 +19,13 @@ Chatwoot-style SLA semantics (docs/research/chatwoot-gaps.md §3):
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_hours import ALWAYS_OPEN, Schedule, deadline
 from app.core.db import session_scope, utcnow
 from app.core.errors import NotFoundError, ValidationFailure
 from app.core.events import Actor, Event, EventNames, emit, on
@@ -32,11 +34,17 @@ from app.models.conversation import Conversation, ConversationStatus
 from app.models.inbox import Inbox
 from app.models.sla import AppliedSla, SlaEvent, SlaEventType, SlaPolicy, SlaStatus
 from app.realtime.manager import broadcast, conversation_topic, workspace_topic
-from app.services import audit, notifications
+from app.services import audit, business_hours, notifications
 from app.services import conversations as conversations_service
 
 _OPEN_APPLIED_STATUSES = (SlaStatus.ACTIVE.value, SlaStatus.ACTIVE_WITH_MISSES.value)
 _THRESHOLD_FIELDS = ("first_response_minutes", "next_response_minutes", "resolution_minutes")
+
+
+def _due_at(schedule: Schedule, start: datetime, minutes: int) -> datetime:
+    """Deadline `minutes` after `start` — business minutes when the policy asks
+    for them (schedule is ALWAYS_OPEN otherwise, which degrades to wall clock)."""
+    return deadline(schedule, start, minutes)
 
 
 def _validate_thresholds(policy: SlaPolicy) -> None:
@@ -76,6 +84,7 @@ async def create_policy(
     first_response_minutes: int | None = None,
     next_response_minutes: int | None = None,
     resolution_minutes: int | None = None,
+    only_during_business_hours: bool = False,
 ) -> SlaPolicy:
     policy = SlaPolicy(
         workspace_id=workspace_id,
@@ -84,6 +93,7 @@ async def create_policy(
         first_response_minutes=first_response_minutes,
         next_response_minutes=next_response_minutes,
         resolution_minutes=resolution_minutes,
+        only_during_business_hours=only_during_business_hours,
     )
     _validate_thresholds(policy)
     session.add(policy)
@@ -111,7 +121,7 @@ async def update_policy(
     """Apply the provided fields (from `model_dump(exclude_unset=True)`);
     explicit nulls clear thresholds, subject to the ≥1-threshold invariant."""
     policy = await get_policy(session, workspace_id, policy_id)
-    for field in ("name", "description", *_THRESHOLD_FIELDS):
+    for field in ("name", "description", "only_during_business_hours", *_THRESHOLD_FIELDS):
         if field in changes:
             value = changes[field]
             setattr(policy, field, value.strip() if field == "name" and value else value)
@@ -345,6 +355,9 @@ async def _evaluate_applied_sla(
     }
     resolved = conversation.status == ConversationStatus.RESOLVED.value
     recorded = 0
+    schedule = ALWAYS_OPEN
+    if policy.only_during_business_hours:
+        schedule = await business_hours.schedule_for_conversation(session, conversation)
 
     # frt — no first reply yet; once per application; response targets stop at resolve.
     if (
@@ -352,7 +365,7 @@ async def _evaluate_applied_sla(
         and not resolved
         and conversation.first_reply_at is None
         and SlaEventType.FRT.value not in seen_types
-        and now > conversation.created_at + timedelta(minutes=policy.first_response_minutes)
+        and now > _due_at(schedule, conversation.created_at, policy.first_response_minutes)
     ):
         await _record_breach(session, applied, conversation, SlaEventType.FRT.value, {})
         recorded += 1
@@ -363,7 +376,7 @@ async def _evaluate_applied_sla(
         and not resolved
         and conversation.first_reply_at is not None
         and conversation.waiting_since is not None
-        and now > conversation.waiting_since + timedelta(minutes=policy.next_response_minutes)
+        and now > _due_at(schedule, conversation.waiting_since, policy.next_response_minutes)
     ):
         episode = conversation.waiting_since.isoformat()
         if episode not in seen_nrt_episodes:
@@ -381,7 +394,7 @@ async def _evaluate_applied_sla(
         policy.resolution_minutes is not None
         and conversation.resolved_at is None
         and SlaEventType.RT.value not in seen_types
-        and now > conversation.created_at + timedelta(minutes=policy.resolution_minutes)
+        and now > _due_at(schedule, conversation.created_at, policy.resolution_minutes)
     ):
         await _record_breach(session, applied, conversation, SlaEventType.RT.value, {})
         recorded += 1
