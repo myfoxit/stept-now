@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     notion_client_secret: str | None = None
     confluence_client_id: str | None = None
     confluence_client_secret: str | None = None
+    github_client_id: str | None = None
+    github_client_secret: str | None = None
+    # Social login. Google login reuses google_client_id unless a dedicated
+    # login app is configured here; GitHub login uses github_client_id.
+    google_login_client_id: str | None = None
+    google_login_client_secret: str | None = None
     # Domain that receives forwarded support mail; each email inbox gets an
     # auto-generated in-{hex}@{this} forward-to address when set.
     inbound_email_domain: str | None = None
@@ -75,6 +81,19 @@ class Settings(BaseSettings):
     oauth_base_override: dict[str, str] = {}
 
     embedding_dim: int = 384
+
+    # Billing (Stripe). All unset ⇒ billing is disabled and every feature is
+    # entitled — self-hosted installs must never be gated.
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+    stripe_publishable_key: str | None = None
+    stripe_price_cloud: str | None = None
+    stripe_price_business: str | None = None
+
+    # Outbound crawler identity + optional egress proxy (per-instance; the
+    # crawl fleet sets a different proxy per worker for distinct egress IPs).
+    crawl_user_agent: str = "SteptBot/1.0 (+https://stepped.ai)"
+    crawl_proxy_url: str | None = None
 
     # In-process periodic scheduler (source re-sync, SLA scans, campaign sends).
     # Never runs under env=test — tests invoke scheduled jobs directly.

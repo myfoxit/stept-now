@@ -38,7 +38,7 @@ Under your widget inbox settings you get an embed snippet:
   window.SteptSettings = {
     workspaceKey: "YOUR_WORKSPACE_KEY",
     // optional: identify logged-in users (HMAC-verified)
-    // identity: { id: "user-123", name: "Ada", email: "ada@example.com", hash: "..." },
+    // identity: { external_id: "user-123", name: "Ada", email: "ada@example.com", hash: "..." },
   };
 </script>
 <script async src="https://app.stepped.ai/widget-assets/loader.js"></script>

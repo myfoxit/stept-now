@@ -1193,6 +1193,13 @@ export default defineBackground(() => {
     return { ok: true };
   }
 
+  /** A drive blocks other sessions only while it can still touch the tab. */
+  function driveActive(): boolean {
+    const drive = state.drive;
+    if (!drive) return false;
+    return drive.status === 'running' || drive.status === 'paused' || drive.awaitingDecision;
+  }
+
   function stopDrive(reason?: string): void {
     driveRunner?.stop();
     driveRunner = null;
@@ -1270,7 +1277,11 @@ export default defineBackground(() => {
     args: DriveOp['args'] | undefined,
   ): Promise<DriveSnapshot> {
     if (op === 'open') {
-      if (state.drive) {
+      // Only an ACTIVE drive blocks a remote session. A completed/errored
+      // drive is side-panel residue (kept so the user can read the outcome) —
+      // treating it as busy left the browser permanently undrivable after any
+      // failed run.
+      if (driveActive()) {
         throw new Error(
           'a tour is being driven in this browser right now — try again when it finishes',
         );
@@ -1363,12 +1374,14 @@ export default defineBackground(() => {
   async function remoteRunTour(
     tourId: string,
   ): Promise<{ status: 'completed' | 'failed' | 'cancelled'; error?: string }> {
-    if (state.drive) {
+    if (driveActive()) {
       return {
         status: 'failed',
         error: 'a tour is already being driven in this browser — try again when it finishes',
       };
     }
+    // Clear terminal residue so the runner below starts from a clean panel.
+    if (state.drive) stopDrive();
     let tabId = remoteDrive?.sessionState?.tabId ?? null;
     if (tabId == null) {
       tabId = (await chrome.tabs.create({ active: true }).catch(() => null))?.id ?? null;

@@ -5,6 +5,13 @@ import starlight from '@astrojs/starlight'
 // workspace like landing/ (own lockfile, pnpm install --ignore-workspace).
 export default defineConfig({
   site: 'https://docs.stepped.ai',
+  vite: {
+    // Bundle Astro's runtime deps into the server chunks instead of leaving
+    // them as bare imports. With pnpm they are not resolvable from dist/ at
+    // generate time; a stray ancestor node_modules (e.g. ~/node_modules with
+    // an ancient clsx) can otherwise shadow them with broken versions.
+    ssr: { noExternal: ['clsx', 'html-escaper'] },
+  },
   integrations: [
     starlight({
       title: 'Stept Docs',
