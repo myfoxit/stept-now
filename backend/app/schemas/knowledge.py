@@ -12,11 +12,25 @@ from app.schemas.common import ORMModel
 
 class SourceCreate(BaseModel):
     # "articles" is excluded on purpose: that source is managed automatically.
-    type: Literal["files", "urls", "text", "sitemap", "crawl", "github", "notion"]
+    type: Literal[
+        "files",
+        "urls",
+        "text",
+        "sitemap",
+        "crawl",
+        "github",
+        "notion",
+        "confluence",
+        "gdrive",
+        "zendesk",
+    ]
     name: str = Field(min_length=1, max_length=200)
+    # Per-type shapes are validated in app.services.knowledge (connection_id /
+    # base_url / space_keys / folder_ids / subdomain / …, caps included).
     config: dict[str, Any] = Field(default_factory=dict)
-    # Connector credentials (e.g. {"token": ...}) — encrypted at rest,
-    # write-only: never returned by the API.
+    # Connector credentials (e.g. {"token": ...}, {"api_token": ...},
+    # {"email": ..., "api_token": ...}) — encrypted at rest, write-only:
+    # never returned by the API. OAuth-mode sources need none.
     secrets: dict[str, Any] | None = None
 
 

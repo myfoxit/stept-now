@@ -17,10 +17,10 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, String, Text, UniqueConstraint
+from sqlalchemy import String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base, PortableJSON
+from app.core.db import Base, PortableJSON, UTCDateTime
 from app.models.base import TimestampMixin, WorkspaceScopedMixin, pk
 
 
@@ -49,7 +49,7 @@ class IntegrationConnection(TimestampMixin, WorkspaceScopedMixin, Base):
     # Fernet blobs via app.core.security.encrypt_secret/decrypt_secret.
     access_token_encrypted: Mapped[str | None] = mapped_column(Text)
     refresh_token_encrypted: Mapped[str | None] = mapped_column(Text)
-    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    token_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # Provider routing facts: Atlassian {cloud_id, site_url, sites?}, Slack
     # {team_id, bot_user_id}, Notion {bot_id, workspace_name}, MS {tenant}.
     meta: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)

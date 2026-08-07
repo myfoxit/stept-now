@@ -311,6 +311,250 @@ describe('AddSourceDialog', () => {
     })
   })
 
+  it('creates a confluence source in token mode with space keys parsed into config', async () => {
+    const fetchFn = mockCreateRoutes('src9')
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /confluence/i }))
+    // Token mode is the default — no integrations round trip needed.
+    expect(screen.getByLabelText('Authentication')).toHaveValue('token')
+    await userEvent.type(
+      screen.getByLabelText(/site url/i),
+      'https://acme.atlassian.net'
+    )
+    await userEvent.type(screen.getByLabelText(/account email/i), 'me@acme.com')
+    await userEvent.type(screen.getByLabelText(/^api token/i), 'atl-token')
+    await userEvent.type(screen.getByLabelText(/space keys/i), 'DOCS, HELP')
+    await userEvent.type(screen.getByLabelText(/max pages/i), '200')
+    await userEvent.click(screen.getByRole('button', { name: /create source/i }))
+
+    await waitFor(() => {
+      expect(bodyOf(fetchFn, 'POST', '/knowledge/sources')).toMatchObject({
+        type: 'confluence',
+        config: {
+          auth: 'token',
+          base_url: 'https://acme.atlassian.net',
+          email: 'me@acme.com',
+          space_keys: ['DOCS', 'HELP'],
+          max_pages: 200,
+        },
+        secrets: { api_token: 'atl-token' },
+      })
+    })
+  })
+
+  it('confluence OAuth mode sends connection_id and no secrets', async () => {
+    const fetchFn = mockFetch({
+      'GET /api/v1/w/w1/integrations': () => ({
+        body: {
+          providers: [
+            {
+              id: 'confluence',
+              name: 'Confluence',
+              category: 'knowledge',
+              auth: 'oauth2',
+              description: '',
+              doc_slug: 'confluence',
+              configured: true,
+              connections: [
+                {
+                  id: 'conn-c1',
+                  provider: 'confluence',
+                  status: 'connected',
+                  account_label: 'acme.atlassian.net',
+                  scopes: [],
+                  meta: {},
+                  created_at: '2026-08-01T00:00:00Z',
+                },
+              ],
+              credential: null,
+            },
+          ],
+        },
+      }),
+      'POST /api/v1/w/w1/knowledge/sources': () => ({
+        status: 201,
+        body: makeSource({ id: 'src10', type: 'confluence' }),
+      }),
+      'POST /api/v1/w/w1/knowledge/sources/src10/sync': () => ({
+        body: makeSource({ id: 'src10', status: 'syncing' }),
+      }),
+    })
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /confluence/i }))
+    await userEvent.selectOptions(screen.getByLabelText('Authentication'), 'oauth')
+    // Wait for the integrations query to populate the select before choosing.
+    const option = await screen.findByRole('option', { name: 'acme.atlassian.net' })
+    await userEvent.selectOptions(screen.getByLabelText('Atlassian account'), option)
+    await userEvent.click(screen.getByRole('button', { name: /create source/i }))
+
+    await waitFor(() => {
+      const body = bodyOf(fetchFn, 'POST', '/knowledge/sources')
+      expect(body).toMatchObject({
+        type: 'confluence',
+        config: { auth: 'oauth', connection_id: 'conn-c1' },
+      })
+      expect(body).not.toHaveProperty('secrets')
+    })
+  })
+
+  it('gdrive requires a Google connection + folder ids and serializes them', async () => {
+    const fetchFn = mockFetch({
+      'GET /api/v1/w/w1/integrations': () => ({
+        body: {
+          providers: [
+            {
+              id: 'google',
+              name: 'Google (Gmail & Drive)',
+              category: 'email',
+              auth: 'oauth2',
+              description: '',
+              doc_slug: 'google',
+              configured: true,
+              connections: [
+                {
+                  id: 'conn-g1',
+                  provider: 'google',
+                  status: 'connected',
+                  account_label: 'me@acme.com',
+                  scopes: [],
+                  meta: {},
+                  created_at: '2026-08-01T00:00:00Z',
+                },
+              ],
+              credential: null,
+            },
+          ],
+        },
+      }),
+      'POST /api/v1/w/w1/knowledge/sources': () => ({
+        status: 201,
+        body: makeSource({ id: 'src11', type: 'gdrive' }),
+      }),
+      'POST /api/v1/w/w1/knowledge/sources/src11/sync': () => ({
+        body: makeSource({ id: 'src11', status: 'syncing' }),
+      }),
+    })
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /drive/i }))
+    const googleOption = await screen.findByRole('option', { name: 'me@acme.com' })
+    await userEvent.selectOptions(screen.getByLabelText('Google account'), googleOption)
+    expect(screen.getByRole('button', { name: /create source/i })).toBeDisabled()
+
+    await userEvent.type(
+      screen.getByLabelText(/folder ids/i),
+      'folder-one\nfolder-two'
+    )
+    await userEvent.type(screen.getByLabelText(/max files/i), '100')
+    await userEvent.click(screen.getByRole('button', { name: /create source/i }))
+
+    await waitFor(() => {
+      expect(bodyOf(fetchFn, 'POST', '/knowledge/sources')).toMatchObject({
+        type: 'gdrive',
+        config: {
+          connection_id: 'conn-g1',
+          folder_ids: ['folder-one', 'folder-two'],
+          max_files: 100,
+        },
+      })
+    })
+  })
+
+  it('shows a Connect deep link instead of the gdrive select when no Google connection exists', async () => {
+    mockFetch({
+      'GET /api/v1/w/w1/integrations': () => ({ body: { providers: [] } }),
+    })
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /drive/i }))
+    const link = await screen.findByRole('link', { name: /connect google/i })
+    expect(link).toHaveAttribute('href', '/settings/integrations')
+  })
+
+  it('zendesk sends subdomain/locale as config and email + api token as secrets', async () => {
+    const fetchFn = mockCreateRoutes('src12')
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /zendesk/i }))
+    await userEvent.type(screen.getByLabelText(/subdomain/i), 'acme')
+    expect(screen.getByLabelText('Locale')).toHaveValue('en-us')
+    await userEvent.type(screen.getByLabelText(/account email/i), 'me@acme.com')
+    const token = screen.getByLabelText(/^api token/i)
+    expect(token).toHaveAttribute('type', 'password')
+    await userEvent.type(token, 'zd-token')
+    await userEvent.click(screen.getByRole('button', { name: /create source/i }))
+
+    await waitFor(() => {
+      expect(bodyOf(fetchFn, 'POST', '/knowledge/sources')).toMatchObject({
+        type: 'zendesk',
+        config: { subdomain: 'acme', locale: 'en-us' },
+        secrets: { email: 'me@acme.com', api_token: 'zd-token' },
+      })
+    })
+  })
+
+  it('notion OAuth mode swaps the token field for a connection select', async () => {
+    const fetchFn = mockFetch({
+      'GET /api/v1/w/w1/integrations': () => ({
+        body: {
+          providers: [
+            {
+              id: 'notion',
+              name: 'Notion',
+              category: 'knowledge',
+              auth: 'oauth2',
+              description: '',
+              doc_slug: 'notion',
+              configured: true,
+              connections: [
+                {
+                  id: 'conn-n1',
+                  provider: 'notion',
+                  status: 'connected',
+                  account_label: 'Acme HQ',
+                  scopes: [],
+                  meta: {},
+                  created_at: '2026-08-01T00:00:00Z',
+                },
+              ],
+              credential: null,
+            },
+          ],
+        },
+      }),
+      'POST /api/v1/w/w1/knowledge/sources': () => ({
+        status: 201,
+        body: makeSource({ id: 'src13', type: 'notion' }),
+      }),
+      'POST /api/v1/w/w1/knowledge/sources/src13/sync': () => ({
+        body: makeSource({ id: 'src13', status: 'syncing' }),
+      }),
+    })
+    renderApp(<AddSourceDialog open onOpenChange={() => {}} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: /notion/i }))
+    // Token mode requires a token…
+    expect(screen.getByRole('button', { name: /create source/i })).toBeDisabled()
+
+    // …OAuth mode requires a connection instead.
+    await userEvent.selectOptions(screen.getByLabelText('Authentication'), 'oauth')
+    expect(screen.queryByLabelText(/integration token/i)).not.toBeInTheDocument()
+    const notionOption = await screen.findByRole('option', { name: 'Acme HQ' })
+    await userEvent.selectOptions(screen.getByLabelText('Notion account'), notionOption)
+    await userEvent.click(screen.getByRole('button', { name: /create source/i }))
+
+    await waitFor(() => {
+      const body = bodyOf(fetchFn, 'POST', '/knowledge/sources')
+      expect(body).toMatchObject({
+        type: 'notion',
+        config: { auth: 'oauth', connection_id: 'conn-n1' },
+      })
+      expect(body).not.toHaveProperty('secrets')
+    })
+  })
+
   it('shows validation errors from an ApiError response inline', async () => {
     mockFetch({
       'POST /api/v1/w/w1/knowledge/sources': () => ({

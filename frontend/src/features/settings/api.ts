@@ -89,6 +89,88 @@ export const profileApi = {
 }
 
 // ---------------------------------------------------------------------------
+// Integrations (docs/INTEGRATIONS-CONTRACTS.md, W11)
+// Local types mirror backend/app/schemas/integrations.py exactly — the
+// generated schema.d.ts predates the endpoints; the intersection becomes
+// redundant once `make types` runs.
+// ---------------------------------------------------------------------------
+
+export type ProviderCategory = 'email' | 'knowledge' | 'channel' | 'app'
+export type ProviderAuth = 'oauth2' | 'token' | 'none'
+export type ConnectionStatus = 'connected' | 'reauth_required' | 'error' | 'revoked'
+
+export interface IntegrationConnection {
+  id: string
+  provider: string
+  status: ConnectionStatus
+  account_label: string | null
+  scopes: string[]
+  meta: Record<string, unknown>
+  created_at: string
+}
+
+/** Operator-visible view of an app credential — the secret is never echoed. */
+export interface IntegrationCredential {
+  client_id: string | null
+  has_secret: boolean
+  /** Fields this provider's credential form needs (client_id, client_secret, extras). */
+  fields: string[]
+  /** The exact redirect URI to register in the provider console. */
+  redirect_uri: string
+  /** True when resolution currently falls back to instance env vars. */
+  from_env: boolean
+}
+
+export interface IntegrationProvider {
+  id: string
+  name: string
+  category: ProviderCategory
+  auth: ProviderAuth
+  description: string
+  doc_slug: string
+  /** True when a usable credential exists — i.e. the Connect button can work. */
+  configured: boolean
+  connections: IntegrationConnection[]
+  credential: IntegrationCredential | null
+}
+
+export interface IntegrationsOut {
+  providers: IntegrationProvider[]
+}
+
+export interface ConnectOut {
+  authorize_url: string
+}
+
+export interface CredentialIn {
+  client_id: string
+  /** Omitted = keep the stored secret; "" clears it. */
+  client_secret?: string | null
+  extra?: Record<string, string>
+}
+
+/** Contract-mandated key — deliberately NOT under the 'settings' prefix. */
+export const integrationsKeys = {
+  all: (workspaceId: string) => ['integrations', workspaceId] as const,
+}
+
+export const integrationsApi = {
+  list: () => api.get<IntegrationsOut>(ws('/integrations')),
+  connect: (provider: string, returnTo = '/settings/integrations') =>
+    api.post<ConnectOut>(ws(`/integrations/${provider}/connect`), { return_to: returnTo }),
+  disconnect: (connectionId: string) =>
+    api.delete<{ message: string }>(ws(`/integrations/connections/${connectionId}`)),
+  reconnect: (connectionId: string, returnTo = '/settings/integrations') =>
+    api.post<ConnectOut>(ws(`/integrations/connections/${connectionId}/reconnect`), {
+      return_to: returnTo,
+    }),
+  putCredentials: (provider: string, body: CredentialIn) =>
+    api.put<IntegrationCredential>(ws(`/integrations/${provider}/credentials`), body),
+  deleteCredentials: (provider: string) =>
+    api.delete<{ message: string }>(ws(`/integrations/${provider}/credentials`)),
+}
+
+// ---------------------------------------------------------------------------
 // Custom attribute definitions (docs/CHATWOOT-BACKLOG.md §1.6)
 // ---------------------------------------------------------------------------
 

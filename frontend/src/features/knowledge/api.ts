@@ -36,7 +36,16 @@ export type AnalyticsZeroResultQuery = components['schemas']['ZeroResultQuery']
 export type AnalyticsFeedbackStats = components['schemas']['FeedbackStats']
 export type AnalyticsAiStats = components['schemas']['AiStats']
 
-export type SourceType = components['schemas']['SourceCreate']['type']
+/**
+ * W11 adds `confluence` / `gdrive` / `zendesk` connectors; the generated
+ * schema.d.ts predates them — the union extension becomes redundant once
+ * `make types` runs at integration.
+ */
+export type SourceType =
+  | components['schemas']['SourceCreate']['type']
+  | 'confluence'
+  | 'gdrive'
+  | 'zendesk'
 export type DocStatus = 'pending' | 'processing' | 'indexed' | 'failed'
 export type SourceStatus = 'idle' | 'syncing' | 'error'
 export type ArticleStatus = 'draft' | 'published'
@@ -48,6 +57,9 @@ export const REMOTE_SOURCE_TYPES: readonly string[] = [
   'crawl',
   'github',
   'notion',
+  'confluence',
+  'gdrive',
+  'zendesk',
   'articles',
 ]
 

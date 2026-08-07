@@ -48,6 +48,9 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   crawl: 'Web crawl',
   github: 'GitHub',
   notion: 'Notion',
+  confluence: 'Confluence',
+  gdrive: 'Google Drive',
+  zendesk: 'Zendesk',
   articles: 'Articles',
 }
 

@@ -1,13 +1,28 @@
 /**
  * Create/edit dialog for knowledge sources.
- * Create: pick a type (files, URLs, text, sitemap, crawl, GitHub, Notion) then fill
- * its config; remote types kick off an initial sync. Edit: type is fixed, config and
- * secrets are editable — stored secrets stay blank with an "unchanged" placeholder.
+ * Create: pick a type (files, URLs, text, sitemap, crawl, GitHub, Notion,
+ * Confluence, Google Drive, Zendesk) then fill its config; remote types kick off
+ * an initial sync. Edit: type is fixed, config and secrets are editable — stored
+ * secrets stay blank with an "unchanged" placeholder. Connector configs mirror
+ * BE-C's contracts in docs/INTEGRATIONS-CONTRACTS.md.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Github, Globe, Link2, Loader2, Map, NotebookText, Type, Upload, X } from 'lucide-react'
+import {
+  BookOpen,
+  FolderOpen,
+  Github,
+  Globe,
+  LifeBuoy,
+  Link2,
+  Loader2,
+  Map,
+  NotebookText,
+  Type,
+  Upload,
+  X,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -26,9 +41,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { ConnectionSelect } from '@/features/settings/components/integrations/ConnectionSelect'
 import { currentWorkspaceId } from '@/stores/auth'
 
 import {
@@ -53,10 +70,22 @@ const TYPE_TABS: { value: SourceType; label: string; icon: LucideIcon }[] = [
   { value: 'crawl', label: 'Crawl', icon: Globe },
   { value: 'github', label: 'GitHub', icon: Github },
   { value: 'notion', label: 'Notion', icon: NotebookText },
+  { value: 'confluence', label: 'Confluence', icon: BookOpen },
+  { value: 'gdrive', label: 'Drive', icon: FolderOpen },
+  { value: 'zendesk', label: 'Zendesk', icon: LifeBuoy },
 ]
 
 /** Types whose documents live remotely — they get an initial sync + optional auto re-sync. */
-const REMOTE_TYPES: SourceType[] = ['urls', 'sitemap', 'crawl', 'github', 'notion']
+const REMOTE_TYPES: SourceType[] = [
+  'urls',
+  'sitemap',
+  'crawl',
+  'github',
+  'notion',
+  'confluence',
+  'gdrive',
+  'zendesk',
+]
 
 const DEFAULT_NAMES: Record<SourceType, string> = {
   files: 'File upload',
@@ -66,6 +95,9 @@ const DEFAULT_NAMES: Record<SourceType, string> = {
   crawl: 'Web crawl',
   github: 'GitHub repository',
   notion: 'Notion workspace',
+  confluence: 'Confluence space',
+  gdrive: 'Google Drive folder',
+  zendesk: 'Zendesk help center',
 }
 
 interface FormState {
@@ -91,6 +123,15 @@ interface FormState {
   rootPageId: string
   token: string
   refreshMinutes: string
+  /** Connector auth mode (notion/confluence): stored token vs OAuth connection. */
+  authMode: 'token' | 'oauth'
+  connectionId: string
+  spaceKeys: string
+  folderIds: string
+  maxFiles: string
+  subdomain: string
+  locale: string
+  accountEmail: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -116,6 +157,14 @@ const EMPTY_FORM: FormState = {
   rootPageId: '',
   token: '',
   refreshMinutes: '',
+  authMode: 'token',
+  connectionId: '',
+  spaceKeys: '',
+  folderIds: '',
+  maxFiles: '',
+  subdomain: '',
+  locale: 'en-us',
+  accountEmail: '',
 }
 
 function formFromSource(source: Source): FormState {
@@ -148,6 +197,14 @@ function formFromSource(source: Source): FormState {
     includePrs: config.include_prs === true,
     rootPageId: str('root_page_id'),
     refreshMinutes: configuredRefresh(config)?.toString() ?? '',
+    authMode: config.auth === 'oauth' ? 'oauth' : 'token',
+    connectionId: str('connection_id'),
+    spaceKeys: patterns('space_keys').join(', '),
+    folderIds: patterns('folder_ids').join('\n'),
+    maxFiles: str('max_files'),
+    subdomain: str('subdomain'),
+    locale: str('locale') || 'en-us',
+    accountEmail: str('email'),
   }
 }
 
@@ -196,12 +253,58 @@ function buildConfig(mode: SourceType, form: FormState): Record<string, unknown>
   if (mode === 'notion') {
     if (form.rootPageId.trim()) config.root_page_id = form.rootPageId.trim()
     if (maxPages !== null) config.max_pages = maxPages
+    // Token mode stays exactly as before W11 — no auth key at all.
+    if (form.authMode === 'oauth') {
+      config.auth = 'oauth'
+      config.connection_id = form.connectionId
+    }
+  }
+  if (mode === 'confluence') {
+    config.auth = form.authMode
+    if (form.authMode === 'oauth') {
+      config.connection_id = form.connectionId
+    } else {
+      config.base_url = form.baseUrl.trim()
+      config.email = form.accountEmail.trim()
+    }
+    config.space_keys = form.spaceKeys
+      .split(/[,\s]+/)
+      .map((k) => k.trim())
+      .filter(Boolean)
+    if (maxPages !== null) config.max_pages = maxPages
+  }
+  if (mode === 'gdrive') {
+    config.connection_id = form.connectionId
+    config.folder_ids = form.folderIds
+      .split('\n')
+      .map((id) => id.trim())
+      .filter(Boolean)
+    const maxFiles = positiveInt(form.maxFiles)
+    if (maxFiles !== null) config.max_files = maxFiles
+  }
+  if (mode === 'zendesk') {
+    config.subdomain = form.subdomain.trim()
+    config.locale = form.locale.trim() || 'en-us'
   }
   if (REMOTE_TYPES.includes(mode)) {
     const refresh = positiveInt(form.refreshMinutes)
     if (refresh !== null && refresh >= 5) config.refresh_minutes = refresh
   }
   return config
+}
+
+/** Secrets payload per type — only keys the user actually typed (blank = keep stored). */
+function buildSecrets(mode: SourceType, form: FormState): Record<string, string> | undefined {
+  const secrets: Record<string, string> = {}
+  const token = form.token.trim()
+  const notionToken = mode === 'notion' && form.authMode === 'token'
+  if ((mode === 'github' || notionToken) && token) secrets.token = token
+  if (mode === 'confluence' && form.authMode === 'token' && token) secrets.api_token = token
+  if (mode === 'zendesk') {
+    if (form.accountEmail.trim()) secrets.email = form.accountEmail.trim()
+    if (token) secrets.api_token = token
+  }
+  return Object.keys(secrets).length > 0 ? secrets : undefined
 }
 
 function validate(mode: SourceType, form: FormState, editing: boolean): string | null {
@@ -226,8 +329,31 @@ function validate(mode: SourceType, form: FormState, editing: boolean): string |
   }
   if (mode === 'github' && (!form.repoOwner.trim() || !form.repo.trim()))
     return 'Repository owner and name are required.'
-  if (mode === 'notion' && !editing && !form.token.trim())
-    return 'A Notion integration token is required.'
+  if (mode === 'notion') {
+    if (form.authMode === 'oauth' && !form.connectionId)
+      return 'Choose a connected Notion account.'
+    if (form.authMode === 'token' && !editing && !form.token.trim())
+      return 'A Notion integration token is required.'
+  }
+  if (mode === 'confluence') {
+    if (form.authMode === 'oauth' && !form.connectionId)
+      return 'Choose a connected Confluence account.'
+    if (form.authMode === 'token') {
+      if (!form.baseUrl.trim() || !form.accountEmail.trim())
+        return 'Site URL and account email are required.'
+      if (!editing && !form.token.trim()) return 'An API token is required.'
+    }
+  }
+  if (mode === 'gdrive') {
+    if (!form.connectionId) return 'Choose a connected Google account.'
+    if (!form.folderIds.split('\n').some((id) => id.trim() !== ''))
+      return 'Add at least one folder ID.'
+  }
+  if (mode === 'zendesk') {
+    if (!form.subdomain.trim()) return 'The Zendesk subdomain is required.'
+    if (!editing && (!form.accountEmail.trim() || !form.token.trim()))
+      return 'Account email and API token are required.'
+  }
   if (form.refreshMinutes.trim()) {
     const refresh = positiveInt(form.refreshMinutes)
     if (refresh === null || refresh < 5) return 'Auto re-sync interval must be at least 5 minutes.'
@@ -271,7 +397,7 @@ export function AddSourceDialog({
   const mutation = useMutation({
     mutationFn: async (): Promise<Source> => {
       const trimmed = form.name.trim()
-      const secrets = form.token.trim() ? { token: form.token.trim() } : undefined
+      const secrets = buildSecrets(mode, form)
 
       if (editing && source) {
         return knowledgeApi.updateSource(source.id, {
@@ -354,7 +480,7 @@ export function AddSourceDialog({
               otherwise tailwind-merge keeps both and the prefixed rule wins —
               the 7 triggers then wrap out of a 36px box onto the fields below. */}
           {!editing ? (
-            <TabsList className="grid h-auto w-full grid-cols-4 group-data-[orientation=horizontal]/tabs:h-auto">
+            <TabsList className="grid h-auto w-full grid-cols-5 group-data-[orientation=horizontal]/tabs:h-auto">
               {TYPE_TABS.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value} className="flex-col gap-1 py-2">
                   <tab.icon className="size-4" /> {tab.label}
@@ -596,14 +722,32 @@ export function AddSourceDialog({
             </TabsContent>
 
             <TabsContent value="notion" className="mt-0 grid gap-3">
-              <SecretField
-                id="notion-token"
-                label="Integration token"
-                value={form.token}
-                onChange={(v) => set('token', v)}
-                hasStored={editing && Boolean(source?.has_secrets)}
-                hint="Create an internal integration in Notion and share pages with it."
+              <AuthModeField
+                id="notion-auth"
+                value={form.authMode}
+                onChange={(v) => set('authMode', v)}
+                tokenLabel="Integration token"
+                oauthLabel="Notion account (OAuth)"
               />
+              {form.authMode === 'oauth' ? (
+                <ConnectionSelect
+                  id="notion-connection"
+                  providerId="notion"
+                  label="Notion account"
+                  value={form.connectionId}
+                  onChange={(v) => set('connectionId', v)}
+                  hint="Pages shared with the connected Notion integration are imported."
+                />
+              ) : (
+                <SecretField
+                  id="notion-token"
+                  label="Integration token"
+                  value={form.token}
+                  onChange={(v) => set('token', v)}
+                  hasStored={editing && Boolean(source?.has_secrets)}
+                  hint="Create an internal integration in Notion and share pages with it."
+                />
+              )}
               <div className="grid gap-1.5">
                 <Label htmlFor="notion-root">Root page ID (optional)</Label>
                 <Input
@@ -618,6 +762,152 @@ export function AddSourceDialog({
                 label="Max pages (optional)"
                 value={form.maxPages}
                 onChange={(v) => set('maxPages', v)}
+              />
+              <RefreshField value={form.refreshMinutes} onChange={(v) => set('refreshMinutes', v)} />
+            </TabsContent>
+
+            <TabsContent value="confluence" className="mt-0 grid gap-3">
+              <AuthModeField
+                id="confluence-auth"
+                value={form.authMode}
+                onChange={(v) => set('authMode', v)}
+                tokenLabel="API token"
+                oauthLabel="Atlassian account (OAuth)"
+              />
+              {form.authMode === 'oauth' ? (
+                <ConnectionSelect
+                  id="confluence-connection"
+                  providerId="confluence"
+                  label="Atlassian account"
+                  value={form.connectionId}
+                  onChange={(v) => set('connectionId', v)}
+                />
+              ) : (
+                <>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="confluence-base-url">Site URL</Label>
+                    <Input
+                      id="confluence-base-url"
+                      value={form.baseUrl}
+                      onChange={(e) => set('baseUrl', e.target.value)}
+                      placeholder="https://yourcompany.atlassian.net"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="confluence-email">Account email</Label>
+                    <Input
+                      id="confluence-email"
+                      type="email"
+                      value={form.accountEmail}
+                      onChange={(e) => set('accountEmail', e.target.value)}
+                      placeholder="you@yourcompany.com"
+                    />
+                  </div>
+                  <SecretField
+                    id="confluence-token"
+                    label="API token"
+                    value={form.token}
+                    onChange={(v) => set('token', v)}
+                    hasStored={editing && Boolean(source?.has_secrets)}
+                    hint="Create one at id.atlassian.com → Security → API tokens."
+                  />
+                </>
+              )}
+              <div className="grid gap-1.5">
+                <Label htmlFor="confluence-spaces">Space keys (optional)</Label>
+                <Input
+                  id="confluence-spaces"
+                  value={form.spaceKeys}
+                  onChange={(e) => set('spaceKeys', e.target.value)}
+                  placeholder="DOCS, HELP — empty imports all global spaces"
+                />
+              </div>
+              <NumberField
+                id="confluence-max-pages"
+                label="Max pages (optional, cap 500)"
+                value={form.maxPages}
+                onChange={(v) => set('maxPages', v)}
+              />
+              <RefreshField value={form.refreshMinutes} onChange={(v) => set('refreshMinutes', v)} />
+            </TabsContent>
+
+            <TabsContent value="gdrive" className="mt-0 grid gap-3">
+              <ConnectionSelect
+                id="gdrive-connection"
+                providerId="google"
+                label="Google account"
+                value={form.connectionId}
+                onChange={(v) => set('connectionId', v)}
+                hint="Drive access is read-only; only the folders below are imported."
+              />
+              <div className="grid gap-1.5">
+                <Label htmlFor="gdrive-folders">Folder IDs (one per line)</Label>
+                <Textarea
+                  id="gdrive-folders"
+                  value={form.folderIds}
+                  onChange={(e) => set('folderIds', e.target.value)}
+                  rows={3}
+                  placeholder="1AbCdEfGhIjKlMnOpQrStUvWxYz"
+                  className="font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground">
+                  From the folder URL: drive.google.com/drive/folders/<b>&lt;id&gt;</b>. Subfolders
+                  are included.
+                </p>
+              </div>
+              <NumberField
+                id="gdrive-max-files"
+                label="Max files (optional, cap 500)"
+                value={form.maxFiles}
+                onChange={(v) => set('maxFiles', v)}
+              />
+              <RefreshField value={form.refreshMinutes} onChange={(v) => set('refreshMinutes', v)} />
+            </TabsContent>
+
+            <TabsContent value="zendesk" className="mt-0 grid gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="zendesk-subdomain">Subdomain</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="zendesk-subdomain"
+                    value={form.subdomain}
+                    onChange={(e) => set('subdomain', e.target.value)}
+                    placeholder="yourcompany"
+                  />
+                  <span className="shrink-0 text-sm text-muted-foreground">.zendesk.com</span>
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="zendesk-locale">Locale</Label>
+                <Input
+                  id="zendesk-locale"
+                  value={form.locale}
+                  onChange={(e) => set('locale', e.target.value)}
+                  placeholder="en-us"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="zendesk-email">Account email</Label>
+                <Input
+                  id="zendesk-email"
+                  type="email"
+                  autoComplete="off"
+                  value={form.accountEmail}
+                  onChange={(e) => set('accountEmail', e.target.value)}
+                  placeholder="you@yourcompany.com"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Stored encrypted with the API token — Zendesk authenticates as
+                  email/token.
+                </p>
+              </div>
+              <SecretField
+                id="zendesk-token"
+                label="API token"
+                value={form.token}
+                onChange={(v) => set('token', v)}
+                hasStored={editing && Boolean(source?.has_secrets)}
+                hint="Admin Center → Apps and integrations → APIs → Zendesk API tokens."
               />
               <RefreshField value={form.refreshMinutes} onChange={(v) => set('refreshMinutes', v)} />
             </TabsContent>
@@ -660,6 +950,36 @@ export function AddSourceDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Token-vs-OAuth switch for connectors that support both auth modes. */
+function AuthModeField({
+  id,
+  value,
+  onChange,
+  tokenLabel,
+  oauthLabel,
+}: {
+  id: string
+  value: 'token' | 'oauth'
+  onChange: (value: 'token' | 'oauth') => void
+  tokenLabel: string
+  oauthLabel: string
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>Authentication</Label>
+      <NativeSelect
+        id={id}
+        className="w-full"
+        value={value}
+        onChange={(e) => onChange(e.target.value as 'token' | 'oauth')}
+      >
+        <NativeSelectOption value="token">{tokenLabel}</NativeSelectOption>
+        <NativeSelectOption value="oauth">{oauthLabel}</NativeSelectOption>
+      </NativeSelect>
+    </div>
   )
 }
 

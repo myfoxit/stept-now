@@ -413,6 +413,11 @@ class TestBlockedIngress:
             headers=ctx.owner_headers,
         )
         assert created.status_code == 201, created.text
+        # Inbound now authenticates with the inbox's auto-generated webhook token
+        # (the bare tokenless endpoint 404s — no open relay); the blocked-contact
+        # drop is enforced once past that gate.
+        inbox_id = created.json()["id"]
+        token = created.json()["config"]["webhook_token"]
         contact = await _contact(client, ctx, name="Spam", email="spam@example.com")
         await client.post(
             f"{ctx.base}/contacts/{contact['id']}/block",
@@ -421,7 +426,7 @@ class TestBlockedIngress:
         )
 
         response = await client.post(
-            "/api/channels/email/inbound",
+            f"/api/channels/email/inbound/{inbox_id}/{token}",
             json={
                 "to": "support@acme.test",
                 "from": "Spam <spam@example.com>",

@@ -3,12 +3,14 @@
 - ingest_document {document_id}: (re)load the raw content, extract, ingest.
 - sync_source {source_id}: "urls" sources fetch each configured URL (10s
   timeout, 2MB cap, text/html only) and ingest inline; connector sources
-  (sitemap/crawl/github/notion) fetch their full listing via
-  `app.rag.connectors`, upsert by (source_id, uri), and prune documents that
-  vanished from a complete, error-free listing (Onyx-style deletion pruning);
-  other source types re-ingest their non-indexed documents. Sitemap syncs are
-  incremental: a URL whose <lastmod> matches the stored one is not refetched
-  (it still counts as present, so pruning leaves it alone). Failures mark the
+  (sitemap/crawl/github/notion/confluence/gdrive/zendesk) fetch their listing
+  via `app.rag.connectors`, upsert by (source_id, uri), and prune documents
+  that vanished from a complete, error-free listing (Onyx-style deletion
+  pruning) — except zendesk, whose incremental listing only names changed
+  articles, so only the ones it reports as archived are pruned; other source
+  types re-ingest their non-indexed documents. Sitemap syncs are incremental:
+  a URL whose <lastmod> matches the stored one is not refetched (it still
+  counts as present, so pruning leaves it alone). Failures mark the
   document/source as errored — the task itself never raises for content
   problems.
 - knowledge_refresh_scan (scheduled, 60s): enqueues sync_source for every
@@ -44,8 +46,10 @@ if TYPE_CHECKING:
 
 logger = log("rag")
 
-# Source types synced through app.rag.connectors (full-listing + pruning).
-CONNECTOR_SOURCE_TYPES = frozenset({"sitemap", "crawl", "github", "notion"})
+# Source types synced through app.rag.connectors.
+CONNECTOR_SOURCE_TYPES = frozenset(
+    {"sitemap", "crawl", "github", "notion", "confluence", "gdrive", "zendesk"}
+)
 
 # The minimum allowed scheduled re-sync interval (config.refresh_minutes).
 MIN_REFRESH_MINUTES = 5
@@ -305,29 +309,62 @@ async def _sync_sitemap(
 
 
 async def _sync_connector(session: AsyncSession, source: KnowledgeSource) -> list[str]:
-    """sitemap/crawl/github/notion: fetch the full listing, upsert + ingest,
-    then prune documents that disappeared — but only when the listing was
-    complete and every document synced cleanly (never prune on partial failure)."""
+    """Connector sources: fetch the listing, upsert + ingest, then prune.
+
+    Full-listing types (sitemap/crawl/github/notion/confluence/gdrive) prune
+    documents that disappeared — but only when the listing was complete and
+    every document synced cleanly (never prune on partial failure). zendesk is
+    incremental: unchanged articles are absent from its listing, so only the
+    articles it names as archived are pruned, and the sync_cursor the fetch
+    wrote into the config copy is persisted. gdrive additionally returns skip
+    notes (PDF/DOCX/oversized raw files); they are recorded in the source
+    error summary, but the pruning decision is made before they are appended —
+    a skipped file never blocks deletion pruning.
+    """
     from app.rag import connectors
     from app.services.knowledge import get_source_secrets
 
-    config = source.config or {}
+    config = dict(source.config or {})
+    secrets = get_source_secrets(source)
     fetch_errors: list[str] = []
+    notes: list[str] = []
     unchanged: set[str] = set()
+    archived: list[str] = []
+    full_listing = True
     if source.type == "sitemap":
         entries = await connectors.fetch_sitemap(config)
         fetched, fetch_errors, unchanged = await _sync_sitemap(session, source, entries)
     elif source.type == "crawl":
         fetched, fetch_errors = await connectors.crawl_site(config)
     elif source.type == "github":
-        fetched = await connectors.fetch_github(config, get_source_secrets(source))
-    else:  # notion
-        fetched = await connectors.fetch_notion(config, get_source_secrets(source))
+        fetched = await connectors.fetch_github(config, secrets)
+    elif source.type == "notion":
+        fetched = await connectors.fetch_notion(
+            config, secrets, session=session, workspace_id=source.workspace_id
+        )
+    elif source.type == "confluence":
+        fetched = await connectors.fetch_confluence(
+            config, secrets, session=session, workspace_id=source.workspace_id
+        )
+    elif source.type == "gdrive":
+        fetched, notes = await connectors.fetch_gdrive(
+            config, secrets, session=session, workspace_id=source.workspace_id
+        )
+    else:  # zendesk — incremental listing + cursor writeback
+        fetched, archived = await connectors.fetch_zendesk(
+            config, secrets, session=session, workspace_id=source.workspace_id
+        )
+        full_listing = False
+        if config != (source.config or {}):
+            source.config = config  # reassigned, not mutated — persists sync_cursor
     errors = fetch_errors + await upsert_and_ingest(session, source, fetched)
     if not errors:
-        keep_uris = {item.uri for item in fetched} | unchanged
-        await _prune_missing_documents(session, source, keep_uris=keep_uris)
-    return errors
+        if full_listing:
+            keep_uris = {item.uri for item in fetched} | unchanged
+            await _prune_missing_documents(session, source, keep_uris=keep_uris)
+        if archived:
+            await _prune_documents_by_uri(session, source, uris=set(archived))
+    return errors + notes
 
 
 async def _prune_missing_documents(
@@ -346,6 +383,26 @@ async def _prune_missing_documents(
             Document.workspace_id == source.workspace_id,
             Document.source_id == source.id,
             Document.uri.not_in(keep_uris),
+        )
+    )
+
+
+async def _prune_documents_by_uri(
+    session: AsyncSession, source: KnowledgeSource, *, uris: set[str]
+) -> None:
+    """Delete exactly these documents (and their chunks) — zendesk's archived
+    articles, which an incremental listing names instead of omitting."""
+    doomed = select(Document.id).where(
+        Document.workspace_id == source.workspace_id,
+        Document.source_id == source.id,
+        Document.uri.in_(uris),
+    )
+    await session.execute(delete(Chunk).where(Chunk.document_id.in_(doomed)))
+    await session.execute(
+        delete(Document).where(
+            Document.workspace_id == source.workspace_id,
+            Document.source_id == source.id,
+            Document.uri.in_(uris),
         )
     )
 
