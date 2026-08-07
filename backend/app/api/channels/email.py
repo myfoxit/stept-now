@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import app.channels.email  # noqa: F401 — registers the outbound "email" sender
 from app.channels.email import reply_conversation_id, strip_quoted
 from app.core.deps import Db
+from app.core.errors import BlockedContactError
 from app.core.events import Actor
 from app.models.conversation import Conversation
 from app.models.inbox import ChannelType, ContactInbox, Inbox
@@ -108,6 +109,8 @@ async def _append_inbound(
     contact, _created = await contacts_service.find_or_create(
         session, workspace_id, email=from_email, name=from_name
     )
+    if contact.blocked:
+        raise BlockedContactError("This contact is blocked")
     contact_inbox = (
         await session.execute(
             select(ContactInbox).where(

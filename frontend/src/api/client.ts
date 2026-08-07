@@ -55,7 +55,8 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = new URL(`${BASE}${path}`, window.location.origin)
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value))
+      if (value !== undefined && value !== null && value !== '')
+        url.searchParams.set(key, String(value))
     }
   }
   return url.pathname + url.search
@@ -98,7 +99,8 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   }
 
   if (!response.ok) {
-    const err = (payload as { error?: { code?: string; message?: string; details?: unknown } })?.error
+    const err = (payload as { error?: { code?: string; message?: string; details?: unknown } })
+      ?.error
     throw new ApiError(
       response.status,
       err?.code ?? 'unknown_error',
@@ -126,6 +128,12 @@ export const api = {
 }
 
 /** Workspace-scoped path helper: ws('/conversations') → /api/v1/w/{id}/conversations */
+/** Auth header for requests that bypass `api.*` (e.g. blob downloads). */
+export function authHeaders(): Record<string, string> {
+  const token = useAuthStore.getState().accessToken
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export function ws(path: string): string {
   const id = useAuthStore.getState().workspaceId
   if (!id) throw new Error('No active workspace selected')

@@ -1,7 +1,8 @@
-/** Left pane: status tabs w/ live counts, filters, search, infinite list. */
+/** Left pane: saved views, status tabs w/ live counts, filters, search,
+ * multi-select + bulk actions, infinite list. */
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Filter, Loader2, PenSquare, Search } from 'lucide-react'
+import { AlertCircle, Filter, Loader2, PenSquare, Search, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useHasPerm } from '@/stores/auth'
@@ -17,16 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { BulkActionBar } from '@/features/inbox/components/BulkActionBar'
 import { ConversationRow } from '@/features/inbox/components/ConversationRow'
 import { NewConversationDialog } from '@/features/inbox/components/NewConversationDialog'
-import type { ConversationFilters, Counts, Tag } from '@/features/inbox/api'
+import { ViewsBar } from '@/features/inbox/components/ViewsBar'
+import type { ConversationFilters, Counts, SavedView, Tag } from '@/features/inbox/api'
 import {
   useConversationsList,
   useCounts,
   useInboxes,
+  useMembers,
   usePresence,
+  useTeams,
 } from '@/features/inbox/hooks'
 import { useTags } from '@/features/contacts/hooks'
+import { useDrilldownStore } from '@/stores/drilldown'
 
 interface TabDef {
   key: string
@@ -38,7 +44,12 @@ interface TabDef {
 const TABS: TabDef[] = [
   { key: 'open', label: 'Open', countKey: 'open', filter: { status: ['open'] } },
   { key: 'mine', label: 'Mine', countKey: 'mine', filter: { status: ['open'], assignee: 'me' } },
-  { key: 'unassigned', label: 'Unassigned', countKey: 'unassigned', filter: { status: ['open'], assignee: 'unassigned' } },
+  {
+    key: 'unassigned',
+    label: 'Unassigned',
+    countKey: 'unassigned',
+    filter: { status: ['open'], assignee: 'unassigned' },
+  },
   { key: 'pending', label: 'AI', countKey: 'pending', filter: { status: ['pending'] } },
   { key: 'snoozed', label: 'Snoozed', countKey: 'snoozed', filter: { status: ['snoozed'] } },
   { key: 'resolved', label: 'Resolved', countKey: 'resolved', filter: { status: ['resolved'] } },
@@ -60,11 +71,27 @@ export function ConversationListPane({
   const [priority, setPriority] = useState<string | undefined>()
   const [tagId, setTagId] = useState<string | undefined>()
   const [newOpen, setNewOpen] = useState(false)
+  const [view, setView] = useState<SavedView | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  // A report drill-down arrives as an unsaved filter document; it applies once
+  // and shows as a dismissible chip rather than pretending to be a saved view.
+  const takeDrilldown = useDrilldownStore((s) => s.take)
+  const [drilldown, setDrilldown] = useState<ReturnType<typeof takeDrilldown>>(null)
+  useEffect(() => {
+    const pending = takeDrilldown()
+    if (pending) {
+      setDrilldown(pending)
+      setView(null)
+    }
+  }, [takeDrilldown])
 
   const canWrite = useHasPerm('conversations:write')
+  const canManage = useHasPerm('conversations:manage')
   const { data: counts } = useCounts()
   const { data: inboxes = [] } = useInboxes()
   const { data: tags = [] } = useTags()
+  const { data: members = [] } = useMembers()
+  const { data: teams = [] } = useTeams()
   const presence = usePresence()
 
   useEffect(() => {
@@ -74,13 +101,36 @@ export function ConversationListPane({
 
   const filters = useMemo<ConversationFilters>(() => {
     const base = TABS.find((t) => t.key === tab)?.filter ?? {}
-    return { ...base, inbox_id: inboxId, priority, tag_id: tagId, q: q || undefined }
-  }, [tab, inboxId, priority, tagId, q])
+    return {
+      ...base,
+      inbox_id: inboxId,
+      priority,
+      tag_id: tagId,
+      q: q || undefined,
+      view_id: view?.id,
+    }
+  }, [tab, inboxId, priority, tagId, q, view])
 
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useConversationsList(filters)
+    useConversationsList(filters, drilldown?.query ?? null)
 
   const items = useMemo(() => data?.pages.flatMap((p) => p.items) ?? [], [data])
+
+  // Rows that scroll out of the filtered set must not stay selected — a bulk
+  // action against a stale id would silently target the wrong conversation.
+  useEffect(() => {
+    setSelected((prev) => {
+      const visible = new Set(items.map((item) => item.id))
+      const next = prev.filter((id) => visible.has(id))
+      return next.length === prev.length ? prev : next
+    })
+  }, [items])
+
+  function toggleSelected(id: string) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+    )
+  }
   const tagsById = useMemo(() => new Map<string, Tag>(tags.map((t) => [t.id, t])), [tags])
   const activeFilterCount = [inboxId, priority, tagId].filter(Boolean).length
 
@@ -101,6 +151,40 @@ export function ConversationListPane({
         ) : null}
       </div>
 
+      {drilldown ? (
+        <div className="flex items-center gap-2 border-b bg-accent/40 px-2 py-1.5 text-xs">
+          <span className="font-medium">Drill-down:</span>
+          <span className="truncate">{drilldown.label}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto size-6"
+            aria-label="Clear drill-down"
+            onClick={() => setDrilldown(null)}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      ) : (
+        <ViewsBar
+          activeViewId={view?.id ?? null}
+          onSelect={(next) => {
+            setView(next)
+            setSelected([])
+          }}
+        />
+      )}
+
+      {canManage && selected.length > 0 ? (
+        <BulkActionBar
+          selected={selected}
+          members={members}
+          teams={teams}
+          tags={tags}
+          onDone={() => setSelected([])}
+        />
+      ) : null}
+
       <div className="flex flex-wrap gap-1 border-b p-2">
         {TABS.map((t) => {
           const count = counts?.[t.countKey] ?? 0
@@ -111,7 +195,9 @@ export function ConversationListPane({
               onClick={() => setTab(t.key)}
               className={cn(
                 'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
-                tab === t.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
+                tab === t.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent'
               )}
             >
               {t.label}
@@ -155,7 +241,10 @@ export function ConversationListPane({
           <PopoverContent align="end" className="w-64 space-y-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Inbox</label>
-              <Select value={inboxId ?? ALL} onValueChange={(v) => setInboxId(v === ALL ? undefined : v)}>
+              <Select
+                value={inboxId ?? ALL}
+                onValueChange={(v) => setInboxId(v === ALL ? undefined : v)}
+              >
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue placeholder="All inboxes" />
                 </SelectTrigger>
@@ -171,7 +260,10 @@ export function ConversationListPane({
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Priority</label>
-              <Select value={priority ?? ALL} onValueChange={(v) => setPriority(v === ALL ? undefined : v)}>
+              <Select
+                value={priority ?? ALL}
+                onValueChange={(v) => setPriority(v === ALL ? undefined : v)}
+              >
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue placeholder="Any priority" />
                 </SelectTrigger>
@@ -187,7 +279,10 @@ export function ConversationListPane({
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Tag</label>
-              <Select value={tagId ?? ALL} onValueChange={(v) => setTagId(v === ALL ? undefined : v)}>
+              <Select
+                value={tagId ?? ALL}
+                onValueChange={(v) => setTagId(v === ALL ? undefined : v)}
+              >
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue placeholder="Any tag" />
                 </SelectTrigger>
@@ -234,7 +329,9 @@ export function ConversationListPane({
               </EmptyMedia>
               <EmptyTitle>No conversations</EmptyTitle>
               <EmptyDescription>
-                {q || activeFilterCount ? 'Try adjusting your filters.' : 'This inbox is all caught up.'}
+                {q || activeFilterCount
+                  ? 'Try adjusting your filters.'
+                  : 'This inbox is all caught up.'}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -248,6 +345,9 @@ export function ConversationListPane({
                 assigneeOnline={!!item.assignee && presence.has(item.assignee.id)}
                 tagsById={tagsById}
                 onSelect={onSelect}
+                selectable={canManage}
+                selected={selected.includes(item.id)}
+                onToggleSelected={toggleSelected}
               />
             ))}
             {hasNextPage ? (

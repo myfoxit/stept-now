@@ -36,7 +36,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useHasPerm } from '@/stores/auth'
 
 import type { SlaPolicy, SlaPolicyCreate } from '../api'
-import { useCreateSlaPolicy, useDeleteSlaPolicy, useSlaPolicies, useUpdateSlaPolicy } from '../hooks'
+import {
+  useCreateSlaPolicy,
+  useDeleteSlaPolicy,
+  useSlaPolicies,
+  useUpdateSlaPolicy,
+} from '../hooks'
 
 const THRESHOLDS = [
   { key: 'first_response_minutes', label: 'First response (minutes)' },
@@ -73,6 +78,7 @@ function EditorDialog({
 }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [businessHoursOnly, setBusinessHoursOnly] = useState(false)
   const [thresholds, setThresholds] = useState<Record<ThresholdKey, string>>({
     first_response_minutes: '',
     next_response_minutes: '',
@@ -88,6 +94,7 @@ function EditorDialog({
     if (!open) return
     setName(policy?.name ?? '')
     setDescription(policy?.description ?? '')
+    setBusinessHoursOnly(policy?.only_during_business_hours ?? false)
     setThresholds({
       first_response_minutes:
         policy?.first_response_minutes != null ? String(policy.first_response_minutes) : '',
@@ -115,6 +122,7 @@ function EditorDialog({
       first_response_minutes: parsed('first_response_minutes'),
       next_response_minutes: parsed('next_response_minutes'),
       resolution_minutes: parsed('resolution_minutes'),
+      only_during_business_hours: businessHoursOnly,
     }
     try {
       if (policy) {
@@ -170,6 +178,21 @@ function EditorDialog({
               />
             </div>
           ))}
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-primary"
+              checked={businessHoursOnly}
+              onChange={(e) => setBusinessHoursOnly(e.target.checked)}
+              aria-label="Count business hours only"
+            />
+            <span>
+              <span className="font-medium">Count business hours only</span>
+              <span className="block text-xs text-muted-foreground">
+                Nights and weekends are excluded, using the inbox&rsquo;s working hours.
+              </span>
+            </span>
+          </label>
           {!hasThreshold ? (
             <p className="text-xs text-destructive">Set at least one target time.</p>
           ) : null}

@@ -8,13 +8,22 @@ snippet for widget inboxes.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_hours import is_open
+from app.core.db import utcnow
 from app.core.deps import Db, Member, Principal, require_perm
 from app.core.events import Actor
 from app.core.permissions import Perm
 from app.models.inbox import Inbox
+from app.schemas.business_hours import (
+    WorkingHourOut,
+    WorkingHoursOut,
+    WorkingHoursUpdate,
+)
 from app.schemas.common import Msg
 from app.schemas.inboxes import InboxCreate, InboxOut, InboxUpdate
+from app.services import business_hours as hours_service
 from app.services import inboxes as inboxes_service
 
 router = APIRouter()
@@ -110,3 +119,55 @@ async def delete_inbox(inbox_id: str, principal: Member, session: Db) -> Msg:
         session, principal.workspace.id, inbox_id, actor=_actor(principal)
     )
     return Msg(message="Inbox deleted")
+
+
+# ---------------------------------------------------------------------------
+# working hours (docs/CHATWOOT-BACKLOG.md §1.1)
+# ---------------------------------------------------------------------------
+
+
+async def _hours_out(session: AsyncSession, workspace_id: str, inbox: Inbox) -> WorkingHoursOut:
+    rows = await hours_service.list_hours(session, workspace_id, inbox.id)
+    schedule = hours_service.build_schedule(inbox, rows)
+    config = inbox.config or {}
+    return WorkingHoursOut(
+        enabled=bool(config.get("working_hours_enabled", False)),
+        timezone=str(config.get("timezone") or "UTC"),
+        out_of_office_message=config.get("out_of_office_message"),
+        days=[WorkingHourOut.model_validate(r) for r in rows],
+        currently_open=is_open(schedule, utcnow()),
+    )
+
+
+@router.get(
+    "/inboxes/{inbox_id}/working-hours",
+    response_model=WorkingHoursOut,
+    dependencies=[Depends(require_perm(Perm.CONVERSATIONS_READ))],
+)
+async def get_working_hours(inbox_id: str, principal: Member, session: Db) -> WorkingHoursOut:
+    inbox = await hours_service.get_inbox(session, principal.workspace.id, inbox_id)
+    return await _hours_out(session, principal.workspace.id, inbox)
+
+
+@router.put(
+    "/inboxes/{inbox_id}/working-hours",
+    response_model=WorkingHoursOut,
+    dependencies=[Depends(require_perm(Perm.CHANNELS_MANAGE))],
+)
+async def set_working_hours(
+    inbox_id: str, body: WorkingHoursUpdate, principal: Member, session: Db
+) -> WorkingHoursOut:
+    """Replace the whole week. `days: []` clears the schedule, which makes the
+    inbox always-open regardless of the `enabled` switch."""
+    await hours_service.replace_hours(
+        session,
+        principal.workspace.id,
+        inbox_id,
+        actor=_actor(principal),
+        days=[d.model_dump() for d in body.days],
+        enabled=body.enabled,
+        timezone=body.timezone,
+        out_of_office_message=body.out_of_office_message,
+    )
+    inbox = await hours_service.get_inbox(session, principal.workspace.id, inbox_id)
+    return await _hours_out(session, principal.workspace.id, inbox)

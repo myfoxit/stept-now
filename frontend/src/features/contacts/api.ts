@@ -65,3 +65,24 @@ export const listSegments = () => api.get<Segment[]>(ws('/segments'))
 export const listTags = () => api.get<Tag[]>(ws('/tags'))
 export const createTag = (body: { name: string; color?: string }) =>
   api.post<Tag>(ws('/tags'), body)
+
+// ---------------------------------------------------------------------------
+// Merge, block, CSV import/export (docs/CHATWOOT-BACKLOG.md §1.7)
+// ---------------------------------------------------------------------------
+
+export type ContactImport = components['schemas']['ContactImportOut']
+export type ContactImportPreview = components['schemas']['ContactImportPreview']
+
+export const contactAdminApi = {
+  merge: (winnerId: string, loserId: string) =>
+    api.post<Contact>(ws(`/contacts/${winnerId}/merge`), { loser_id: loserId }),
+  setBlocked: (id: string, blocked: boolean) =>
+    api.post<Contact>(ws(`/contacts/${id}/block`), { blocked }),
+  listImports: () => api.get<ContactImport[]>(ws('/contacts/imports')),
+  getImport: (id: string) => api.get<ContactImport>(ws(`/contacts/imports/${id}`)),
+  upload: (file: File) => api.upload<ContactImportPreview>(ws('/contacts/imports'), file),
+  start: (id: string, mapping?: Record<string, string>) =>
+    api.post<ContactImport>(ws(`/contacts/imports/${id}/start`), { mapping: mapping ?? null }),
+  /** Absolute URL so the browser can download it directly. */
+  exportUrl: () => ws('/contacts/export'),
+}

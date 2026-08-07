@@ -15,7 +15,7 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import GUID, Base, PortableJSON, UTCDateTime, utcnow
@@ -41,10 +41,13 @@ class SlaPolicy(TimestampMixin, WorkspaceScopedMixin, Base):
     id: Mapped[str] = pk()
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    # Wall-clock minutes; at least one threshold is required (enforced in the service).
+    # Minutes; at least one threshold is required (enforced in the service).
     first_response_minutes: Mapped[int | None] = mapped_column(Integer)
     next_response_minutes: Mapped[int | None] = mapped_column(Integer)
     resolution_minutes: Mapped[int | None] = mapped_column(Integer)
+    # When true the thresholds count only open minutes on the inbox's weekly
+    # schedule (app.core.business_hours), so nights and weekends don't breach.
+    only_during_business_hours: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class AppliedSla(TimestampMixin, WorkspaceScopedMixin, Base):

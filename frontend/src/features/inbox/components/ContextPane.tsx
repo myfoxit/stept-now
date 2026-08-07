@@ -10,6 +10,7 @@ import { timeAgo } from '@/lib/format'
 import { ContactAvatar, PriorityFlag, StatusBadge } from '@/features/inbox/components/atoms'
 import { ApprovalCard } from '@/features/inbox/components/ApprovalCard'
 import { SlaCard } from '@/features/inbox/components/SlaCard'
+import { WatchersCard } from '@/features/inbox/components/WatchersCard'
 import { TagsEditor } from '@/features/inbox/components/TagsEditor'
 import { inboxApi, type Conversation } from '@/features/inbox/api'
 import { useConversationTags, usePendingApprovals } from '@/features/inbox/hooks'
@@ -17,7 +18,9 @@ import { useConversationTags, usePendingApprovals } from '@/features/inbox/hooks
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
       {children}
     </div>
   )
@@ -77,6 +80,7 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
 
         <Section title="SLA">
           <SlaCard conversationId={conversation.id} />
+          <WatchersCard conversationId={conversation.id} />
         </Section>
 
         {pending.length ? (

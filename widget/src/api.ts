@@ -387,3 +387,10 @@ export function sendMessageFeedback(
     { method: 'POST', token, body: JSON.stringify({ rating }) },
   )
 }
+
+/** The `error.code` carried by the API's error envelope, when there is one. */
+export function errorCode(error: ApiError): string | null {
+  const body = error.body as { error?: { code?: unknown } } | null
+  const code = body?.error?.code
+  return typeof code === 'string' ? code : null
+}

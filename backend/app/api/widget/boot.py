@@ -18,7 +18,7 @@ from app.api.widget.conversations import ConversationSummary, conversation_summa
 from app.api.widget.deps import resolve_inbox
 from app.core.db import utcnow, uuid7
 from app.core.deps import Db
-from app.core.errors import ForbiddenError
+from app.core.errors import BlockedContactError, ForbiddenError
 from app.core.ratelimit import RateLimit
 from app.core.security import create_widget_token, verify_identity_hash
 from app.models.article import Article
@@ -156,10 +156,16 @@ async def _resolve_contact(
             name=identity.name,
             verified=True,
         )
+        # A blocked visitor gets no widget session at all — checking here keeps
+        # the block ahead of conversation creation and message posting alike.
+        if contact.blocked:
+            raise BlockedContactError("This contact is blocked")
         return contact
     if contact_inbox is not None:
         existing = await session.get(Contact, contact_inbox.contact_id)
         if existing is not None:
+            if existing.blocked:
+                raise BlockedContactError("This contact is blocked")
             return existing
     # Brand-new anonymous visitor — mint a bare contact (no shared identity keys,
     # so this never collapses distinct visitors together).

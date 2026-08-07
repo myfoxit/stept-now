@@ -1,14 +1,12 @@
 /** TanStack Query hooks for the contact directory. */
 
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
+import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import {
+  contactAdminApi,
   contactsApi,
   listSegments,
   listTags,
@@ -17,6 +15,11 @@ import {
 } from '@/features/contacts/api'
 
 const AREA = 'contacts'
+
+/** Surface the API's own message when there is one; fall back otherwise. */
+function message(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback
+}
 
 export function useContactsList(filters: { q?: string; segmentId?: string }) {
   const workspaceId = useAuthStore((s) => s.workspaceId)
@@ -121,4 +124,68 @@ export function useContactNoteMutations(contactId: string) {
       onSuccess: invalidate,
     }),
   }
+}
+
+// --- merge, block, import ----------------------------------------------------
+
+export function useMergeContacts() {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: ({ winnerId, loserId }: { winnerId: string; loserId: string }) =>
+      contactAdminApi.merge(winnerId, loserId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [AREA, workspaceId] })
+      toast.success('Contacts merged')
+    },
+    onError: (error) => toast.error(message(error, 'Could not merge the contacts')),
+  })
+}
+
+export function useSetContactBlocked() {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: ({ id, blocked }: { id: string; blocked: boolean }) =>
+      contactAdminApi.setBlocked(id, blocked),
+    onSuccess: async (contact) => {
+      await queryClient.invalidateQueries({ queryKey: [AREA, workspaceId] })
+      toast.success(contact.blocked ? 'Contact blocked' : 'Contact unblocked')
+    },
+    onError: (error) => toast.error(message(error, 'Could not update the contact')),
+  })
+}
+
+export function useContactImports() {
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useQuery({
+    queryKey: [AREA, workspaceId, 'imports'],
+    enabled: !!workspaceId,
+    queryFn: contactAdminApi.listImports,
+    // A running import updates its counters as the queued task works through
+    // the file, so poll while anything is still processing.
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((row) => row.status === 'processing') ? 2000 : false,
+  })
+}
+
+export function useUploadImport() {
+  return useMutation({
+    mutationFn: contactAdminApi.upload,
+    onError: (error) => toast.error(message(error, 'Could not read that file')),
+  })
+}
+
+export function useStartImport() {
+  const queryClient = useQueryClient()
+  const workspaceId = useAuthStore((s) => s.workspaceId)
+  return useMutation({
+    mutationFn: ({ id, mapping }: { id: string; mapping?: Record<string, string> }) =>
+      contactAdminApi.start(id, mapping),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [AREA, workspaceId] })
+      toast.success('Import started')
+    },
+    onError: (error) => toast.error(message(error, 'Could not start the import')),
+  })
 }

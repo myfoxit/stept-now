@@ -1010,3 +1010,57 @@ icon picker w/ emoji), article list (status filter), editor page: title, collect
 select, markdown textarea w/ live preview split (render via marked? NO new deps — write
 a tiny md renderer or reuse a util: simple regex-based renderer acceptable, or reuse
 widget approach — keep minimal headings/bold/l
+
+---
+
+## Inbox parity additions (W9 — docs/CHATWOOT-BACKLOG.md §1)
+
+### Filter documents
+
+One shape, four consumers (conversation list, saved views, bulk targeting, report drill-down):
+
+```json
+{ "match": "all" | "any",
+  "conditions": [{ "field": "status", "op": "in", "value": ["open"] }] }
+```
+
+`GET /w/{ws}/views/catalog` is the source of truth for which `(field, op)` pairs exist — it
+includes the workspace's own `attributes.<key>` definitions, so clients never hardcode a field
+list. Two rules the engine enforces:
+
+- `attributes.*` conditions are evaluated in Python (JSON filtering isn't portable across
+  Postgres and SQLite), so they can only *narrow* a SQL result set.
+- Because of that, `attributes.*` under `match: "any"` is rejected: a row could match on the
+  attribute alone, which SQL never returned, and finding it would need a full-table scan.
+
+Paginated endpoints keep pulling batches until a page is full, so post-filters never short-page.
+
+### New endpoints
+
+| Method | Path | Notes |
+|---|---|---|
+| GET/PUT | `/w/{ws}/inboxes/{id}/working-hours` | Full weekly replacement; `days: []` clears |
+| GET/POST | `/w/{ws}/views` · PATCH/DELETE `/views/{id}` | Personal or shared; sharing needs `conversations:manage` |
+| GET | `/w/{ws}/views/catalog` | Filter field + operator catalog |
+| POST | `/w/{ws}/conversations/search` | Ad-hoc filter run (cursor-paginated) |
+| POST | `/w/{ws}/conversations/bulk` | One action, ≤500 targets by ids or filter |
+| GET/POST | `/w/{ws}/conversations/{id}/participants` · DELETE `/{user_id}` | Leaving is a mute |
+| GET | `/w/{ws}/mentions` · POST `/mentions/read` | Current user's mentions |
+| GET/POST | `/w/{ws}/custom-attributes` · PATCH/DELETE `/{id}` | `key` + `attribute_model` immutable |
+| POST | `/w/{ws}/contacts/{id}/merge` · `/block` | Merge keeps a tombstone |
+| GET/POST | `/w/{ws}/contacts/imports` · GET `/{id}` · POST `/{id}/start` | CSV upload → map → queued run |
+| GET | `/w/{ws}/contacts/export` | Whole-directory CSV |
+| GET | `/w/{ws}/reports/breakdown` · `/reports/sla` · `*.csv` | Rows carry their drill-down filter |
+
+### Behavioural contracts worth knowing
+
+- **Business hours are opt-in twice.** An SLA policy must set `only_during_business_hours`, *and*
+  the inbox must have `working_hours_enabled` with at least one open day. Either missing → wall
+  clock. This keeps every existing policy's behaviour identical.
+- **Blocking raises `BlockedContactError` (403, code `contact_blocked`)** rather than silently
+  dropping, so a channel webhook can answer the provider definitively instead of looking like a
+  delivery failure it should retry.
+- **Custom attribute definitions are additive.** Keys with no definition are stored unchanged;
+  deleting a definition never deletes data.
+- **Bulk is a loop, not a shortcut.** It calls the same service functions as single edits, so
+  trackers, activity notes, events and realtime broadcasts all still fire.

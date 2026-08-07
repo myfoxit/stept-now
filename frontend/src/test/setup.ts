@@ -30,3 +30,11 @@ if (!window.ResizeObserver) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined
 }
+// Radix Select/Dropdown use the Pointer Capture API to track drag-to-select.
+// jsdom implements pointer *events* but not capture, so a click on a trigger
+// throws before the listbox ever opens.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false
+  Element.prototype.setPointerCapture = () => undefined
+  Element.prototype.releasePointerCapture = () => undefined
+}

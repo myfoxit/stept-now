@@ -82,3 +82,23 @@ export const profileApi = {
   changePassword: (body: { current_password: string; new_password: string }) =>
     api.post<{ message: string }>('/api/v1/me/change-password', body),
 }
+
+// ---------------------------------------------------------------------------
+// Custom attribute definitions (docs/CHATWOOT-BACKLOG.md §1.6)
+// ---------------------------------------------------------------------------
+
+export type CustomAttribute = components['schemas']['CustomAttributeOut']
+export type CustomAttributeCreate = components['schemas']['CustomAttributeCreate']
+export type CustomAttributeUpdate = components['schemas']['CustomAttributeUpdate']
+
+export const attributesApi = {
+  list: (attributeModel?: string) =>
+    api.get<CustomAttribute[]>(ws('/custom-attributes'), {
+      query: attributeModel ? { attribute_model: attributeModel } : {},
+    }),
+  create: (body: CustomAttributeCreate) =>
+    api.post<CustomAttribute>(ws('/custom-attributes'), body),
+  update: (id: string, body: CustomAttributeUpdate) =>
+    api.patch<CustomAttribute>(ws(`/custom-attributes/${id}`), body),
+  remove: (id: string) => api.delete<{ message: string }>(ws(`/custom-attributes/${id}`)),
+}

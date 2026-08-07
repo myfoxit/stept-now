@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { ContactAvatar, StatusBadge } from '@/features/inbox/components/atoms'
+import { ContactAdminActions } from '@/features/contacts/components/ContactAdminActions'
 import { TagsEditor } from '@/features/inbox/components/TagsEditor'
 import { inboxApi } from '@/features/inbox/api'
 import {
@@ -121,13 +122,21 @@ export function Component() {
               <CardTitle className="flex items-center gap-2">
                 {contact.name || 'Unnamed contact'}
                 {contact.verified ? <BadgeCheck className="size-4 text-blue-500" /> : null}
+                {contact.blocked ? (
+                  <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+                    Blocked
+                  </span>
+                ) : null}
               </CardTitle>
               <p className="text-sm text-muted-foreground">{contact.email ?? 'No email'}</p>
             </div>
             {canWrite && !editing ? (
-              <Button variant="outline" size="sm" onClick={startEdit}>
-                Edit
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" onClick={startEdit}>
+                  Edit
+                </Button>
+                <ContactAdminActions contact={contact} />
+              </div>
             ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
@@ -136,15 +145,27 @@ export function Component() {
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="grid gap-1.5">
                     <Label htmlFor="name">Name</Label>
-                    <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                    <Input
+                      id="name"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
                   </div>
                   <div className="grid gap-1.5">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    <Input
+                      id="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
                   </div>
                   <div className="grid gap-1.5">
                     <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                    <Input
+                      id="phone"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -156,7 +177,9 @@ export function Component() {
                         placeholder="key"
                         aria-label={`Attribute ${i + 1} key`}
                         onChange={(e) =>
-                          setAttrs(attrs.map((row, j) => (j === i ? [e.target.value, row[1]] : row)))
+                          setAttrs(
+                            attrs.map((row, j) => (j === i ? [e.target.value, row[1]] : row))
+                          )
                         }
                       />
                       <Input
@@ -164,7 +187,9 @@ export function Component() {
                         placeholder="value"
                         aria-label={`Attribute ${i + 1} value`}
                         onChange={(e) =>
-                          setAttrs(attrs.map((row, j) => (j === i ? [row[0], e.target.value] : row)))
+                          setAttrs(
+                            attrs.map((row, j) => (j === i ? [row[0], e.target.value] : row))
+                          )
                         }
                       />
                       <Button
@@ -177,7 +202,11 @@ export function Component() {
                       </Button>
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={() => setAttrs([...attrs, ['', '']])}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAttrs([...attrs, ['', '']])}
+                  >
                     <Plus className="size-4" /> Add attribute
                   </Button>
                 </div>
@@ -195,8 +224,14 @@ export function Component() {
                 <div className="grid gap-3 text-sm sm:grid-cols-2">
                   <Detail label="External ID" value={contact.external_id} />
                   <Detail label="Phone" value={contact.phone} />
-                  <Detail label="First seen" value={contact.first_seen_at ? fullDateTime(contact.first_seen_at) : null} />
-                  <Detail label="Last seen" value={contact.last_seen_at ? fullDateTime(contact.last_seen_at) : null} />
+                  <Detail
+                    label="First seen"
+                    value={contact.first_seen_at ? fullDateTime(contact.first_seen_at) : null}
+                  />
+                  <Detail
+                    label="Last seen"
+                    value={contact.last_seen_at ? fullDateTime(contact.last_seen_at) : null}
+                  />
                 </div>
                 {Object.entries(contact.attributes ?? {}).length ? (
                   <>
@@ -213,7 +248,9 @@ export function Component() {
                 ) : null}
                 <Separator />
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Tags
+                  </p>
                   <TagsEditor
                     appliedTagIds={(contact.tags ?? []).map((t) => t.id)}
                     canManage={canWrite}
@@ -253,7 +290,9 @@ export function Component() {
                           <span className="font-medium">{item.label}</span>
                         )}
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {item.kind === 'conversation' ? <StatusBadge status={item.status} /> : null}
+                          {item.kind === 'conversation' ? (
+                            <StatusBadge status={item.status} />
+                          ) : null}
                           <span>{timeAgo(item.date)}</span>
                         </div>
                       </div>
@@ -285,7 +324,9 @@ export function Component() {
                     size="sm"
                     disabled={!noteBody.trim() || noteMutations.add.isPending}
                     onClick={() =>
-                      noteMutations.add.mutate(noteBody.trim(), { onSuccess: () => setNoteBody('') })
+                      noteMutations.add.mutate(noteBody.trim(), {
+                        onSuccess: () => setNoteBody(''),
+                      })
                     }
                   >
                     Add note

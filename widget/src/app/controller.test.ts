@@ -196,3 +196,22 @@ describe('Controller.submitMessageFeedback', () => {
     expect(calls.some((call) => call.url.includes('/feedback'))).toBe(false)
   })
 })
+
+describe('blocked visitors', () => {
+  it('shows a neutral message rather than confirming the block', async () => {
+    // Telling a blocked visitor they're blocked is hostile and confirms it.
+    mockFetch([
+      {
+        method: 'POST',
+        path: '/api/widget/boot',
+        status: 403,
+        body: { error: { code: 'contact_blocked', message: 'This contact is blocked' } },
+      },
+    ])
+    const c = makeController()
+    await c.boot()
+    const screen = c.getState().screen
+    expect(screen.name).toBe('error')
+    expect(screen.name === 'error' && screen.message).toBe('Chat is unavailable right now.')
+  })
+})

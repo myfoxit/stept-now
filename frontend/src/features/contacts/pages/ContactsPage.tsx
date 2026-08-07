@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { AlertCircle, Loader2, Search, Users } from 'lucide-react'
+import { AlertCircle, Download, Loader2, Search, Upload, Users } from 'lucide-react'
 
 import { timeAgo } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
@@ -17,9 +17,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { useHasPerm } from '@/stores/auth'
+import { authHeaders } from '@/api/client'
 import { ContactAvatar } from '@/features/inbox/components/atoms'
+import { ImportDialog } from '@/features/contacts/components/ImportDialog'
+import { contactAdminApi } from '@/features/contacts/api'
 import { useContactsList, useSegments } from '@/features/contacts/hooks'
+
+/** Fetch the CSV with the session's auth header, then hand it to the browser. */
+async function downloadExport() {
+  const response = await fetch(contactAdminApi.exportUrl(), { headers: authHeaders() })
+  if (!response.ok) return
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'contacts.csv'
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 const ALL = '__all__'
 
@@ -30,6 +53,8 @@ export function Component() {
   const [segmentId, setSegmentId] = useState<string | undefined>()
 
   const { data: segments = [] } = useSegments()
+  const canWrite = useHasPerm('contacts:write')
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setQ(searchInput.trim()), 300)
@@ -45,6 +70,26 @@ export function Component() {
       <div className="flex items-center gap-2 border-b px-6 py-4">
         <Users className="size-5" />
         <h1 className="text-lg font-semibold">Contacts</h1>
+        {canWrite ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="mr-1 size-4" />
+            Import
+          </Button>
+        ) : null}
+        <Button
+          variant="outline"
+          size="sm"
+          className={canWrite ? undefined : 'ml-auto'}
+          onClick={() => downloadExport()}
+        >
+          <Download className="mr-1 size-4" />
+          Export
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b px-6 py-3">
@@ -58,7 +103,10 @@ export function Component() {
             className="pl-8"
           />
         </div>
-        <Select value={segmentId ?? ALL} onValueChange={(v) => setSegmentId(v === ALL ? undefined : v)}>
+        <Select
+          value={segmentId ?? ALL}
+          onValueChange={(v) => setSegmentId(v === ALL ? undefined : v)}
+        >
           <SelectTrigger aria-label="Segment" className="w-52">
             <SelectValue placeholder="All contacts" />
           </SelectTrigger>
@@ -96,7 +144,9 @@ export function Component() {
               </EmptyMedia>
               <EmptyTitle>No contacts found</EmptyTitle>
               <EmptyDescription>
-                {q || segmentId ? 'Try a different search or segment.' : 'Contacts appear here as people reach out.'}
+                {q || segmentId
+                  ? 'Try a different search or segment.'
+                  : 'Contacts appear here as people reach out.'}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -166,6 +216,8 @@ export function Component() {
           </div>
         ) : null}
       </div>
+
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )
 }

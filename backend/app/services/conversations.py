@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.channels.registry  # noqa: F401 — registers the deliver_message task
 from app.core.db import utcnow
-from app.core.errors import NotFoundError, ValidationFailure
+from app.core.errors import BlockedContactError, NotFoundError, ValidationFailure
 from app.core.events import Actor, Event, EventNames, emit
 from app.core.pagination import clamp_limit, decode_cursor, encode_cursor
 from app.core.queue import enqueue
@@ -56,6 +56,7 @@ from app.schemas.conversations import (
     InboxRef,
 )
 from app.schemas.messages import MessageOut
+from app.services import collaboration, filters
 
 # Channels delivered in-app (websocket/REST pull) — no background delivery task.
 _LOCAL_CHANNELS = {ChannelType.WIDGET.value, ChannelType.API.value}
@@ -440,6 +441,11 @@ async def ingest_inbound(
             return conversation, existing
 
     contact = await _resolve_contact(session, workspace_id, contact_info or {})
+    # Blocked contacts are dropped at the channel door: no conversation, no
+    # message, no notification. Raised (not silently returned) so the webhook
+    # handler can answer the provider with a definite status.
+    if contact.blocked:
+        raise BlockedContactError("This contact is blocked")
 
     contact_inbox = (
         await session.execute(
@@ -602,6 +608,27 @@ async def add_message(
         conversation.waiting_since = None
     conversation.last_activity_at = now
     await session.flush()
+
+    # Collaboration (§1.2). Activity entries are excluded from both: they are
+    # generated prose ("Sam assigned the conversation to Ada"), so treating them
+    # as authored participation or scanning them for handles would be wrong.
+    if author_type == AuthorType.USER and author_id and visibility != MessageVisibility.ACTIVITY:
+        await collaboration.add_participant(
+            session,
+            conversation.workspace_id,
+            conversation.id,
+            author_id,
+            reason="note" if visibility == MessageVisibility.NOTE else "reply",
+        )
+    # Mentions are note-only — an `@handle` in a public reply would be visible
+    # to the contact.
+    if visibility == MessageVisibility.NOTE:
+        await collaboration.record_mentions(
+            session,
+            conversation,
+            message,
+            author_user_id=author_id if author_type == AuthorType.USER else None,
+        )
 
     if conversation.status != previous_status:
         await emit(
@@ -782,6 +809,14 @@ async def assign(
     if not (assignee_changed or team_changed):
         return conversation
     await session.flush()
+    if assignee_changed and conversation.assignee_user_id is not None:
+        await collaboration.add_participant(
+            session,
+            conversation.workspace_id,
+            conversation.id,
+            conversation.assignee_user_id,
+            reason="assignee",
+        )
     label = actor.label or "System"
     if assignee_changed:
         text = (
@@ -993,6 +1028,7 @@ async def list_conversations(
     tag_id: str | None = None,
     priority: str | None = None,
     q: str | None = None,
+    view_query: dict[str, Any] | None = None,
     cursor: str | None = None,
     limit: int | None = None,
     current_user_id: str | None = None,
@@ -1040,21 +1076,53 @@ async def list_conversations(
         q=q,
         current_user_id=current_user_id,
     )
+    # Saved-view / drill-down filter document (app.services.filters). SQL-able
+    # conditions join the WHERE clause; `attributes.*` ones stay as Python
+    # post-filters and are applied to each fetched batch below.
+    post_filters: list[filters.PostFilter] = []
+    if view_query:
+        condition, post_filters, _ = filters.compile_conversation_filter(view_query)
+        if condition is not None:
+            query = query.where(condition)
     query = query.order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
-    if cursor:
-        activity_raw, row_id = decode_cursor(cursor, 2)
+
+    def _seek(base: Select[Any], token: str | None) -> Select[Any]:
+        if not token:
+            return base
+        activity_raw, row_id = decode_cursor(token, 2)
         activity = datetime.fromisoformat(activity_raw)
-        query = query.where(
+        return base.where(
             or_(
                 Conversation.last_activity_at < activity,
                 (Conversation.last_activity_at == activity) & (Conversation.id < row_id),
             )
         )
 
-    rows = (await session.execute(query.limit(page_size + 1))).all()
+    # Post-filters can reject rows after the database has already counted them
+    # toward the page, so keep pulling batches until the page is full or the
+    # result set is exhausted. Without post-filters this loop runs exactly once
+    # and behaves identically to a plain keyset page.
+    rows: list[Any] = []
+    seek_token = cursor
+    exhausted = False
+    while True:
+        batch = (await session.execute(_seek(query, seek_token).limit(page_size + 1))).all()
+        has_more = len(batch) > page_size
+        batch = batch[:page_size]
+        if not batch:
+            exhausted = True
+            break
+        last_scanned = batch[-1][0]
+        seek_token = encode_cursor(last_scanned.last_activity_at.isoformat(), last_scanned.id)
+        rows.extend(row for row in batch if filters.passes_post_filters(row[0], post_filters))
+        if len(rows) >= page_size or not has_more:
+            exhausted = not has_more
+            break
+
     next_cursor = None
     if len(rows) > page_size:
         rows = rows[:page_size]
+    if rows and not exhausted:
         last = rows[-1][0]
         next_cursor = encode_cursor(last.last_activity_at.isoformat(), last.id)
 

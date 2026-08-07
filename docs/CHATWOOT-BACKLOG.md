@@ -30,9 +30,11 @@ survivable as someone's actual inbox.
 
 ---
 
-## 1. P0 — daily-driver blockers
+## 1. P0 — daily-driver blockers ✅ **SHIPPED** (branch `feature/p0-inbox-parity`)
 
 A support team adopting Stept hits every one of these in the first week and cannot work around them.
+All seven landed together; each subsection below keeps its original analysis, with a
+**Shipped** note recording what was actually built and where.
 
 ### 1.1 Business hours / working-hours model · **M**
 **Chatwoot:** `working_hours` (per inbox × day_of_week: open/close hour+minutes, `open_all_day`,
@@ -50,6 +52,14 @@ gate for OOO auto-replies, business-hours-only campaigns, and AI `response_windo
 instants, given a schedule + tz) → wire into `services/slas.py` behind a per-policy
 `only_during_business_hours` flag; OOO message on the widget boot payload; `trigger_only_during_business_hours`
 on campaigns. Test the DST boundary and the "opened Friday 18:00, replied Monday 09:30" case.
+
+**Shipped:** `app/core/business_hours.py` (pure `Schedule`/`DayWindow` maths: `is_open`,
+`elapsed_minutes`, `deadline`, DST-correct via `zoneinfo`), `working_hours` table +
+`app/services/business_hours.py`, `GET|PUT /inboxes/{id}/working-hours`, and
+`sla_policies.only_during_business_hours` wired into the breach scan. Settings → Working hours
+lets you draw the week per inbox with a live open/closed badge. A policy with the flag off is
+unchanged (wall clock); an inbox with no schedule counts as always open, so nothing existing
+shifts behaviour.
 
 ---
 
@@ -70,6 +80,13 @@ notification preferences (§2.5) and for the participants fan-out that Chatwoot'
 participant + mention row + notification + realtime push on `ws:{workspace_id}`; a `participating=true`
 filter on the conversation list; auto-add assignee and anyone who posts a note.
 
+**Shipped:** `conversation_participants` + `mentions` tables,
+`app/services/collaboration.py`, participant routes on the conversation and a `/mentions` feed
+with read receipts. Note authors and assignees become watchers implicitly; `@name` in a private
+note resolves against workspace members, notifies, and subscribes. Leaving is stored as a mute so
+a later re-assignment doesn't resurrect the subscription. Public replies never create mentions —
+an @handle there would leak to the contact. Watchers card in the conversation context pane.
+
 ---
 
 ### 1.3 Saved views / custom filters · **M**
@@ -89,6 +106,14 @@ reuses `segments.contact_matches()`; persist as `saved_views` (per-user + shared
 sidebar. Pairs tightly with §1.6 — typed attribute definitions are what make the operator list
 non-garbage.
 
+**Shipped:** `app/services/filters.py` — one filter DSL over 18 conversation
+fields plus `attributes.*`, with an explicit per-field operator table. `saved_views` table
+(personal/shared), `GET /views/catalog` (drives the builder, including the workspace's own
+attribute definitions), `POST /conversations/search` for ad-hoc runs, and `?view_id=` on the
+list. `attributes.*` conditions are Python post-filters, so the feed keeps fetching batches until
+a page is full rather than silently short-paging — and they're rejected under `match: "any"`,
+where they'd need a full-table scan to be correct.
+
 ---
 
 ### 1.4 Bulk actions in the inbox · **S/M**
@@ -105,6 +130,12 @@ primitive is vendored but unused — no palette is wired.
 **Build:** checkbox selection in `ConversationListPane`, a bulk action bar (assign / team / tag / status /
 priority / run macro), one `POST /conversations/bulk` endpoint, and `j`/`k`/`e`/`a` hotkeys. Wire
 `⌘K` to a go-to palette while you're in there — the component is already sitting in the repo.
+
+**Shipped:** `app/services/bulk.py` + `POST /conversations/bulk`
+(status/priority/assign/team/tag, targets by ids *or* filter, 500 cap). Every action loops through
+the same service functions a single edit uses, so trackers, activity notes, events and realtime
+all still fire; per-conversation failures are reported rather than rolling the batch back. Row
+checkboxes + a bulk bar in the list pane. (⌘K already existed and is unchanged.)
 
 ---
 
@@ -130,6 +161,13 @@ the conversation list (this is why §1.3 comes first); (d) SLA attainment + brea
 `sla_events`; (e) FRT distribution histogram + traffic heatmap; (f) **only then** the rollup table —
 Chatwoot's `reporting_events_rollups` is a scale fix, and you don't have the scale yet.
 
+**Shipped:** `GET /reports/breakdown?dimension=agent|team|inbox|tag|channel`,
+`GET /reports/sla` (attainment per policy + which target was missed, read off the `sla_events`
+the scan already writes), and `.csv` variants of overview/breakdown/sla. Every breakdown row
+carries the filter document that reproduces its own population, so clicking a number opens
+exactly those conversations through `/conversations/search` — a test asserts the number and the
+list agree. The rollup table stays deferred; it's a scale fix, not a correctness one.
+
 ---
 
 ### 1.6 Typed custom-attribute definitions · **S/M**
@@ -143,6 +181,13 @@ Values live in the record's `custom_attributes` jsonb.
 **Why P0:** untyped JSON has no edit UI, no validation, no filter operators, and no reporting
 dimension. It is the missing type system under §1.3 filters, segments, campaign audiences, and the
 contact sidebar. Small table, disproportionate unlock.
+
+**Shipped:** `custom_attribute_definitions` table +
+`app/services/custom_attributes.py` with per-type coercion (number/currency/percent bounds, ISO
+dates, list options, http-only links, admin regex with the admin's own error cue). Wired into
+contact create/update and conversation PATCH. Undefined keys pass through untouched — definitions
+are additive metadata, not a schema lock — and deleting a definition leaves stored values in
+place. Settings → Custom attributes; the filter catalog picks them up automatically.
 
 ---
 
@@ -163,6 +208,15 @@ two contacts). Blocking is the only answer to a spammer.
 conversations/notes/events/contact_inboxes in one transaction, audit it); `contact.blocked` checked in
 the inbound path of every channel adapter; a CSV import with a column-mapping step, per-row error log,
 and resumable batches. An Intercom/Chatwoot-shaped importer preset would be a strong launch asset.
+
+**Shipped:** `POST /contacts/{id}/merge` (reparents conversations, notes,
+events, CSAT, channel identities and tags; winner keeps its scalars and inherits blanks;
+attributes deep-merge; the loser survives as a `merged_into_id` tombstone so old links resolve),
+`POST /contacts/{id}/block` enforced at widget boot **and** channel ingress via a dedicated
+`BlockedContactError`, and a CSV import pipeline (`contact_imports` table, upload → auto-detected
+mapping + sample rows → queued run, per-row errors collected and capped) plus `GET
+/contacts/export`. Import matches existing contacts by external_id → email → phone, so re-running
+an export updates instead of duplicating.
 
 ---
 

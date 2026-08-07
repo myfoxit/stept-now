@@ -59,6 +59,7 @@ async def create_sla_policy(body: SlaPolicyCreate, principal: Member, session: D
         first_response_minutes=body.first_response_minutes,
         next_response_minutes=body.next_response_minutes,
         resolution_minutes=body.resolution_minutes,
+        only_during_business_hours=body.only_during_business_hours,
     )
     return SlaPolicyOut.model_validate(policy)
 

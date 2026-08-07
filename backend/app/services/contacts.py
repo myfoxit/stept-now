@@ -16,7 +16,7 @@ from app.core.pagination import clamp_limit, decode_cursor, encode_cursor
 from app.models.contact import Contact, ContactEvent, ContactNote
 from app.models.csat import CsatResponse
 from app.models.tag import ContactTag, Tag
-from app.services import audit
+from app.services import audit, custom_attributes
 from app.services.segments import PostFilter, compile_filters, get_segment
 
 
@@ -245,6 +245,9 @@ async def create_contact(
     avatar_url: str | None = None,
     attributes: dict[str, Any] | None = None,
 ) -> Contact:
+    coerced = await custom_attributes.validate_attributes(
+        session, workspace_id, "contact", dict(attributes or {})
+    )
     contact = Contact(
         workspace_id=workspace_id,
         external_id=external_id.strip() if external_id else None,
@@ -252,7 +255,9 @@ async def create_contact(
         name=(name or "").strip(),
         phone=phone,
         avatar_url=avatar_url,
-        attributes=dict(attributes or {}),
+        attributes=await custom_attributes.apply_defaults(
+            session, workspace_id, "contact", coerced
+        ),
     )
     session.add(contact)
     try:
@@ -301,7 +306,9 @@ async def update_contact(
     if avatar_url is not None:
         contact.avatar_url = avatar_url
     if attributes is not None:
-        contact.attributes = dict(attributes)
+        contact.attributes = await custom_attributes.validate_attributes(
+            session, workspace_id, "contact", dict(attributes)
+        )
     try:
         await session.flush()
     except IntegrityError as exc:

@@ -49,6 +49,10 @@ class ContactOut(ORMModel):
     avatar_url: str | None = None
     attributes: dict[str, Any]
     verified: bool
+    blocked: bool = False
+    # Set when this contact was folded into another; the row is kept so old
+    # links and channel source_ids still resolve.
+    merged_into_id: str | None = None
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
     created_at: datetime

@@ -7,6 +7,7 @@ transport-agnostic. All errors serialize to one envelope:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -43,6 +44,14 @@ class ForbiddenError(AppError):
     code = "forbidden"
 
 
+class BlockedContactError(ForbiddenError):
+    """Inbound from a blocked contact. Its own type so channel webhooks can
+    acknowledge the provider (200) instead of signalling a delivery failure that
+    would make the provider retry forever."""
+
+    code = "contact_blocked"
+
+
 class NotFoundError(AppError):
     status_code = 404
     code = "not_found"
@@ -75,6 +84,36 @@ def _envelope(code: str, message: str, details: Any = None) -> dict[str, Any]:
     return body
 
 
+def _jsonable(value: Any) -> Any:
+    """Best-effort JSON coercion for values embedded in validation details."""
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, list | tuple | set):
+        return [_jsonable(v) for v in value]
+    return str(value)
+
+
+def _clean_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
+    """Make Pydantic's error list JSON-safe.
+
+    Errors raised from a `@model_validator` carry the original exception object
+    under `ctx.error`, which `json.dumps` cannot encode — serialising the raw
+    list turns a 422 into a 500. Coerce anything non-primitive to its string
+    form, and drop `input` since it echoes the caller's payload (which can hold
+    credentials) straight back into the response body.
+    """
+    cleaned: list[dict[str, Any]] = []
+    for error in errors:
+        if not isinstance(error, dict):
+            cleaned.append({"msg": str(error)})
+            continue
+        item = {k: _jsonable(v) for k, v in error.items() if k != "input"}
+        cleaned.append(item)
+    return cleaned
+
+
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
@@ -87,7 +126,9 @@ def install_error_handlers(app: FastAPI) -> None:
     async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content=_envelope("validation_failed", "Request validation failed", exc.errors()),
+            content=_envelope(
+                "validation_failed", "Request validation failed", _clean_errors(exc.errors())
+            ),
         )
 
     @app.exception_handler(Exception)
