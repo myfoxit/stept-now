@@ -11,6 +11,7 @@ from app.models.workspace import Workspace
 from app.schemas.common import Msg
 from app.schemas.user import ChangePasswordRequest, UserOut, UserUpdate
 from app.schemas.workspace import MeResponse, MyMembership, WorkspaceOut
+from app.services import auth as auth_service
 from app.services import workspaces as ws_service
 
 router = APIRouter()
@@ -56,5 +57,7 @@ async def change_password(body: ChangePasswordRequest, user: CurrentUser, sessio
     if not verify_password(body.current_password, user.password_hash):
         raise UnauthorizedError("Current password is incorrect")
     user.password_hash = hash_password(body.new_password)
+    # A reset link mailed before this change must not outlive it.
+    auth_service.clear_password_reset(user)
     session.add(user)
     return Msg(message="Password changed")

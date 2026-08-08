@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import secrets
 from datetime import timedelta
+from functools import lru_cache
 from typing import Any, Literal
 
 import jwt
@@ -20,9 +21,7 @@ from app.core.errors import UnauthorizedError
 
 _hasher = PasswordHasher()
 
-TokenType = Literal[
-    "access", "refresh", "widget", "password_reset", "recorder", "extension", "tour_preview"
-]
+TokenType = Literal["access", "refresh", "widget", "recorder", "extension", "tour_preview"]
 
 API_KEY_PREFIX = "sk_stept_"
 
@@ -47,6 +46,25 @@ def verify_password(password: str, password_hash: str | None) -> bool:
         return _hasher.verify(password_hash, password)
     except VerificationError:
         return False
+
+
+@lru_cache(maxsize=1)
+def _decoy_hash() -> str:
+    return _hasher.hash(secrets.token_urlsafe(16))
+
+
+def burn_password_verify() -> None:
+    """Do the work of a password check without a password to check.
+
+    A login for an address with no account would otherwise answer without ever
+    running argon2, and that gap is measurable: it turns the login endpoint into
+    an oracle for which addresses are registered. Verifying against a decoy hash
+    costs the same as the real path.
+    """
+    try:
+        _hasher.verify(_decoy_hash(), "not-the-password")
+    except VerificationError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -91,8 +109,27 @@ def create_refresh_token(user_id: str, jti: str | None = None) -> tuple[str, str
     return token, jti
 
 
-def create_password_reset_token(user_id: str) -> str:
-    return _encode({"sub": user_id}, timedelta(hours=1), "password_reset")
+# ---------------------------------------------------------------------------
+# password-reset tokens — opaque, single-use, stored only as a hash
+# ---------------------------------------------------------------------------
+#
+# Deliberately NOT a JWT. A stateless token is valid for its whole TTL no matter
+# how often it is used, so a link leaked from an inbox, a shared screen or a
+# referrer header stays live; and anyone holding the signing key could mint one.
+# A random token checked against a stored hash can be revoked the instant it is
+# spent, and the hash is useless to a reader of the database.
+
+PASSWORD_RESET_TTL = timedelta(hours=1)
+
+
+def create_password_reset_token() -> tuple[str, str]:
+    """Returns (raw_token, sha256_hex). Only the hash is ever persisted."""
+    raw = secrets.token_urlsafe(32)
+    return raw, hash_reset_token(raw)
+
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def create_widget_token(workspace_id: str, contact_id: str) -> str:

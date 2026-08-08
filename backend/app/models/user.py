@@ -25,6 +25,12 @@ class User(TimestampMixin, Base):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     preferences: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
+    # Password reset: sha256 of the emailed token, never the token itself, so a
+    # database read cannot mint a reset. At most one is outstanding — issuing a
+    # new one overwrites the old — and it is cleared the moment it is spent or
+    # the password changes by any other route, which is what makes it single-use.
+    password_reset_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    password_reset_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class UserIdentity(Base):

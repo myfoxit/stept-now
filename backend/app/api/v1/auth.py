@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.config import get_settings
+from app.core.csrf import check_origin
 from app.core.deps import Db
 from app.core.errors import UnauthorizedError
 from app.core.ratelimit import RateLimit
@@ -86,7 +87,10 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
 @router.post(
     "/refresh",
     response_model=TokenResponse,
-    dependencies=[Depends(RateLimit("refresh", times=30, seconds=60))],
+    dependencies=[
+        Depends(check_origin),
+        Depends(RateLimit("refresh", times=30, seconds=60)),
+    ],
 )
 async def refresh(request: Request, response: Response, session: Db):
     raw = request.cookies.get(REFRESH_COOKIE)
@@ -99,7 +103,7 @@ async def refresh(request: Request, response: Response, session: Db):
     return _token_response(UserOut.model_validate(user), create_access_token(user.id))
 
 
-@router.post("/logout", response_model=Msg)
+@router.post("/logout", response_model=Msg, dependencies=[Depends(check_origin)])
 async def logout(request: Request, response: Response, session: Db):
     raw = request.cookies.get(REFRESH_COOKIE)
     if raw:

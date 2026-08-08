@@ -31,7 +31,11 @@ async def signup(session: AsyncSession, *, email: str, name: str, password: str)
 async def authenticate(session: AsyncSession, *, email: str, password: str) -> User:
     email = email.strip().lower()
     user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
-    if user is not None and user.password_hash is None:
+    if user is None:
+        # Spend the same argon2 work a real check would, then fail identically.
+        security.burn_password_verify()
+        raise UnauthorizedError("Invalid email or password")
+    if user.password_hash is None:
         # Social-login-only account: no password can ever match, and the generic
         # message would steer the user to password reset instead of the button
         # that works.
@@ -39,7 +43,7 @@ async def authenticate(session: AsyncSession, *, email: str, password: str) -> U
             "This account uses social login — continue with Google or GitHub, "
             "or set a password via password reset"
         )
-    if user is None or not security.verify_password(password, user.password_hash):
+    if not security.verify_password(password, user.password_hash):
         raise UnauthorizedError("Invalid email or password")
     user.last_seen_at = utcnow()
     return user
@@ -164,25 +168,50 @@ async def revoke_refresh_token(session: AsyncSession, raw_token: str) -> None:
 
 
 async def request_password_reset(session: AsyncSession, email: str) -> str | None:
-    """Returns the reset token if the account exists (caller emails it)."""
+    """Returns the reset token if the account exists (caller emails it).
+
+    Issuing a token invalidates any previous one: a single outstanding reset per
+    account means a link the user abandoned cannot be used later.
+    """
     user = (
         await session.execute(select(User).where(User.email == email.strip().lower()))
     ).scalar_one_or_none()
     if user is None:
         return None  # do not reveal account existence
-    return security.create_password_reset_token(user.id)
+    raw, token_hash = security.create_password_reset_token()
+    user.password_reset_hash = token_hash
+    user.password_reset_expires_at = utcnow() + security.PASSWORD_RESET_TTL
+    await session.flush()
+    return raw
 
 
 async def reset_password(session: AsyncSession, *, token: str, new_password: str) -> User:
-    payload = security.decode_token(token, "password_reset")
-    user = await session.get(User, payload["sub"])
-    if user is None:
-        raise UnauthorizedError("Unknown user")
+    """Spend a reset token. The token is consumed here — a replay finds no match."""
+    now = utcnow()
+    user = (
+        await session.execute(
+            select(User).where(User.password_reset_hash == security.hash_reset_token(token))
+        )
+    ).scalar_one_or_none()
+    if user is None or user.password_reset_expires_at is None:
+        raise UnauthorizedError("Invalid or expired reset token")
+    if user.password_reset_expires_at <= now:
+        # Clear it rather than leaving a dead row to be probed.
+        clear_password_reset(user)
+        raise UnauthorizedError("Invalid or expired reset token")
     user.password_hash = security.hash_password(new_password)
+    clear_password_reset(user)
     # Password change invalidates every session.
     await session.execute(
         update(RefreshToken)
         .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
-        .values(revoked_at=utcnow())
+        .values(revoked_at=now)
     )
     return user
+
+
+def clear_password_reset(user: User) -> None:
+    """Drop any outstanding reset token. Call on every password change, however
+    it happened — otherwise a reset link mailed before the change still works."""
+    user.password_reset_hash = None
+    user.password_reset_expires_at = None
