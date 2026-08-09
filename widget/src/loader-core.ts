@@ -21,6 +21,9 @@ export interface SteptCommandHandlers {
   hide: () => void
   shutdown: () => void
   startTour: (tourId: string) => void
+  /** Register a client action the AI assistant may run (`actions.ts`). */
+  action: (def?: unknown) => void
+  removeAction: (name: string) => void
 }
 
 /** The public callable. `q` holds calls queued before the real fn was installed. */
@@ -55,6 +58,12 @@ export function createDispatcher(handlers: SteptCommandHandlers): SteptFn {
         break
       case 'startTour':
         handlers.startTour(String(args[0] ?? ''))
+        break
+      case 'action':
+        handlers.action(args[0])
+        break
+      case 'removeAction':
+        handlers.removeAction(String(args[0] ?? ''))
         break
       default:
         if (typeof console !== 'undefined') {

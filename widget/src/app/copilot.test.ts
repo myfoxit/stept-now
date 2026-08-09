@@ -376,3 +376,178 @@ describe('page ops', () => {
     })
   })
 })
+
+// --- client actions ----------------------------------------------------------
+
+const INVITE_WIRE = {
+  name: 'invite_teammate',
+  description: 'Invite a teammate by email',
+  confirm: true,
+  approval: false,
+  requires_identity: false,
+}
+
+describe('client actions', () => {
+  it('advertises loader defs with page context and with outgoing messages', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const calls = mockFetch(
+      copilotRoutes([
+        {
+          method: 'POST',
+          path: '/conversations/conv1/messages',
+          body: {
+            id: 'm1',
+            direction: 'in',
+            author_type: 'contact',
+            author_name: 'Visitor',
+            content: 'hi',
+            attachments: [],
+            created_at: new Date().toISOString(),
+            meta: {},
+          },
+        },
+      ]),
+    )
+    capturePosts()
+
+    const c = makeController()
+    await c.boot()
+    fromLoader(MSG.PAGE_CONTEXT, {
+      url: 'https://app.test/',
+      path: '/',
+      title: 'Home',
+      actions: [INVITE_WIRE],
+    })
+    await c.openConversation('conv1')
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('/page-context'))).toBe(true)
+    })
+    const context = calls.find((call) => call.url.includes('/page-context'))!
+    expect(JSON.parse(context.init.body!).client_actions).toEqual([INVITE_WIRE])
+
+    await c.send('hi')
+    const message = calls.find(
+      (call) => call.url.includes('/messages') && call.init.method === 'POST',
+    )!
+    expect(JSON.parse(message.init.body!).client_actions).toEqual([INVITE_WIRE])
+  })
+
+  it('parks a confirm action behind the card and dispatches only on Run', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const calls = mockFetch(copilotRoutes())
+    capturePosts()
+
+    const c = makeController()
+    await c.boot()
+    fromLoader(MSG.PAGE_CONTEXT, {
+      url: 'https://app.test/',
+      path: '/',
+      title: 'Home',
+      actions: [INVITE_WIRE],
+    })
+    await c.openConversation('conv1')
+    pushRealtime(c, {
+      run_id: 'run8',
+      op_id: 'op8',
+      op: 'action',
+      args: { name: 'invite_teammate', params: { email: 'sam@acme.io' }, confirm: true },
+    })
+
+    // Nothing crossed the bridge; the card holds the op.
+    expect(posted.some((p) => p.type === MSG.COPILOT_OP)).toBe(false)
+    expect(c.getState().pendingAction).toMatchObject({
+      opId: 'op8',
+      name: 'invite_teammate',
+      params: { email: 'sam@acme.io' },
+      description: 'Invite a teammate by email',
+    })
+
+    c.confirmPendingAction()
+    expect(c.getState().pendingAction).toBeNull()
+    expect(posted.find((p) => p.type === MSG.COPILOT_OP)!.payload).toEqual({
+      opId: 'op8',
+      op: 'action',
+      args: { name: 'invite_teammate', params: { email: 'sam@acme.io' } },
+    })
+
+    fromLoader(MSG.COPILOT_RESULT, { opId: 'op8', result: { ok: true, result: 'invited' } })
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('/copilot/result'))).toBe(true)
+    })
+    expect(
+      JSON.parse(calls.find((call) => call.url.includes('/copilot/result'))!.init.body!).result,
+    ).toEqual({ ok: true, result: 'invited' })
+  })
+
+  it('answers a declined card as a declined result, never running the handler', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const calls = mockFetch(copilotRoutes())
+    capturePosts()
+
+    const c = makeController()
+    await c.boot()
+    await c.openConversation('conv1')
+    pushRealtime(c, {
+      run_id: 'run9',
+      op_id: 'op9',
+      op: 'action',
+      args: { name: 'invite_teammate', params: {}, confirm: true },
+    })
+    c.declinePendingAction()
+
+    expect(posted.some((p) => p.type === MSG.COPILOT_OP)).toBe(false)
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('/copilot/result'))).toBe(true)
+    })
+    const body = JSON.parse(calls.find((call) => call.url.includes('/copilot/result'))!.init.body!)
+    expect(body.result.declined).toBe(true)
+    expect(body.result.ok).toBe(false)
+  })
+
+  it('dispatches a no-confirm action straight to the loader', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch(copilotRoutes())
+    capturePosts()
+
+    const c = makeController()
+    await c.boot()
+    await c.openConversation('conv1')
+    pushRealtime(c, {
+      run_id: 'run10',
+      op_id: 'op10',
+      op: 'action',
+      args: { name: 'log_event', params: { name: 'seen' }, confirm: false },
+    })
+
+    expect(c.getState().pendingAction).toBeNull()
+    expect(c.getState().workingOnPage).toBe('action')
+    expect(posted.find((p) => p.type === MSG.COPILOT_OP)!.payload).toEqual({
+      opId: 'op10',
+      op: 'action',
+      args: { name: 'log_event', params: { name: 'seen' } },
+    })
+  })
+
+  it('ignores a duplicate delivery of an op already parked or in flight', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch(copilotRoutes())
+    capturePosts()
+
+    const c = makeController()
+    await c.boot()
+    await c.openConversation('conv1')
+    const frame = {
+      run_id: 'run11',
+      op_id: 'op11',
+      op: 'action',
+      args: { name: 'invite_teammate', params: { email: 'a@b.c' }, confirm: true },
+    }
+    pushRealtime(c, frame)
+    pushRealtime(c, frame) // e.g. the reload re-fetch racing the socket
+
+    expect(c.getState().pendingAction?.opId).toBe('op11')
+    c.confirmPendingAction()
+    pushRealtime(c, frame) // late duplicate must not re-run a dispatched action
+    expect(posted.filter((p) => p.type === MSG.COPILOT_OP)).toHaveLength(1)
+  })
+})

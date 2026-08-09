@@ -103,7 +103,12 @@ async def test_page_context_reports_no_page_control_without_an_agent(client, wid
         json={"url": "https://app.test/"},
         headers=auth_headers(token),
     )
-    assert response.json() == {"ok": True, "page_control": False, "allow_actions": False}
+    assert response.json() == {
+        "ok": True,
+        "page_control": False,
+        "allow_actions": False,
+        "accepted_actions": [],
+    }
 
 
 async def test_consent_unlocks_actions_and_is_echoed_back(client, widget):
@@ -115,7 +120,12 @@ async def test_consent_unlocks_actions_and_is_echoed_back(client, widget):
         json={"url": "https://app.test/"},
         headers=auth_headers(token),
     )
-    assert offered.json() == {"ok": True, "page_control": True, "allow_actions": False}
+    assert offered.json() == {
+        "ok": True,
+        "page_control": True,
+        "allow_actions": False,
+        "accepted_actions": [],
+    }
 
     consented = await client.post(
         f"/api/widget/conversations/{conversation_id}/page-context",
@@ -150,7 +160,12 @@ async def test_revoking_consent_switches_page_control_off(client, widget):
         json={"url": "https://app.test/", "allow_actions": False},
         headers=auth_headers(token),
     )
-    assert revoked.json() == {"ok": True, "page_control": False, "allow_actions": False}
+    assert revoked.json() == {
+        "ok": True,
+        "page_control": False,
+        "allow_actions": False,
+        "accepted_actions": [],
+    }
 
 
 async def test_page_context_needs_a_widget_token(client, widget):

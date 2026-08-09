@@ -13,6 +13,7 @@ import {
   WidgetApi,
   widgetWsUrl,
 } from '../api'
+import type { ClientActionWireDef } from '../actions'
 import { MSG } from '../protocol'
 import type {
   ArticleDetail,
@@ -56,6 +57,17 @@ export interface PageContext {
   title: string
 }
 
+/** A client action parked behind its confirm card, waiting on the visitor. */
+export interface PendingActionCard {
+  opId: string
+  runId: string
+  /** The developer's action name (`invite_teammate`, not `app_…`). */
+  name: string
+  params: Record<string, unknown>
+  /** From the advertised def, for the card copy ('' when it changed away). */
+  description: string
+}
+
 export interface AppState {
   screen: Screen
   config: WidgetConfig
@@ -80,6 +92,8 @@ export interface AppState {
   actionsAllowed: boolean
   /** Set while a page op is being executed, so the thread can say so. */
   workingOnPage: string | null
+  /** A client action waiting for the visitor's Run / Not now. */
+  pendingAction: PendingActionCard | null
 }
 
 const INITIAL: AppState = {
@@ -102,6 +116,7 @@ const INITIAL: AppState = {
   pageControl: false,
   actionsAllowed: false,
   workingOnPage: null,
+  pendingAction: null,
 }
 
 export class Controller {
@@ -117,6 +132,8 @@ export class Controller {
   private agentTypingTimer: ReturnType<typeof setTimeout> | null = null
   /** opId → the run waiting on it, while the loader executes the op. */
   private pendingOps = new Map<string, { runId: string; op: string }>()
+  /** Client-action defs the loader last advertised (null until it has). */
+  private actionDefs: ClientActionWireDef[] | null = null
 
   constructor(params: BootParams) {
     this.params = params
@@ -227,6 +244,14 @@ export class Controller {
       path: typeof payload.path === 'string' ? payload.path : '',
       title: typeof payload.title === 'string' ? payload.title : '',
     }
+    if (Array.isArray(payload.actions)) {
+      // Function-free defs from the loader's registry; an older loader build
+      // sends nothing, and null keeps the backend's stored set untouched.
+      this.actionDefs = payload.actions.filter(
+        (d): d is ClientActionWireDef =>
+          !!d && typeof d === 'object' && typeof (d as ClientActionWireDef).name === 'string',
+      )
+    }
     this.set({ page })
     void this.pushPageContext()
   }
@@ -242,10 +267,22 @@ export class Controller {
         title: page.title,
         path: page.path,
         allowActions,
+        clientActions: this.actionDefs ?? undefined,
       })
       this.set({ pageControl: ack.page_control, actionsAllowed: ack.allow_actions })
+      this.warnRejectedActions(ack.accepted_actions)
     } catch {
       /* page context is an enhancement — a failure just means less context */
+    }
+  }
+
+  /** Surface defs the server dropped (bad name, over a cap) — otherwise a
+   * developer's action silently never exists and there is nothing to debug. */
+  private warnRejectedActions(accepted: string[] | undefined): void {
+    if (!this.actionDefs?.length || !Array.isArray(accepted)) return
+    const rejected = this.actionDefs.filter((d) => !accepted.includes(d.name)).map((d) => d.name)
+    if (rejected.length && typeof console !== 'undefined') {
+      console.warn(`[stept] actions not accepted by the server: ${rejected.join(', ')}`)
     }
   }
 
@@ -273,7 +310,29 @@ export class Controller {
     const opId = typeof data.op_id === 'string' ? data.op_id : ''
     const op = typeof data.op === 'string' ? data.op : ''
     if (!runId || !opId || !op) return
+    // The socket frame and the reload re-fetch can deliver the same op; a page
+    // op executed twice is wasteful, a client action executed twice is a real
+    // double side effect. First delivery wins.
+    if (this.pendingOps.has(opId) || this.state.pendingAction?.opId === opId) return
     const args = (data.args || {}) as Record<string, unknown>
+
+    if (op === 'action') {
+      const name = typeof args.name === 'string' ? args.name : ''
+      const params = (args.params || {}) as Record<string, unknown>
+      if (args.confirm !== false) {
+        // Park behind the card; the loader hears nothing until Run.
+        const def = this.actionDefs?.find((d) => d.name === name)
+        this.set({
+          pendingAction: { opId, runId, name, params, description: def?.description || '' },
+        })
+        return
+      }
+      this.pendingOps.set(opId, { runId, op })
+      this.set({ workingOnPage: op })
+      bridge.post(MSG.COPILOT_OP, { opId, op, args: { name, params } })
+      return
+    }
+
     this.set({ workingOnPage: op })
 
     if (op === 'guide') {
@@ -296,6 +355,31 @@ export class Controller {
 
     this.pendingOps.set(opId, { runId, op })
     bridge.post(MSG.COPILOT_OP, { opId, op, args })
+  }
+
+  /** Run the client action waiting behind its confirm card. */
+  confirmPendingAction(): void {
+    const card = this.state.pendingAction
+    if (!card) return
+    this.pendingOps.set(card.opId, { runId: card.runId, op: 'action' })
+    this.set({ pendingAction: null, workingOnPage: 'action' })
+    bridge.post(MSG.COPILOT_OP, {
+      opId: card.opId,
+      op: 'action',
+      args: { name: card.name, params: card.params },
+    })
+  }
+
+  /** Refuse it. The run resumes with a declined result the model can explain. */
+  declinePendingAction(): void {
+    const card = this.state.pendingAction
+    if (!card) return
+    this.set({ pendingAction: null })
+    void this.finishOp(card.runId, card.opId, {
+      ok: false,
+      declined: true,
+      error: 'the person chose not to run this action',
+    })
   }
 
   /** The loader answered a page op — pass the result back to the agent run. */
@@ -401,6 +485,7 @@ export class Controller {
       messages: [],
       nextCursor: null,
       agentTyping: false,
+      pendingAction: null,
     })
   }
 
@@ -412,6 +497,7 @@ export class Controller {
       nextCursor: null,
       loadingMessages: true,
       agentTyping: false,
+      pendingAction: null,
     })
     try {
       const page = await this.api.listMessages(id)
@@ -463,7 +549,7 @@ export class Controller {
 
     try {
       if (screen.conversationId === null) {
-        const summary = await this.api.createConversation(content)
+        const summary = await this.api.createConversation(content, this.actionDefs ?? undefined)
         this.set({
           screen: { name: 'thread', conversationId: summary.id },
           conversations: [summary, ...this.state.conversations],
@@ -479,7 +565,11 @@ export class Controller {
         items.forEach((m) => this.seenIds.add(m.id))
         this.set({ messages: items, nextCursor: page.next_cursor })
       } else {
-        const real = (await this.api.sendMessage(screen.conversationId, content)) as UiMessage
+        const real = (await this.api.sendMessage(
+          screen.conversationId,
+          content,
+          this.actionDefs ?? undefined,
+        )) as UiMessage
         this.replaceTemp(temp.id, real)
       }
     } catch {
@@ -565,7 +655,13 @@ export class Controller {
         created_at: raw.created_at,
         meta: { citations: raw.meta?.citations },
       }
-      this.set({ messages: [...this.state.messages, message], agentTyping: false })
+      this.set({
+        messages: [...this.state.messages, message],
+        agentTyping: false,
+        // A reply while a confirm card is up means the run moved on without the
+        // answer (declined elsewhere, or the timeout sweep) — the card is dead.
+        ...(raw.direction === 'out' && this.state.pendingAction ? { pendingAction: null } : {}),
+      })
       if (raw.direction === 'out') void this.markRead(convId)
     } else if (convId && raw.direction === 'out') {
       // A reply landed in a conversation we're not viewing → mark unread + refresh.

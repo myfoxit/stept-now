@@ -7,6 +7,7 @@
  * with the public `widget_key` (+ optional token) instead of the bearer token.
  */
 
+import type { ClientActionWireDef } from './actions'
 import type {
   BootResult,
   Campaign,
@@ -114,10 +115,18 @@ export class WidgetApi {
     return this.authed('/api/widget/conversations')
   }
 
-  createConversation(message: string): Promise<ConversationSummary> {
+  createConversation(
+    message: string,
+    clientActions?: ClientActionWireDef[],
+  ): Promise<ConversationSummary> {
     return this.authed('/api/widget/conversations', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        // With the message on purpose: stored in the same transaction that
+        // triggers the agent run, so the FIRST turn already has the page's verbs.
+        ...(clientActions === undefined ? {} : { client_actions: clientActions }),
+      }),
     })
   }
 
@@ -126,10 +135,17 @@ export class WidgetApi {
     return this.authed(`/api/widget/conversations/${conversationId}/messages${q}`)
   }
 
-  sendMessage(conversationId: string, message: string): Promise<WidgetMessage> {
+  sendMessage(
+    conversationId: string,
+    message: string,
+    clientActions?: ClientActionWireDef[],
+  ): Promise<WidgetMessage> {
     return this.authed(`/api/widget/conversations/${conversationId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        ...(clientActions === undefined ? {} : { client_actions: clientActions }),
+      }),
     })
   }
 
@@ -170,7 +186,14 @@ export class WidgetApi {
    */
   setPageContext(
     conversationId: string,
-    context: { url: string; title?: string; path?: string; allowActions?: boolean },
+    context: {
+      url: string
+      title?: string
+      path?: string
+      allowActions?: boolean
+      /** Tri-state like allowActions: omitted leaves the stored defs untouched. */
+      clientActions?: ClientActionWireDef[]
+    },
   ): Promise<PageContextAck> {
     return this.authed(`/api/widget/conversations/${conversationId}/page-context`, {
       method: 'POST',
@@ -179,6 +202,7 @@ export class WidgetApi {
         title: context.title ?? null,
         path: context.path ?? null,
         ...(context.allowActions === undefined ? {} : { allow_actions: context.allowActions }),
+        ...(context.clientActions === undefined ? {} : { client_actions: context.clientActions }),
       }),
     })
   }

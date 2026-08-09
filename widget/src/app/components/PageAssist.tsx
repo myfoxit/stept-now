@@ -49,6 +49,8 @@ export function PageAssist({
 /** Plain-language status for the op in flight. */
 function describe(op: string): string {
   switch (op) {
+    case 'action':
+      return 'Running the action…'
     case 'act':
       return 'Doing that on the page…'
     case 'navigate':

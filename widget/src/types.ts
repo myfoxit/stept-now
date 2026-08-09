@@ -390,6 +390,8 @@ export interface PageContextAck {
   page_control: boolean
   /** May it click and type, or only point? */
   allow_actions: boolean
+  /** Client-action names that survived server normalization (absent pre-W12). */
+  accepted_actions?: string[]
 }
 
 /**

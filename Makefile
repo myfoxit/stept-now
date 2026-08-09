@@ -45,11 +45,13 @@ lint: ## Static checks only
 test-backend: ## Backend tests (SQLite by default; pg tests auto-skip if unreachable)
 	cd backend && uv run pytest -q
 
-test-frontend: ## Frontend + widget + extension + dom-capture unit tests
+test-frontend: ## Frontend + widget + extension + dom-capture + SDK unit tests
 	pnpm --filter @stept/frontend test -- --run
 	pnpm --filter @stept/widget test -- --run
 	pnpm --filter @stept/extension test -- --run
 	pnpm --filter @stept/dom-capture test -- --run
+	pnpm --filter @stept/js test -- --run
+	pnpm --filter @stept/react test -- --run
 
 build: ## Production builds (frontend, widget, extension + its downloadable zip)
 	pnpm -r build

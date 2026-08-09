@@ -53,6 +53,7 @@ export function Component() {
   const [handoffMessage, setHandoffMessage] = useState('')
   const [pageControl, setPageControl] = useState(false)
   const [allowPageActions, setAllowPageActions] = useState(false)
+  const [clientActionsEnabled, setClientActionsEnabled] = useState(true)
   const [policies, setPolicies] = useState<Record<string, ToolPolicy>>({})
 
   // Build the tool matrix rows (builtins + custom actions).
@@ -84,6 +85,7 @@ export function Component() {
     setHandoffMessage(settings?.handoff_message ?? '')
     setPageControl(settings?.page_control?.enabled ?? false)
     setAllowPageActions(settings?.page_control?.allow_actions ?? false)
+    setClientActionsEnabled(settings?.client_actions?.enabled ?? true)
     const tools = (agent.tools as ToolConfig[]) ?? []
     const map: Record<string, ToolPolicy> = {}
     for (const t of BUILTIN_TOOLS) {
@@ -118,6 +120,7 @@ export function Component() {
         handoff_message: handoffMessage,
         guardrails: { max_tool_calls: maxToolCalls, require_citations: requireCitations },
         page_control: { enabled: pageControl, allow_actions: pageControl && allowPageActions },
+        client_actions: { enabled: clientActionsEnabled },
       }
       const tools: ToolConfig[] = toolRows.map((row) => ({
         key: row.key,
@@ -422,6 +425,26 @@ export function Component() {
                   </p>
                 </CardContent>
               ) : null}
+            </Card>
+
+            {/* Client actions (SDK-registered) */}
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-sm">Client actions</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Functions your site registers with <code>Stept(&apos;action&apos;, …)</code>{' '}
+                    become tools this agent can run in the visitor&rsquo;s browser. Each action
+                    decides whether the visitor confirms first or your team approves.
+                  </p>
+                </div>
+                <Switch
+                  checked={clientActionsEnabled}
+                  onCheckedChange={setClientActionsEnabled}
+                  aria-label="Enable client actions"
+                  disabled={!canManage}
+                />
+              </CardHeader>
             </Card>
 
             {/* MCP channel */}

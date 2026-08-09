@@ -33,7 +33,13 @@ Stept('show')            // show / hide the launcher
 Stept('hide')
 Stept('shutdown')        // tear the widget down (e.g. on logout)
 Stept('startTour', id)   // play a published tour by id
+Stept('action', def)     // teach the AI assistant one of your app's actions
+Stept('removeAction', n) // …and take it back
 ```
+
+`Stept('action', …)` is the [Actions SDK](/product/actions-sdk/) — one line that lets the
+assistant run your own functions (invite a teammate, apply a promo code) in the visitor's
+browser, behind confirm cards and optional team approval.
 
 ## Identity verification
 

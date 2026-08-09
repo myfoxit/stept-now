@@ -49,6 +49,7 @@ import {
   type SteptCommandHandlers,
   type SteptFn,
 } from './loader-core'
+import { ActionRegistry } from './actions'
 import { PageAgent, type PageOp } from './page-agent'
 import { envelope, MSG, type MessageType, parseEnvelope } from './protocol'
 import { selectFirstEligibleSurvey, SurveyWidget, surveySeenKey } from './survey-widget'
@@ -140,6 +141,10 @@ class WidgetHost {
 
   /** Host-page executor for AI copilot ops — built on first use. */
   private pageAgent: PageAgent | null = null
+
+  /** Client actions the page registered (`Stept('action', …)`). Survives
+   * shutdown/boot cycles: the handlers belong to the page, not this instance. */
+  private actions = new ActionRegistry()
 
   constructor(settings: SteptSettings) {
     this.settings = settings
@@ -387,9 +392,20 @@ class WidgetHost {
   private async runCopilotOp(payload: Record<string, unknown>): Promise<void> {
     const opId = String(payload.opId ?? '')
     if (!opId) return
-    const op = payload.op as PageOp['op'] | undefined
+    const op = payload.op as PageOp['op'] | 'action' | undefined
     if (!op) {
       this.post(MSG.COPILOT_RESULT, { opId, result: { ok: false, error: 'missing op' } })
+      return
+    }
+    if (op === 'action') {
+      // A registered client action — the developer's own code, never the DOM
+      // executor. The confirm gate already happened in the iframe.
+      const args = (payload.args ?? {}) as Record<string, unknown>
+      const result = await this.actions.execute(
+        String(args.name ?? ''),
+        (args.params ?? {}) as Record<string, unknown>,
+      )
+      this.post(MSG.COPILOT_RESULT, { opId, result })
       return
     }
     const result = await this.agent().run({
@@ -488,7 +504,20 @@ class WidgetHost {
       url: window.location.href,
       path: window.location.pathname,
       title: document.title,
+      // Function-free defs; the app forwards them with context/messages so the
+      // agent's next turn knows this page's verbs.
+      actions: this.actions.wireDefs(),
     })
+  }
+
+  /** `Stept('action', def)` — register (or replace) a client action. */
+  registerAction(def: unknown): void {
+    if (this.actions.register(def)) this.pushPageContext()
+  }
+
+  /** `Stept('removeAction', name)` — e.g. a component unmounted. */
+  removeAction(name: string): void {
+    if (this.actions.remove(name)) this.pushPageContext()
   }
 
   private post(type: MessageType, payload: unknown): void {
@@ -771,6 +800,8 @@ function boot(): void {
     hide: () => host.hide(),
     shutdown: () => host.shutdown(),
     startTour: (id) => void host.startTour(id),
+    action: (def) => host.registerAction(def),
+    removeAction: (name) => host.removeAction(name),
   }
   installStept(win, handlers)
   host.init()

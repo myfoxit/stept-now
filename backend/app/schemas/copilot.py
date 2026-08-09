@@ -29,6 +29,11 @@ class PageContextIn(BaseModel):
     #: Tri-state on purpose: `None` leaves an earlier answer untouched (the loader
     #: pushes context on every SPA navigation and must not silently revoke it).
     allow_actions: bool | None = None
+    #: Actions the host page registered (`Stept('action', …)`), same tri-state:
+    #: `None` leaves the stored defs untouched, `[]` clears them. Items are loose
+    #: dicts on purpose — invalid defs are dropped by normalization, never 422'd,
+    #: so a buggy page cannot break its own conversation.
+    client_actions: list[dict[str, Any]] | None = Field(default=None, max_length=100)
 
 
 class PageContextOut(BaseModel):
@@ -36,6 +41,9 @@ class PageContextOut(BaseModel):
     #: Echoed back so the widget can show the right affordance without guessing.
     page_control: bool = False
     allow_actions: bool = False
+    #: Names of the client actions that survived normalization — the SDK warns
+    #: about the difference so a rejected def is debuggable, not silent.
+    accepted_actions: list[str] = Field(default_factory=list)
 
 
 class ClientOpResultIn(BaseModel):

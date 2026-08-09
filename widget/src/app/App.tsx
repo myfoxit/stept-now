@@ -89,7 +89,10 @@ export function App({ controller }: { controller: Controller }) {
           pageTitle={state.page?.title || state.page?.path || ''}
           actionsAllowed={state.actionsAllowed}
           workingOnPage={state.workingOnPage}
+          pendingAction={state.pendingAction}
           onAllowActions={(allowed) => void controller.setActionsAllowed(allowed)}
+          onRunAction={() => controller.confirmPendingAction()}
+          onDismissAction={() => controller.declinePendingAction()}
           onSend={(text) => void controller.send(text)}
           onTyping={(t) => controller.emitTyping(t)}
           onLoadMore={() => void controller.loadOlderMessages()}

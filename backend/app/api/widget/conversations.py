@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents import client_actions
 from app.api.widget.deps import WidgetAuth, WidgetPrincipal
 from app.core.db import utcnow
 from app.core.deps import Db
@@ -70,10 +71,15 @@ class WidgetMessageOut(BaseModel):
 class WidgetMessageCreate(BaseModel):
     message: str = Field(min_length=1, max_length=150_000)
     attachments: list[AttachmentRef] = Field(default_factory=list)
+    #: Actions the host page registered, sent WITH the message so they are stored
+    #: in the same transaction that triggers the agent run — the very first run
+    #: can already use them, with no page-context race. `None` = leave untouched.
+    client_actions: list[dict[str, Any]] | None = Field(default=None, max_length=100)
 
 
 class WidgetReplyCreate(BaseModel):
     message: str = Field(min_length=1, max_length=150_000)
+    client_actions: list[dict[str, Any]] | None = Field(default=None, max_length=100)
 
 
 class TypingRequest(BaseModel):
@@ -185,6 +191,24 @@ async def _owned_conversation(
     return conversation
 
 
+def _store_client_actions(
+    conversation: Conversation, principal: WidgetPrincipal, raw: list[dict[str, Any]] | None
+) -> None:
+    """Persist page-registered action defs on the conversation (None = no-op).
+
+    Written BEFORE the message row that triggers the agent run, in the same
+    transaction, so the run that answers this very message already sees them.
+    """
+    if raw is None:
+        return
+    defs = client_actions.normalize_defs(raw)
+    attributes = dict(conversation.attributes or {})
+    attributes[client_actions.ATTR_KEY] = client_actions.stored_block(
+        defs, identified=bool(principal.contact.external_id)
+    )
+    conversation.attributes = attributes
+
+
 async def _ingest_visitor_message(
     session: AsyncSession,
     principal: WidgetPrincipal,
@@ -192,6 +216,7 @@ async def _ingest_visitor_message(
     content: str,
     attachments: list[dict[str, Any]] | None,
     force_new: bool = False,
+    client_actions_raw: list[dict[str, Any]] | None = None,
 ) -> tuple[Conversation, Message]:
     actor = Actor(type="contact", id=principal.contact.id, label=principal.contact.name or None)
     conversation = None
@@ -222,6 +247,7 @@ async def _ingest_visitor_message(
             contact_inbox=principal.contact_inbox,
             actor=actor,
         )
+    _store_client_actions(conversation, principal, client_actions_raw)
     message = await conversations_service.add_message(
         session,
         conversation,
@@ -270,6 +296,7 @@ async def create_conversation(
         content=body.message,
         attachments=[a.model_dump() for a in body.attachments],
         force_new=True,
+        client_actions_raw=body.client_actions,
     )
     return await _summary(session, conversation)
 
@@ -308,6 +335,7 @@ async def create_message(
 ) -> WidgetMessageOut:
     conversation = await _owned_conversation(session, principal, conversation_id)
     actor = Actor(type="contact", id=principal.contact.id, label=principal.contact.name or None)
+    _store_client_actions(conversation, principal, body.client_actions)
     message = await conversations_service.add_message(
         session,
         conversation,

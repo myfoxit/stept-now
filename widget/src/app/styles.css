@@ -497,6 +497,52 @@ body {
   }
 }
 
+/* The confirm card for a client action — rendered in the thread like a message. */
+.sw-action-card {
+  align-self: flex-start;
+  max-width: 85%;
+  margin: 2px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sw-border);
+  border-left: 3px solid var(--sw-accent);
+  border-radius: 12px;
+  background: var(--sw-panel);
+  font-size: 13px;
+  color: var(--sw-text);
+}
+.sw-action-card-title strong {
+  font-weight: 600;
+}
+.sw-action-card-desc {
+  margin-top: 4px;
+  color: var(--sw-muted);
+  font-size: 12px;
+}
+.sw-action-card-params {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--sw-bg);
+  font-size: 12px;
+}
+.sw-action-card-param {
+  display: flex;
+  gap: 8px;
+}
+.sw-action-card-param dt {
+  color: var(--sw-muted);
+  flex: 0 0 auto;
+}
+.sw-action-card-param dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sw-action-card-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .sw-composer {
   display: flex;
   align-items: flex-end;

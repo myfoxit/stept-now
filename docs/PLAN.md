@@ -343,6 +343,49 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     exchange → connection persisted as `connected`; the stored access + refresh tokens are Fernet
     ciphertext at rest (verified by inspecting the `integration_connections` row directly).
 
+- [x] **W12 (Actions SDK — client actions)** — the developer-facing half of the in-app
+  assistant: a host page teaches the agent its own verbs in one line. Contracts:
+  `docs/ACTIONS-SDK-CONTRACTS.md`. Docs: docs-site → Product → "Actions SDK".
+  Worktree: `../stept-now-actions-sdk` (branch `feature/actions-sdk`). Single-session build.
+  - **Surface**: `Stept('action', {name, description, params, confirm, approval,
+    requiresIdentity, run})` + `Stept('removeAction', name)` (queue-safe pre-load); npm
+    `@stept/js` (SSR-safe typed wrapper: `loadStept`/`stept`/`registerAction`) and
+    `@stept/react` (`<SteptProvider>`, `useStept()`, `useSteptAction()` with
+    mount/replace/unmount lifecycle). Handlers run in the page with the user's session —
+    the server never calls the customer's API.
+  - **Mechanics (no migration)**: defs ride widget message/conversation POSTs (stored in
+    the same transaction that triggers the run — the FIRST turn already has them) and
+    page-context POSTs (tri-state: null keeps, [] clears), into
+    `conversation.attributes["client_actions"]` beside page-control consent.
+    `resolve_agent_tools` merges them as `app_<name>` specs into `ToolPlan.client` +
+    new `client_action_defs`; execution rides the existing `client_request` /
+    `awaiting_client` defer-resume path with a new `{op:"action"}` wire op. The iframe
+    renders a confirm card (Run / Not now) before anything crosses to the loader's
+    `ActionRegistry`; declines resume the run as a declined tool result.
+  - **Guardrails**: 20 defs/conversation + 16k stored budget + schema-size caps
+    (normalize-don't-422, accepted names echoed for SDK console warnings); 10 action
+    calls/run; def schema validated server-side before any browser round-trip;
+    `approval: true` routes through the existing durable team gate; `requiresIdentity`
+    defs are withheld (not refused) for anonymous visitors, decided at intake from the
+    HMAC-verified principal; per-agent `settings.client_actions.enabled` off-switch
+    (default ON — registering is the opt-in); workspace `CustomAction` names beat
+    page-registered names; a stale replayed op falls back to confirm-ON; the
+    stale-wait sweep gives `{op:"action"}` a person-sized 600s clock (vs 90s page ops)
+    and resumes with "did not confirm". Dedupe guard: a socket+reload double delivery
+    can no longer double-execute (covers page ops too).
+  - **Dashboard/docs**: trace viewer labels `client_request` steps "Page op" vs
+    "App action" (+ args); Agent builder gains the Client actions card; docs-site page
+    with script-tag + React quickstarts, field reference, and three recipes; README
+    "Actions SDK" bullet; `packages/{js,react}` publish-shaped (dev exports → src,
+    `publishConfig` → dist; publishing itself deferred — needs the npm org; note:
+    `@stept/widget` npm name is held by the internal iframe app and is load-bearing in
+    CI/Makefile/e2e filters, so the public package is `@stept/js` pending a
+    publish-time rename decision).
+  - **Measured after W12** (SQLite): backend **1562** passed, 8 pg-marked skipped;
+    frontend **477**; widget **205**; extension **199**; dom-capture **107**;
+    `@stept/js` **5**; `@stept/react` **4**; e2e **23** (2 new action journeys: confirm
+    → handler runs in the host page → run resumes; decline → declined result, page
+    untouched). `make verify` green end to end; docs-site builds; no alembic change.
 - [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
   `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
   untouched. Postgres containers used for migration validation may still be up on 54329

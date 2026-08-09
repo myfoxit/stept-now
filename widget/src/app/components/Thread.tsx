@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'preact/hooks'
 
 import type { FeedbackRating } from '../../types'
-import type { UiMessage } from '../controller'
+import type { PendingActionCard, UiMessage } from '../controller'
+import { ActionCard } from './ActionCard'
 import { Composer } from './Composer'
 import { Csat } from './Csat'
 import { MessageBubble } from './MessageBubble'
@@ -21,6 +22,7 @@ export function Thread({
   pageTitle,
   actionsAllowed,
   workingOnPage,
+  pendingAction,
   onSend,
   onTyping,
   onLoadMore,
@@ -28,6 +30,8 @@ export function Thread({
   onFeedback,
   onRetry,
   onAllowActions,
+  onRunAction,
+  onDismissAction,
 }: {
   messages: UiMessage[]
   agentTyping: boolean
@@ -42,6 +46,8 @@ export function Thread({
   pageTitle: string
   actionsAllowed: boolean
   workingOnPage: string | null
+  /** A client action waiting for the visitor's go-ahead (confirm: true). */
+  pendingAction: PendingActionCard | null
   onSend: (text: string) => void
   onTyping: (isTyping: boolean) => void
   onLoadMore: () => void
@@ -49,6 +55,8 @@ export function Thread({
   onFeedback: (messageId: string, rating: FeedbackRating) => void
   onRetry: (messageId: string) => void
   onAllowActions: (allowed: boolean) => void
+  onRunAction: () => void
+  onDismissAction: () => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
@@ -57,7 +65,7 @@ export function Thread({
     if (atBottom.current && scroller.current) {
       scroller.current.scrollTop = scroller.current.scrollHeight
     }
-  }, [messages, agentTyping])
+  }, [messages, agentTyping, pendingAction])
 
   const onScroll = (): void => {
     const el = scroller.current
@@ -92,6 +100,9 @@ export function Thread({
           />
         ))}
         {agentTyping && <TypingDots />}
+        {pendingAction && (
+          <ActionCard action={pendingAction} onRun={onRunAction} onDismiss={onDismissAction} />
+        )}
         {resolved && (
           <Csat done={csatDone} onSubmit={onCsat} />
         )}

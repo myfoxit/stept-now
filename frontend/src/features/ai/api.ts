@@ -42,6 +42,8 @@ export interface AgentSettings {
   guardrails: { max_tool_calls: number; require_citations: boolean }
   /** In-app guidance: see the visitor's page, and (optionally) act on it. */
   page_control?: { enabled: boolean; allow_actions: boolean }
+  /** Actions the customer's page registers via the SDK. On unless switched off. */
+  client_actions?: { enabled: boolean }
   /** Expose this agent at /mcp/agents/{id} to external MCP clients. */
   mcp?: McpChannelSettings
 }

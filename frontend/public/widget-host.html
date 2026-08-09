@@ -33,6 +33,8 @@
 
     <section data-tour="knowledge">Knowledge section anchor.</section>
     <section data-tour="ai">AI section anchor.</section>
+    <!-- Where the client action leaves visible evidence (actions-journey.spec). -->
+    <p id="action-result" hidden></p>
     <script>
       // The mini app: reveal the form, then confirm what was saved.
       const form = document.getElementById('invoice-form')
@@ -53,6 +55,29 @@
       const key = q.get('key') || 'wk_REPLACE_ME'
       const api = (q.get('api') || 'http://localhost:8600').replace(/\/+$/, '')
       window.SteptSettings = { workspaceKey: key, apiBase: api }
+      // A client action registered BEFORE the loader arrives — the queue shim
+      // is part of what the e2e proves. The handler runs in this page.
+      window.Stept =
+        window.Stept ||
+        function (...args) {
+          ;(window.Stept.q = window.Stept.q || []).push(args)
+        }
+      Stept('action', {
+        name: 'create_invoice_draft',
+        description: 'Create a draft invoice for an amount',
+        params: {
+          type: 'object',
+          properties: { amount: { type: 'string' } },
+          required: ['amount'],
+        },
+        confirm: true,
+        run: ({ amount }) => {
+          const target = document.getElementById('action-result')
+          target.hidden = false
+          target.textContent = `Draft created for ${amount}`
+          return `draft created for ${amount}`
+        },
+      })
       const s = document.createElement('script')
       s.src = api + '/widget-assets/loader.js'
       s.async = true

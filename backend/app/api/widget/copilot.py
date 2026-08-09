@@ -20,7 +20,7 @@ from fastapi import APIRouter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents import engine, page_tools
+from app.agents import client_actions, engine, page_tools
 from app.api.widget.deps import WidgetAuth, WidgetPrincipal
 from app.core.deps import Db
 from app.core.errors import ConflictError, NotFoundError
@@ -95,6 +95,13 @@ async def set_page_context(
         attributes["page_path"] = body.path
     if body.allow_actions is not None:
         attributes["page_control_consent"] = body.allow_actions
+    accepted: list[str] = []
+    if body.client_actions is not None:
+        defs = client_actions.normalize_defs(body.client_actions)
+        attributes[client_actions.ATTR_KEY] = client_actions.stored_block(
+            defs, identified=bool(principal.contact.external_id)
+        )
+        accepted = [str(entry["name"]) for entry in defs]
     conversation.attributes = attributes
     await session.flush()
 
@@ -102,7 +109,9 @@ async def set_page_context(
     offer, mutating = page_tools.client_tools_available(
         agent.settings if agent is not None else None, attributes
     )
-    return PageContextOut(ok=True, page_control=offer, allow_actions=mutating)
+    return PageContextOut(
+        ok=True, page_control=offer, allow_actions=mutating, accepted_actions=accepted
+    )
 
 
 @router.get("/conversations/{conversation_id}/copilot/pending", response_model=PendingOpOut | None)
@@ -134,14 +143,27 @@ async def pending_op(
     op_id = pending.get("client_op_id")
     if not op_id or "result" in pending:
         return None
+    name = str(pending.get("name") or "")
+    if client_actions.is_action_name(name):
+        defs, _identified = client_actions.stored_defs(conversation.attributes)
+        action_def = next(
+            (d for d in defs if client_actions.spec_name(str(d.get("name") or "")) == name),
+            None,
+        )
+        # The stored def may have changed since the call parked. A missing def
+        # still replays with confirm ON — the safe side: a stale card renders
+        # rather than something auto-running on reload.
+        fallback = {"name": name[len(client_actions.SPEC_PREFIX) :], "confirm": True}
+        op = client_actions.op_for(action_def or fallback, pending.get("input") or {})
+        return PendingOpOut(
+            run_id=run.id, op_id=str(op_id), tool=name, op=str(op["op"]), args=op["args"]
+        )
     return PendingOpOut(
         run_id=run.id,
         op_id=str(op_id),
-        tool=str(pending.get("name") or ""),
+        tool=name,
         op=str(pending.get("op") or ""),
-        args=page_tools.op_for(str(pending.get("name") or ""), pending.get("input") or {}).get(
-            "args", {}
-        ),
+        args=page_tools.op_for(name, pending.get("input") or {}).get("args", {}),
     )
 
 

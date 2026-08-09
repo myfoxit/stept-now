@@ -4,12 +4,14 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   MessageSquare,
+  MousePointerClick,
   Shield,
   ShieldCheck,
   ShieldQuestion,
   Sparkles,
   Users,
   Wrench,
+  Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -20,6 +22,7 @@ import type { AgentStep } from '../api'
 
 const KIND_META: Record<string, { label: string; icon: LucideIcon; className: string }> = {
   llm_call: { label: 'LLM call', icon: Sparkles, className: 'text-brand' },
+  client_request: { label: 'Page op', icon: MousePointerClick, className: 'text-violet-500' },
   tool_call: { label: 'Tool call', icon: Wrench, className: 'text-blue-500' },
   tool_result: { label: 'Tool result', icon: ArrowLeftRight, className: 'text-blue-500' },
   approval_request: { label: 'Approval requested', icon: ShieldQuestion, className: 'text-amber-500' },
@@ -55,10 +58,18 @@ export function StepTrace({ steps }: { steps: AgentStep[] }) {
   return (
     <ol className="space-y-0">
       {steps.map((step, i) => {
-        const meta = KIND_META[step.kind] ?? {
+        let meta = KIND_META[step.kind] ?? {
           label: step.kind,
           icon: Sparkles,
           className: 'text-muted-foreground',
+        }
+        // A deferred client call is either a DOM op or a page-registered app
+        // action — different trust story, worth different words in the trace.
+        if (
+          step.kind === 'client_request' &&
+          (step.output as Record<string, unknown> | null)?.op === 'action'
+        ) {
+          meta = { label: 'App action', icon: Zap, className: 'text-violet-500' }
         }
         const Icon = meta.icon
         const text = stepText(step)
@@ -98,7 +109,9 @@ export function StepTrace({ steps }: { steps: AgentStep[] }) {
               {text ? (
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{text}</p>
               ) : null}
-              {step.kind === 'tool_call' ? <JsonBlock data={step.input} /> : null}
+              {step.kind === 'tool_call' || step.kind === 'client_request' ? (
+                <JsonBlock data={step.input} />
+              ) : null}
               {step.kind === 'tool_result' && !text ? <JsonBlock data={step.output} /> : null}
             </div>
           </li>

@@ -32,6 +32,8 @@ function stubHandlers(): SteptCommandHandlers & { calls: string[] } {
     hide: () => calls.push('hide'),
     shutdown: () => calls.push('shutdown'),
     startTour: (id) => calls.push(`startTour:${id}`),
+    action: (def) => calls.push(`action:${(def as { name?: string } | undefined)?.name ?? ''}`),
+    removeAction: (name) => calls.push(`removeAction:${name}`),
   }
 }
 
@@ -42,6 +44,17 @@ describe('createDispatcher', () => {
     dispatch('open')
     dispatch('startTour', 'tour-9')
     expect(h.calls).toEqual(['open', 'startTour:tour-9'])
+  })
+
+  it('routes action registration commands, queueable before load', () => {
+    const h = stubHandlers()
+    const queued: SteptFn = (() => {}) as SteptFn
+    queued.q = [
+      ['action', { name: 'invite_teammate', description: 'x', run: () => 'ok' }],
+      ['removeAction', 'invite_teammate'],
+    ]
+    installStept({ Stept: queued }, h)
+    expect(h.calls).toEqual(['action:invite_teammate', 'removeAction:invite_teammate'])
   })
 
   it('warns on unknown commands instead of throwing', () => {

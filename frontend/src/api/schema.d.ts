@@ -3590,6 +3590,9 @@ export interface paths {
     /**
      * List Messages
      * @description Public messages only — notes and activity entries are never returned.
+     *
+     *     Filtering happens in the query (``public_only``), so every page is a full
+     *     page of visitor-visible messages and the cursor never strands earlier ones.
      */
     get: operations['list_messages_api_widget_conversations__conversation_id__messages_get']
     put?: never
@@ -7076,6 +7079,12 @@ export interface components {
     PageContextIn: {
       /** Allow Actions */
       allow_actions?: boolean | null
+      /** Client Actions */
+      client_actions?:
+        | {
+            [key: string]: unknown
+          }[]
+        | null
       /** Path */
       path?: string | null
       /** Title */
@@ -7085,6 +7094,8 @@ export interface components {
     }
     /** PageContextOut */
     PageContextOut: {
+      /** Accepted Actions */
+      accepted_actions?: string[]
       /**
        * Allow Actions
        * @default false
@@ -8976,6 +8987,12 @@ export interface components {
     WidgetMessageCreate: {
       /** Attachments */
       attachments?: components['schemas']['AttachmentRef'][]
+      /** Client Actions */
+      client_actions?:
+        | {
+            [key: string]: unknown
+          }[]
+        | null
       /** Message */
       message: string
     }
@@ -9011,6 +9028,12 @@ export interface components {
     }
     /** WidgetReplyCreate */
     WidgetReplyCreate: {
+      /** Client Actions */
+      client_actions?:
+        | {
+            [key: string]: unknown
+          }[]
+        | null
       /** Message */
       message: string
     }

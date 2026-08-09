@@ -67,6 +67,12 @@ self-hostable and MIT-licensed:
   page they're on and act on it: play the right product tour, compose an on-the-spot
   walkthrough with coach-marks, or click/fill/navigate for them — capped per run, with
   password fields off-limits and approval gates on anything sensitive.
+- 🧩 **Actions SDK** — teach the agent your app's own verbs in one line:
+  `Stept('action', { name, description, params, run })` (or `useSteptAction()` from
+  `@stept/react`) registers a function the agent can call **in the visitor's browser,
+  with their session** — behind an in-chat "Run this?" card, optional team approval, and
+  identity gating. Stept's server never touches your API, and every call lands in the
+  run's trace.
 - 🔌 **MCP server built in** — every workspace (and every agent) is an MCP endpoint:
   Claude, Cursor or any MCP client can search your knowledge, read conversations, create
   docs, and even run tours in a real browser through the Chrome extension bridge.

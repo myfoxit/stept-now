@@ -33,7 +33,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents import page_tools
+from app.agents import client_actions, page_tools
 from app.agents.guides import search_guides
 from app.ai.base import ToolSpec
 from app.core.events import Actor
@@ -118,6 +118,9 @@ class ToolPlan:
     #: Tool names the engine must defer to the visitor's browser instead of
     #: executing server-side (`app.agents.page_tools`).
     client: set[str] = field(default_factory=set)
+    #: spec name (``app_*``) → the page-registered def behind it
+    #: (`app.agents.client_actions`). Every key is also in ``client``.
+    client_action_defs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 # --- helpers ----------------------------------------------------------------
@@ -565,8 +568,32 @@ async def resolve_agent_tools(
         control[spec_name] = "none"
         action_ids[spec_name] = action_id
 
+    # Page-registered client actions (`Stept('action', …)`), stored on the
+    # conversation by the widget's page-context POST. Last so a name collision
+    # resolves in favor of what the workspace configured over what a page sent.
+    action_defs: dict[str, dict[str, Any]] = {}
+    if conversation is not None and client_actions.enabled(agent.settings):
+        defs, identified = client_actions.stored_defs(conversation.attributes)
+        taken = {existing.name for existing in specs}
+        for entry in client_actions.offered(defs, identified=identified):
+            entry_spec = client_actions.spec_for(entry)
+            if entry_spec.name in taken:
+                continue
+            specs.append(entry_spec)
+            policy[entry_spec.name] = configured.get(entry_spec.name) or (
+                POLICY_REQUIRE_APPROVAL if entry.get("approval") else POLICY_AUTO
+            )
+            control[entry_spec.name] = "none"
+            client.add(entry_spec.name)
+            action_defs[entry_spec.name] = entry
+
     return ToolPlan(
-        specs=specs, policy=policy, control=control, action_ids=action_ids, client=client
+        specs=specs,
+        policy=policy,
+        control=control,
+        action_ids=action_ids,
+        client=client,
+        client_action_defs=action_defs,
     )
 
 

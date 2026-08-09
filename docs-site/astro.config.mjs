@@ -44,6 +44,7 @@ export default defineConfig({
           items: [
             { label: 'Inbox & conversations', slug: 'product/inbox' },
             { label: 'Chat widget', slug: 'product/widget' },
+            { label: 'Actions SDK', slug: 'product/actions-sdk' },
             { label: 'Knowledge base & crawling', slug: 'product/knowledge' },
             { label: 'AI agent', slug: 'product/ai-agent' },
             { label: 'Product tours', slug: 'product/tours' },

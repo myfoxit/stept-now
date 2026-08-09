@@ -47,7 +47,7 @@ from sqlalchemy import event as event_
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents import page_tools
+from app.agents import client_actions, page_tools
 from app.agents import tools as tool_registry
 from app.agents.tools import (
     ACTION_DEFAULT_POLICY,
@@ -82,6 +82,10 @@ HISTORY_CAP = 30
 #: it. Generous enough for a slow page + a `page_wait`, short enough that a
 #: closed tab does not leave the person staring at a silent thread.
 CLIENT_OP_TIMEOUT_SECONDS = 90
+#: A parked *client action* may be sitting behind a confirm card, i.e. waiting on
+#: a person reading it — that deserves minutes, not the 90s a DOM op gets. The
+#: run is durable state either way; nothing is held while it waits.
+ACTION_CONFIRM_TIMEOUT_SECONDS = 600
 _TERMINAL_STATUSES = frozenset({"completed", "failed", "handed_off", "canceled"})
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 
@@ -524,18 +528,18 @@ async def execute_run(
             return await _pause_for_approval(ctx, sink, messages, call)
 
         if call.name in plan.client:
-            client_error = await _reject_client_call(ctx, sink, messages, call)
+            client_error = await _reject_client_call(ctx, sink, messages, call, plan)
             if client_error is not None:
                 continue
             if sandbox:
                 # A dry run has no browser on the other end; report what WOULD
                 # have been asked of the page so the trace still reads honestly.
                 await sink.add("tool_call", name=call.name, input=call.input)
-                dry = {"dry_run": True, **page_tools.op_for(call.name, call.input)}
+                dry = {"dry_run": True, **_client_op(plan, call)}
                 await sink.add("tool_result", name=call.name, output=dry)
                 messages.append(ChatMessage.tool_result(call.id, json.dumps(dry)))
                 continue
-            return await _pause_for_client(ctx, sink, messages, call)
+            return await _pause_for_client(ctx, sink, messages, call, plan)
 
         await sink.add("tool_call", name=call.name, input=call.input)
         outcome = await tool_registry.execute_tool(ctx, call.name, call.input)
@@ -742,23 +746,38 @@ async def _pause_for_approval(
 
 
 async def _reject_client_call(
-    ctx: ToolContext, sink: _StepSink, messages: list[ChatMessage], call: ToolCall
+    ctx: ToolContext,
+    sink: _StepSink,
+    messages: list[ChatMessage],
+    call: ToolCall,
+    plan: tool_registry.ToolPlan,
 ) -> str | None:
-    """Answer a malformed or over-budget page call locally; None means "send it".
+    """Answer a malformed or over-budget client call locally; None means "send it".
 
     Two guards, both cheaper than a browser round-trip: schema validation, and a
     per-run cap on ops that change the visitor's app. The cap counts what already
     happened in this run's trace, so it survives the pause/resume cycle that every
     client op goes through.
     """
-    error = page_tools.validate(call.name, call.input)
-    if error is None and call.name in page_tools.MUTATING_TOOLS:
-        used = await _client_ops_used(ctx.session, ctx.run.id)
-        if used >= page_tools.MAX_MUTATING_OPS:
-            error = (
-                f"you have already changed this page {used} times in one go — "
-                "stop and tell the person what you did and what is left"
-            )
+    action_def = plan.client_action_defs.get(call.name)
+    if action_def is not None:
+        error = client_actions.validate(action_def, call.input)
+        if error is None:
+            used = await _app_actions_used(ctx.session, ctx.run.id)
+            if used >= client_actions.MAX_ACTION_CALLS:
+                error = (
+                    f"you have already run {used} app actions in one go — "
+                    "stop and tell the person what happened and what is left"
+                )
+    else:
+        error = page_tools.validate(call.name, call.input)
+        if error is None and call.name in page_tools.MUTATING_TOOLS:
+            used = await _client_ops_used(ctx.session, ctx.run.id)
+            if used >= page_tools.MAX_MUTATING_OPS:
+                error = (
+                    f"you have already changed this page {used} times in one go — "
+                    "stop and tell the person what you did and what is left"
+                )
     if error is None:
         return None
     await sink.add("tool_call", name=call.name, input=call.input)
@@ -784,11 +803,32 @@ async def _client_ops_used(session: AsyncSession, run_id: str) -> int:
     return sum(1 for name in rows if name in page_tools.MUTATING_TOOLS)
 
 
+async def _app_actions_used(session: AsyncSession, run_id: str) -> int:
+    """Client actions already dispatched in this run (counted from the trace)."""
+    rows = (
+        (
+            await session.execute(
+                select(AgentStep.name).where(
+                    AgentStep.run_id == run_id,
+                    AgentStep.kind == "client_request",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return sum(1 for name in rows if name is not None and client_actions.is_action_name(name))
+
+
 async def _pause_for_client(
-    ctx: ToolContext, sink: _StepSink, messages: list[ChatMessage], call: ToolCall
+    ctx: ToolContext,
+    sink: _StepSink,
+    messages: list[ChatMessage],
+    call: ToolCall,
+    plan: tool_registry.ToolPlan,
 ) -> ExecutionResult:
-    """Hand a page op to the visitor's widget and park the run until it answers."""
-    op = page_tools.op_for(call.name, call.input)
+    """Hand a client op to the visitor's widget and park the run until it answers."""
+    op = _client_op(plan, call)
     op_id = uuid7()
     ctx.run.pending_tool_call = {
         "id": call.id,
@@ -823,6 +863,14 @@ async def _pause_for_client(
     )
     await _set_agent_typing(ctx, False)  # PageAssist UI takes over — stop the dots
     return ExecutionResult("awaiting_client", None, sink.sandbox_steps, _run_citations(ctx.run))
+
+
+def _client_op(plan: tool_registry.ToolPlan, call: ToolCall) -> dict[str, Any]:
+    """The wire op for one deferred client call — page op or registered action."""
+    action_def = plan.client_action_defs.get(call.name)
+    if action_def is not None:
+        return client_actions.op_for(action_def, call.input)
+    return page_tools.op_for(call.name, call.input)
 
 
 def _broadcast_after_commit(
@@ -917,15 +965,25 @@ async def sweep_stale_client_waits(session: AsyncSession) -> list[AgentRun]:
         .scalars()
         .all()
     )
+    action_cutoff = utcnow() - timedelta(seconds=ACTION_CONFIRM_TIMEOUT_SECONDS)
+    swept: list[AgentRun] = []
     for run in stale:
         pending = run.pending_tool_call or {}
         if "result" in pending:
             continue  # a result landed; the queued resume will pick it up
-        run.pending_tool_call = {**pending, "result": {"error": "timed out waiting for the page"}}
+        if pending.get("op") == "action" and run.updated_at > action_cutoff:
+            continue  # likely a confirm card in front of a person — give them time
+        message = (
+            "the person did not confirm the action in time"
+            if pending.get("op") == "action"
+            else "timed out waiting for the page"
+        )
+        run.pending_tool_call = {**pending, "result": {"error": message}}
         await enqueue("execute_agent_run", run_id=run.id)
-    if stale:
+        swept.append(run)
+    if swept:
         await session.flush()
-    return list(stale)
+    return swept
 
 
 async def _final_reply(ctx: ToolContext, sink: _StepSink, content: str) -> ExecutionResult:
