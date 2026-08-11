@@ -35,7 +35,11 @@ void bootstrapLocale().then(() => {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        <Toaster richColors position="top-right" />
+        {/* Bottom-right, never top-right: header action buttons (Publish/Pause,
+            Save) live in the top-right corner, and a success toast there sits on
+            top of them — hovering it pauses sonner's dismiss timer, so the
+            button underneath can stay unclickable indefinitely. */}
+        <Toaster richColors position="bottom-right" />
       </QueryClientProvider>
     </StrictMode>
   )

@@ -694,10 +694,15 @@ export class WidgetHost {
    * Policy gate for a backend-PUSHED tour (an offer, never a command):
    * `auto` plays it, `ask` (default) shows a compact offer pill, `never`
    * drops it. Returns true when the tour claimed this page view.
+   *
+   * Banners and announcements are exempt from `ask`: they ARE the unobtrusive
+   * form of an offer (a passive bar, no scrim, page stays usable), so gating
+   * one behind a pill only hides the announcement behind an extra click.
+   * `never` still suppresses them.
    */
   private offerTour(tour: Tour): boolean {
     if (this.autostartPolicy === 'never') return false
-    if (this.autostartPolicy === 'auto') {
+    if (this.autostartPolicy === 'auto' || tour.kind === 'banner' || tour.kind === 'announcement') {
       this.play(tour)
       return true
     }

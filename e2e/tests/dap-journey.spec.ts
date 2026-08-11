@@ -98,6 +98,14 @@ test('a tour authored in the dashboard plays on a host page and its events land 
     try {
       await openWidgetHost(host, widgetKey, stageHash)
 
+      // Default autostart policy is `ask`: a pushed flow tour never hijacks the
+      // page — it arrives as a compact offer pill, and playing is the
+      // visitor's choice. (Banners are exempt and render directly.)
+      const offer = host.locator('#stept-tour-pill')
+      await expect(offer).toBeVisible({ timeout: 20_000 })
+      await expect(offer).toContainText(name)
+      await offer.getByRole('button', { name: 'Start' }).click()
+
       const firstTip = host.getByRole('dialog', { name: stepOne })
       await expect(firstTip).toBeVisible({ timeout: 20_000 })
       await expect(firstTip).toContainText('1 of 2')

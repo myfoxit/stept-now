@@ -133,6 +133,27 @@ function makeTour(id: string, titles: string[]): Tour {
   }
 }
 
+/** A kind=banner tour: one passive bar step, no anchors, no scrim. */
+function makeBanner(id: string, title: string): Tour {
+  return {
+    id,
+    name: `Banner ${id}`,
+    kind: 'banner',
+    version: 1,
+    theme: { accent: '#5b46e5' },
+    steps: [
+      {
+        id: `${id}-s0`,
+        type: 'banner' as const,
+        selector: '',
+        title,
+        body: '',
+        placement: 'center' as const,
+      },
+    ],
+  }
+}
+
 const pill = (): HTMLElement | null => document.getElementById('stept-tour-pill')
 const pillButton = (label: string): HTMLButtonElement => {
   const hit = [...(pill()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === label)
@@ -213,6 +234,27 @@ describe('autostart policy', () => {
     tourById['tour-1'] = tour
     await bootHost({}, { tour_autostart_policy: 'never' })
     expect(document.querySelector('.stept-tour-tip')).toBeNull()
+    expect(pill()).toBeNull()
+  })
+
+  it('renders a pushed banner immediately under ask — announcements are never pill-gated', async () => {
+    const banner = makeBanner('banner-1', 'New: AI answers')
+    experiencesData = { tours: [banner], checklists: [], surveys: [] }
+    tourById['banner-1'] = banner
+    await bootHost()
+    expect(document.querySelector('.stept-tour-banner')?.textContent).toContain('New: AI answers')
+    // The regular playing-progress pill (Stop) may accompany it — what must
+    // not exist is the offer pill gating the banner behind a Start click.
+    const pillLabels = [...(pill()?.querySelectorAll('button') ?? [])].map((b) => b.textContent)
+    expect(pillLabels).not.toContain('Start')
+  })
+
+  it('still suppresses a pushed banner under policy never', async () => {
+    const banner = makeBanner('banner-1', 'New: AI answers')
+    experiencesData = { tours: [banner], checklists: [], surveys: [] }
+    tourById['banner-1'] = banner
+    await bootHost({ tourAutostartPolicy: 'never' })
+    expect(document.querySelector('.stept-tour-banner')).toBeNull()
     expect(pill()).toBeNull()
   })
 })
