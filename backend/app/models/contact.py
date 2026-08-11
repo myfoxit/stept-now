@@ -28,6 +28,11 @@ class Contact(TimestampMixin, WorkspaceScopedMixin, Base):
     name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     phone: Mapped[str | None] = mapped_column(String(50))
     avatar_url: Mapped[str | None] = mapped_column(String(500))
+    # Language this contact is served in: widget chrome, help-center articles,
+    # and the language the AI answers in. Learned from what they actually write
+    # (see `app.services.language`) and overridable by the host page's boot
+    # config; NULL until we have evidence, so we never guess from an IP.
+    locale: Mapped[str | None] = mapped_column(String(12))
     # Custom attributes (plan, company, …) — filterable in segments/automations.
     attributes: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
     # True once identity was verified via HMAC (widget identity verification).

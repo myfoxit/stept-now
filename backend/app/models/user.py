@@ -23,6 +23,10 @@ class User(TimestampMixin, Base):
     password_hash: Mapped[str | None] = mapped_column(String(300))
     avatar_url: Mapped[str | None] = mapped_column(String(500))
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Dashboard language. NULL ⇒ follow the browser's Accept-Language; an
+    # explicit value always wins, because someone who picked Japanese means it
+    # whatever laptop they are borrowing. Codes come from `app.core.i18n`.
+    locale: Mapped[str | None] = mapped_column(String(12))
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     preferences: Mapped[dict[str, Any]] = mapped_column(PortableJSON, default=dict, nullable=False)
     # Password reset: sha256 of the emailed token, never the token itself, so a

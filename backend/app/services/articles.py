@@ -9,9 +9,10 @@ import re
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import utcnow
+from app.core.db import utcnow, uuid7
 from app.core.errors import ConflictError, NotFoundError
 from app.core.events import Actor
+from app.core.i18n import DEFAULT_LOCALE
 from app.models.article import Article, ArticleCollection
 from app.models.knowledge import Chunk, Document
 from app.models.workspace import Workspace
@@ -42,12 +43,22 @@ async def _resolve_slug(
     *,
     explicit: str | None,
     fallback: str,
+    locale: str,
     exclude_id: str | None = None,
 ) -> str:
-    """Explicit slugs must be free (409 otherwise); generated ones auto-dedupe."""
+    """Explicit slugs must be free (409 otherwise); generated ones auto-dedupe.
+
+    Scoped to one locale, matching the DB constraint: the German translation of
+    "Reset your password" is entitled to the slug its own title generates, even
+    if some English article already took the same string.
+    """
 
     async def taken(candidate: str) -> bool:
-        query = select(model.id).where(model.workspace_id == workspace_id, model.slug == candidate)
+        query = select(model.id).where(
+            model.workspace_id == workspace_id,
+            model.locale == locale,
+            model.slug == candidate,
+        )
         if exclude_id:
             query = query.where(model.id != exclude_id)
         return (await session.execute(query)).first() is not None
@@ -90,16 +101,24 @@ async def create_collection(
     description: str | None = None,
     icon: str | None = None,
     ord: int = 0,
+    locale: str = DEFAULT_LOCALE,
+    translation_key: str | None = None,
 ) -> ArticleCollection:
+    collection_id = uuid7()
     collection = ArticleCollection(
+        id=collection_id,
         workspace_id=workspace_id,
         name=name.strip(),
         slug=await _resolve_slug(
-            session, workspace_id, ArticleCollection, explicit=slug, fallback=name
+            session, workspace_id, ArticleCollection, explicit=slug, fallback=name, locale=locale
         ),
         description=description,
         icon=icon,
         ord=ord,
+        locale=locale,
+        # No key given ⇒ this is an original, not a translation, so it starts
+        # its own group keyed by its own id.
+        translation_key=translation_key or collection_id,
     )
     session.add(collection)
     await session.flush()
@@ -146,6 +165,7 @@ async def update_collection(
             ArticleCollection,
             explicit=slug,
             fallback=slug,
+            locale=collection.locale,
             exclude_id=collection_id,
         )
     if description is not None:
@@ -228,17 +248,37 @@ async def create_article(
     body: str = "",
     slug: str | None = None,
     collection_id: str | None = None,
+    locale: str = DEFAULT_LOCALE,
+    translation_key: str | None = None,
 ) -> Article:
     if collection_id is not None:
         await get_collection(session, workspace_id, collection_id)
+    if translation_key is not None:
+        existing = (
+            await session.execute(
+                select(Article.id).where(
+                    Article.workspace_id == workspace_id,
+                    Article.translation_key == translation_key,
+                    Article.locale == locale,
+                )
+            )
+        ).first()
+        if existing is not None:
+            raise ConflictError(f"This article already has a {locale} translation")
+    article_id = uuid7()
     article = Article(
+        id=article_id,
         workspace_id=workspace_id,
         collection_id=collection_id,
         title=title.strip(),
-        slug=await _resolve_slug(session, workspace_id, Article, explicit=slug, fallback=title),
+        slug=await _resolve_slug(
+            session, workspace_id, Article, explicit=slug, fallback=title, locale=locale
+        ),
         body=body,
         status="draft",
         author_id=actor.id if actor.type == "user" else None,
+        locale=locale,
+        translation_key=translation_key or article_id,
     )
     session.add(article)
     await session.flush()
@@ -261,7 +301,13 @@ async def update_article(
         article.title = title.strip()
     if slug is not None:
         article.slug = await _resolve_slug(
-            session, workspace_id, Article, explicit=slug, fallback=slug, exclude_id=article_id
+            session,
+            workspace_id,
+            Article,
+            explicit=slug,
+            fallback=slug,
+            locale=article.locale,
+            exclude_id=article_id,
         )
     if body is not None:
         article.body = body

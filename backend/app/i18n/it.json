@@ -1,0 +1,21 @@
+{
+  "email.password_reset.subject": "Reimposta la tua password Stept",
+  "email.password_reset.intro": "Clicca per reimpostare la tua password (valido per 1 ora):",
+  "email.password_reset.cta": "Reimposta password",
+  "email.password_reset.ignore": "Se non hai richiesto tu questa operazione, puoi ignorare questa email: la tua password resta invariata.",
+
+  "email.invite.subject": "Sei stato invitato in {{workspace}} su Stept",
+  "email.invite.body": "{{inviter}} ti ha invitato a unirti a {{workspace}} su Stept.",
+  "email.invite.cta": "Accetta l'invito",
+  "email.invite.validity_one": "Questo invito è valido per {{count}} giorno.",
+  "email.invite.validity_other": "Questo invito è valido per {{count}} giorni.",
+  "email.invite.fallback_inviter": "Un membro del team",
+
+  "api.auth.logged_out": "Disconnesso",
+  "api.auth.reset_sent": "Se l'account esiste, l'email di reimpostazione è in arrivo",
+  "api.auth.password_updated": "Password aggiornata; effettua l'accesso",
+
+  "widget.greeting": "Ciao 👋",
+  "widget.tagline.ai": "Chiedici qualsiasi cosa: la nostra IA risponde all'istante.",
+  "widget.tagline.human": "Di solito rispondiamo entro pochi minuti."
+}

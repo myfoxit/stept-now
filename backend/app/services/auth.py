@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import NamedTuple
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,11 +168,24 @@ async def revoke_refresh_token(session: AsyncSession, raw_token: str) -> None:
         record.revoked_at = utcnow()
 
 
-async def request_password_reset(session: AsyncSession, email: str) -> str | None:
+class PasswordResetIssue(NamedTuple):
+    """A freshly issued reset token plus the language to email it in."""
+
+    token: str
+    #: The account's stored locale, or None to fall back to the request's.
+    locale: str | None
+
+
+async def request_password_reset(session: AsyncSession, email: str) -> PasswordResetIssue | None:
     """Returns the reset token if the account exists (caller emails it).
 
     Issuing a token invalidates any previous one: a single outstanding reset per
     account means a link the user abandoned cannot be used later.
+
+    The account's locale rides along so the email can be written in the language
+    the person chose rather than the language of whatever browser they happen to
+    be sitting at. This leaks nothing: the endpoint's response body is identical
+    whether or not the account exists.
     """
     user = (
         await session.execute(select(User).where(User.email == email.strip().lower()))
@@ -182,7 +196,7 @@ async def request_password_reset(session: AsyncSession, email: str) -> str | Non
     user.password_reset_hash = token_hash
     user.password_reset_expires_at = utcnow() + security.PASSWORD_RESET_TTL
     await session.flush()
-    return raw
+    return PasswordResetIssue(raw, user.locale)
 
 
 async def reset_password(session: AsyncSession, *, token: str, new_password: str) -> User:

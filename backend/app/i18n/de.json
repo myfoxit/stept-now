@@ -1,0 +1,21 @@
+{
+  "email.password_reset.subject": "Stept-Passwort zurücksetzen",
+  "email.password_reset.intro": "Klicken Sie hier, um Ihr Passwort zurückzusetzen (1 Stunde gültig):",
+  "email.password_reset.cta": "Passwort zurücksetzen",
+  "email.password_reset.ignore": "Falls Sie das nicht angefordert haben, können Sie diese E-Mail ignorieren – Ihr Passwort bleibt unverändert.",
+
+  "email.invite.subject": "Sie wurden zu {{workspace}} auf Stept eingeladen",
+  "email.invite.body": "{{inviter}} hat Sie eingeladen, {{workspace}} auf Stept beizutreten.",
+  "email.invite.cta": "Einladung annehmen",
+  "email.invite.validity_one": "Diese Einladung ist {{count}} Tag gültig.",
+  "email.invite.validity_other": "Diese Einladung ist {{count}} Tage gültig.",
+  "email.invite.fallback_inviter": "Ein Teammitglied",
+
+  "api.auth.logged_out": "Abgemeldet",
+  "api.auth.reset_sent": "Falls dieses Konto existiert, ist eine E-Mail zum Zurücksetzen unterwegs",
+  "api.auth.password_updated": "Passwort aktualisiert – bitte melden Sie sich an",
+
+  "widget.greeting": "Hallo 👋",
+  "widget.tagline.ai": "Fragen Sie uns alles – unsere KI antwortet sofort.",
+  "widget.tagline.human": "Wir antworten normalerweise innerhalb weniger Minuten."
+}

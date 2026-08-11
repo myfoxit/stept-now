@@ -5,8 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.api.v1.billing import require_plan_feature
-from app.core.deps import Db, Member, require_perm
+from app.core.deps import Db, Member, RequestLocale, require_perm
 from app.core.events import Actor
+from app.core.i18n import negotiate, workspace_locale
 from app.core.permissions import BUILTIN_ROLES, Perm
 from app.schemas.common import Msg
 from app.schemas.workspace import (
@@ -77,7 +78,9 @@ async def list_invitations(principal: Member, session: Db):
     status_code=201,
     dependencies=[Depends(require_perm(Perm.MEMBERS_MANAGE))],
 )
-async def create_invitation(body: InvitationCreate, principal: Member, session: Db):
+async def create_invitation(
+    body: InvitationCreate, principal: Member, session: Db, locale: RequestLocale
+):
     invitation = await members_service.create_invitation(
         session,
         principal.workspace.id,
@@ -86,6 +89,10 @@ async def create_invitation(body: InvitationCreate, principal: Member, session: 
         email=body.email,
         role=body.role,
         custom_role_id=body.custom_role_id,
+        # The invitee has no account yet, so there is no preference to honour.
+        # The workspace's own default is the best guess available — a German
+        # team inviting a colleague should not send them English.
+        locale=negotiate(preferred=workspace_locale(principal.workspace.settings), fallback=locale),
     )
     return InvitationOut.model_validate(invitation)
 

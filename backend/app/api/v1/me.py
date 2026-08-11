@@ -44,6 +44,9 @@ async def update_me(body: UserUpdate, user: CurrentUser, session: Db) -> UserOut
         user.name = body.name
     if body.avatar_url is not None:
         user.avatar_url = body.avatar_url
+    if body.locale is not None:
+        # "" clears the choice, putting the account back on browser detection.
+        user.locale = body.locale or None
     if body.preferences is not None:
         merged = dict(user.preferences)
         merged.update(body.preferences)

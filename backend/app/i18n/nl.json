@@ -1,0 +1,21 @@
+{
+  "email.password_reset.subject": "Stel je Stept-wachtwoord opnieuw in",
+  "email.password_reset.intro": "Klik om je wachtwoord opnieuw in te stellen (1 uur geldig):",
+  "email.password_reset.cta": "Wachtwoord opnieuw instellen",
+  "email.password_reset.ignore": "Heb je hier niet om gevraagd? Dan kun je deze e-mail negeren — je wachtwoord blijft ongewijzigd.",
+
+  "email.invite.subject": "Je bent uitgenodigd voor {{workspace}} op Stept",
+  "email.invite.body": "{{inviter}} heeft je uitgenodigd om deel te nemen aan {{workspace}} op Stept.",
+  "email.invite.cta": "Uitnodiging accepteren",
+  "email.invite.validity_one": "Deze uitnodiging is {{count}} dag geldig.",
+  "email.invite.validity_other": "Deze uitnodiging is {{count}} dagen geldig.",
+  "email.invite.fallback_inviter": "Een teamgenoot",
+
+  "api.auth.logged_out": "Uitgelogd",
+  "api.auth.reset_sent": "Als dat account bestaat, is er een e-mail onderweg om het opnieuw in te stellen",
+  "api.auth.password_updated": "Wachtwoord bijgewerkt; log opnieuw in",
+
+  "widget.greeting": "Hallo 👋",
+  "widget.tagline.ai": "Vraag ons alles — onze AI antwoordt direct.",
+  "widget.tagline.human": "We reageren meestal binnen een paar minuten."
+}

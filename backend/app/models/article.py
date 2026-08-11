@@ -15,7 +15,9 @@ from app.models.base import TimestampMixin, WorkspaceScopedMixin, pk
 class ArticleCollection(TimestampMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "article_collections"
     __table_args__ = (
-        UniqueConstraint("workspace_id", "slug", name="uq_article_collections_ws_slug"),
+        UniqueConstraint(
+            "workspace_id", "locale", "slug", name="uq_article_collections_ws_locale_slug"
+        ),
     )
 
     id: Mapped[str] = pk()
@@ -24,13 +26,35 @@ class ArticleCollection(TimestampMixin, WorkspaceScopedMixin, Base):
     description: Mapped[str | None] = mapped_column(String(500))
     icon: Mapped[str | None] = mapped_column(String(20))  # emoji
     ord: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Language this collection is written in (`app.core.i18n` codes).
+    locale: Mapped[str] = mapped_column(String(12), default="en", nullable=False, index=True)
+    # Groups the same collection across locales. See `Article.translation_key`.
+    translation_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
 
 
 class Article(TimestampMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "articles"
-    __table_args__ = (UniqueConstraint("workspace_id", "slug", name="uq_articles_ws_slug"),)
+    __table_args__ = (
+        # A slug is unique *within* a locale, so /de/passwort-zuruecksetzen and
+        # /en/reset-password can coexist — and so can two locales that happen to
+        # share a slug (product names, "faq").
+        UniqueConstraint("workspace_id", "locale", "slug", name="uq_articles_ws_locale_slug"),
+        # One variant per language per translation group.
+        UniqueConstraint(
+            "workspace_id",
+            "translation_key",
+            "locale",
+            name="uq_articles_ws_translation_locale",
+        ),
+    )
 
     id: Mapped[str] = pk()
+    # Language this article is written in (`app.core.i18n` codes).
+    locale: Mapped[str] = mapped_column(String(12), default="en", nullable=False, index=True)
+    # Shared id for "the same article in other languages". Defaults to the
+    # article's own id, so every article starts as a group of one and gaining a
+    # translation never has to rewrite the original's identity or URL.
+    translation_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     collection_id: Mapped[str | None] = mapped_column(
         GUID, ForeignKey("article_collections.id", ondelete="SET NULL"), index=True
     )

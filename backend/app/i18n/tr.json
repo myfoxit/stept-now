@@ -1,0 +1,21 @@
+{
+  "email.password_reset.subject": "Stept şifrenizi sıfırlayın",
+  "email.password_reset.intro": "Şifrenizi sıfırlamak için tıklayın (1 saat geçerlidir):",
+  "email.password_reset.cta": "Şifreyi sıfırla",
+  "email.password_reset.ignore": "Bu isteği siz yapmadıysanız bu e-postayı yoksayabilirsiniz — şifreniz değişmeden kalır.",
+
+  "email.invite.subject": "Stept'te {{workspace}} çalışma alanına davet edildiniz",
+  "email.invite.body": "{{inviter}}, sizi Stept'teki {{workspace}} çalışma alanına katılmaya davet etti.",
+  "email.invite.cta": "Daveti kabul et",
+  "email.invite.validity_one": "Bu davet {{count}} gün geçerlidir.",
+  "email.invite.validity_other": "Bu davet {{count}} gün geçerlidir.",
+  "email.invite.fallback_inviter": "Bir ekip arkadaşı",
+
+  "api.auth.logged_out": "Oturum kapatıldı",
+  "api.auth.reset_sent": "Bu hesap varsa, sıfırlama e-postası yola çıktı",
+  "api.auth.password_updated": "Şifre güncellendi; lütfen giriş yapın",
+
+  "widget.greeting": "Merhaba 👋",
+  "widget.tagline.ai": "Bize her şeyi sorun — yapay zekâmız anında yanıtlıyor.",
+  "widget.tagline.human": "Genellikle birkaç dakika içinde yanıt veriyoruz."
+}

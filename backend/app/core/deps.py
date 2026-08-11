@@ -18,7 +18,7 @@ from fastapi import Depends, Path, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import security
+from app.core import i18n, security
 from app.core.db import get_session_factory, utcnow
 from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.permissions import Perm, resolve_permissions, scopes_to_permissions
@@ -39,6 +39,26 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 
 Db = Annotated[AsyncSession, Depends(get_db)]
+
+
+def request_locale(request: Request) -> str:
+    """Language for anything this request renders server-side.
+
+    Deliberately auth-free so it also works on the unauthenticated routes that
+    send the most important email we have (password reset). Order is explicit
+    `?locale=` — used by help-center links and email previews, where the URL
+    *is* the choice — then `Accept-Language`, then English.
+
+    Authenticated callers should prefer the stored preference over this:
+    ``negotiate(request.headers.get("accept-language"), preferred=user.locale)``.
+    """
+    return i18n.negotiate(
+        request.headers.get("accept-language"),
+        preferred=request.query_params.get("locale"),
+    )
+
+
+RequestLocale = Annotated[str, Depends(request_locale)]
 
 
 def _bearer_token(request: Request) -> str | None:

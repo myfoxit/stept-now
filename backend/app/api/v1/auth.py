@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.config import get_settings
 from app.core.csrf import check_origin
-from app.core.deps import Db
+from app.core.deps import Db, RequestLocale
 from app.core.errors import UnauthorizedError
+from app.core.i18n import negotiate, t
 from app.core.ratelimit import RateLimit
 from app.core.security import create_access_token
 from app.schemas.auth import (
@@ -104,12 +105,12 @@ async def refresh(request: Request, response: Response, session: Db):
 
 
 @router.post("/logout", response_model=Msg, dependencies=[Depends(check_origin)])
-async def logout(request: Request, response: Response, session: Db):
+async def logout(request: Request, response: Response, session: Db, locale: RequestLocale):
     raw = request.cookies.get(REFRESH_COOKIE)
     if raw:
         await auth_service.revoke_refresh_token(session, raw)
     response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
-    return Msg(message="Logged out")
+    return Msg(message=t("api.auth.logged_out", locale))
 
 
 @router.post(
@@ -117,21 +118,24 @@ async def logout(request: Request, response: Response, session: Db):
     response_model=Msg,
     dependencies=[Depends(RateLimit("pwreset", times=5, seconds=3600))],
 )
-async def password_reset(body: PasswordResetRequest, session: Db):
-    token = await auth_service.request_password_reset(session, body.email)
-    if token is not None:
+async def password_reset(body: PasswordResetRequest, session: Db, locale: RequestLocale):
+    issue = await auth_service.request_password_reset(session, body.email)
+    if issue is not None:
         settings = get_settings()
-        link = f"{settings.app_base_url}/reset-password?token={token}"
+        link = f"{settings.app_base_url}/reset-password?token={issue.token}"
+        # The account's own setting wins over the browser it was requested from.
+        email_locale = negotiate(preferred=issue.locale, fallback=locale)
         await send_email(
             body.email,
-            "Reset your Stept password",
-            f"<p>Click to reset your password (valid for 1 hour):</p>"
-            f'<p><a href="{link}">{link}</a></p>',
+            t("email.password_reset.subject", email_locale),
+            f"<p>{t('email.password_reset.intro', email_locale)}</p>"
+            f'<p><a href="{link}">{t("email.password_reset.cta", email_locale)}</a></p>'
+            f"<p>{t('email.password_reset.ignore', email_locale)}</p>",
         )
-    return Msg(message="If that account exists, a reset email is on its way")
+    return Msg(message=t("api.auth.reset_sent", locale))
 
 
 @router.post("/password-reset/confirm", response_model=Msg)
-async def password_reset_confirm(body: PasswordResetConfirm, session: Db):
+async def password_reset_confirm(body: PasswordResetConfirm, session: Db, locale: RequestLocale):
     await auth_service.reset_password(session, token=body.token, new_password=body.new_password)
-    return Msg(message="Password updated; please log in")
+    return Msg(message=t("api.auth.password_updated", locale))

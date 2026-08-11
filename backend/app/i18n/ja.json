@@ -1,0 +1,20 @@
+{
+  "email.password_reset.subject": "Stept のパスワードをリセット",
+  "email.password_reset.intro": "こちらをクリックしてパスワードをリセットしてください（1 時間有効）:",
+  "email.password_reset.cta": "パスワードをリセット",
+  "email.password_reset.ignore": "心当たりがない場合は、このメールを無視してください。パスワードは変更されません。",
+
+  "email.invite.subject": "Stept の {{workspace}} に招待されました",
+  "email.invite.body": "{{inviter}} さんがあなたを Stept の {{workspace}} に招待しました。",
+  "email.invite.cta": "招待を承認する",
+  "email.invite.validity_other": "この招待は {{count}} 日間有効です。",
+  "email.invite.fallback_inviter": "チームメンバー",
+
+  "api.auth.logged_out": "ログアウトしました",
+  "api.auth.reset_sent": "アカウントが存在する場合、リセット用のメールをお送りしました",
+  "api.auth.password_updated": "パスワードを更新しました。ログインしてください",
+
+  "widget.greeting": "こんにちは 👋",
+  "widget.tagline.ai": "何でもお尋ねください — AI がすぐにお答えします。",
+  "widget.tagline.human": "通常、数分以内に返信します。"
+}

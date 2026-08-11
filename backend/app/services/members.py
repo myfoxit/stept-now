@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.db import utcnow
 from app.core.errors import BadRequestError, ConflictError, NotFoundError
 from app.core.events import Actor, Event, EventNames, emit
+from app.core.i18n import DEFAULT_LOCALE, t
 from app.core.permissions import Perm, is_builtin_role
 from app.core.security import new_token
 from app.models.user import User
@@ -123,6 +124,7 @@ async def create_invitation(
     email: str,
     role: str,
     custom_role_id: str | None = None,
+    locale: str = DEFAULT_LOCALE,
 ) -> Invitation:
     email = email.strip().lower()
     await _validate_role(session, workspace_id, role, custom_role_id)
@@ -166,12 +168,14 @@ async def create_invitation(
     await session.flush()
 
     link = f"{settings.app_base_url}/accept-invite?token={invitation.token}"
+    days = settings.invitation_ttl_days
+    inviter = actor.label or t("email.invite.fallback_inviter", locale)
     await send_email(
         email,
-        f"You've been invited to {workspace_name} on Stept",
-        f"<p>{actor.label or 'A teammate'} invited you to join <b>{workspace_name}</b> "
-        f'on Stept.</p><p><a href="{link}">Accept the invitation</a> '
-        f"(valid for {settings.invitation_ttl_days} days).</p>",
+        t("email.invite.subject", locale, workspace=workspace_name),
+        f"<p>{t('email.invite.body', locale, inviter=inviter, workspace=workspace_name)}</p>"
+        f'<p><a href="{link}">{t("email.invite.cta", locale)}</a> '
+        f"{t('email.invite.validity', locale, count=days)}</p>",
     )
     await audit.record(
         session,

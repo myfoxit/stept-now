@@ -1,0 +1,21 @@
+{
+  "email.password_reset.subject": "Redefina sua senha do Stept",
+  "email.password_reset.intro": "Clique para redefinir sua senha (válido por 1 hora):",
+  "email.password_reset.cta": "Redefinir senha",
+  "email.password_reset.ignore": "Se você não solicitou isso, pode ignorar este e-mail — sua senha permanece inalterada.",
+
+  "email.invite.subject": "Você foi convidado para {{workspace}} no Stept",
+  "email.invite.body": "{{inviter}} convidou você para entrar em {{workspace}} no Stept.",
+  "email.invite.cta": "Aceitar o convite",
+  "email.invite.validity_one": "Este convite é válido por {{count}} dia.",
+  "email.invite.validity_other": "Este convite é válido por {{count}} dias.",
+  "email.invite.fallback_inviter": "Um colega de equipe",
+
+  "api.auth.logged_out": "Sessão encerrada",
+  "api.auth.reset_sent": "Se essa conta existir, um e-mail de redefinição está a caminho",
+  "api.auth.password_updated": "Senha atualizada; faça login",
+
+  "widget.greeting": "Olá 👋",
+  "widget.tagline.ai": "Pergunte o que quiser — nossa IA responde na hora.",
+  "widget.tagline.human": "Normalmente respondemos em alguns minutos."
+}
