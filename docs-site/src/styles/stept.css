@@ -61,6 +61,20 @@
   font-size: 1.1875rem;
 }
 
+/* The header lockup, matched to the one on stepped.ai: an ink wordmark (not the
+   accent — the whole point of the split mark is that indigo appears once) and a
+   mark sized against the cap height beside it. Starlight's default renders the
+   logo far larger than the title, which makes the mark shout in what is
+   otherwise the quietest bar on the page. */
+.site-title {
+  color: var(--sl-color-white);
+  gap: 0.5rem;
+}
+.site-title img {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
 /* The header is chrome: keep it quiet and let content carry the colour. */
 .header {
   border-bottom: 1px solid var(--sl-color-gray-5);

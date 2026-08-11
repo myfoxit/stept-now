@@ -19,7 +19,9 @@ export function AppShell() {
         */}
         <div className="flex items-center gap-2 border-b px-3 py-2 md:hidden">
           <SidebarTrigger />
-          <StepMark className="size-4 text-brand" />
+          {/* size-5, not size-4: the mark's master geometry closes up below
+              20px (that is what assets/brand/stept-favicon.svg exists for). */}
+          <StepMark className="size-5" />
           <span className="text-sm font-semibold tracking-tight">Stept</span>
         </div>
         <div className="min-h-0 flex-1">

@@ -38,7 +38,9 @@ export function Login({ auth }: { auth: AuthState }) {
   return (
     <div className="login">
       <div className="login-hero">
-        <Logo size={46} />
+        {/* The panel's front door — the one screen here where the logo is the
+            subject, so it gets the split rather than the chrome mono. */}
+        <Logo size={46} variant="split" />
         <h1 className="login-title">Stept Recorder</h1>
         <p className="login-sub">Sign in to record product tours straight from any page.</p>
       </div>

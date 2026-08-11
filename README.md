@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/stept-mark-partial-dark.svg">
+  <img src="assets/brand/stept-mark-partial.svg" alt="" width="64" height="64">
+</picture>
+
 # Stept
 
 **Open-source Intercom + Fin + Pendo in one box — with an AI agent that

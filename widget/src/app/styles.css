@@ -244,9 +244,17 @@ body {
 .sw-branding a {
   color: inherit;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .sw-branding a:hover {
   text-decoration: underline;
+}
+.sw-brand-mark {
+  flex: none;
+  /* The mark is a credit, not a claim on the customer's surface. */
+  opacity: 0.8;
 }
 
 /* --- thread --------------------------------------------------------------- */

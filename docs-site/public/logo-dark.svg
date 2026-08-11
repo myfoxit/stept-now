@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="Stept">
+  <title>Stept</title>
+  <!-- Dark-surface variant. Indigo lifted to #6D66F0 for contrast on near-black. Do not recolour with CSS filters. -->
+  <rect x="3" y="3.5" width="15" height="7" rx="2.9" fill="#FFFFFF"/>
+  <rect x="6" y="13.5" width="15" height="7" rx="2.9" fill="#6D66F0"/>
+</svg>

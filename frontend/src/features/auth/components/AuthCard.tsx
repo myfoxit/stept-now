@@ -18,7 +18,9 @@ export function AuthCard({
     <div className="flex min-h-full items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <StepMark className="size-8 text-brand" title="Stept" />
+          {/* The one place in the app the logo is the subject rather than
+              furniture, so it gets the split: ink bar + indigo leading bar. */}
+          <StepMark className="size-8" variant="split" title="Stept" />
           <span className="text-xl font-semibold tracking-tight">Stept</span>
         </div>
         <Card>

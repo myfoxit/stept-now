@@ -30,9 +30,13 @@ export function WorkspaceSwitcher() {
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton size="lg" className="flex-1 data-[state=open]:bg-sidebar-accent">
           {/* The product mark, not a workspace initial — the sidebar is Stept's
-              own chrome, and the workspace name sits right beside it. */}
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-            <StepMark className="size-5" title="Stept" />
+              own chrome, and the workspace name sits right beside it. No tile
+              behind it: the mark is two solid bars and reads on its own, and the
+              brand forbids container shapes outside the app icon. The size-8 box
+              is pure alignment, so the row height matches the tiled variants
+              shadcn's sidebar expects. */}
+          <div className="flex size-8 shrink-0 items-center justify-center">
+            <StepMark className="size-6" title="Stept" />
           </div>
           <div className="grid flex-1 text-left leading-tight">
             <span className="truncate font-semibold">{current?.name ?? 'Stept'}</span>

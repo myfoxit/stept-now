@@ -80,8 +80,24 @@ export function Home({
         )}
       </div>
 
+      {/* The only Stept branding in the widget — everything above it belongs to
+          the customer. Mono and inheriting the muted text colour so it stays a
+          credit rather than a second logo competing with theirs, and drawn in
+          the optically corrected small geometry (assets/brand/README.md: the
+          24px master closes up below 20px). */}
       <div class="sw-branding">
         <a href="https://stepped.ai" target="_blank" rel="noopener noreferrer">
+          <svg
+            class="sw-brand-mark"
+            viewBox="0 0 32 32"
+            width="13"
+            height="13"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="4" y="5" width="20" height="9" rx="3.8" fill="currentColor" />
+            <rect x="8" y="18" width="20" height="9" rx="3.8" fill="currentColor" />
+          </svg>
           Powered by Stept
         </a>
       </div>
