@@ -6,15 +6,27 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { envelope, MSG } from '../protocol'
+import { envelope, MSG, type MessageType } from '../protocol'
+import { MSG_EXTRA } from './api-extra'
 import { Controller } from './controller'
 
 class FakeWebSocket {
   static OPEN = 1
   static CONNECTING = 0
+  /** Last instance, so tests can push frames through `onmessage`. */
+  static last: FakeWebSocket | null = null
   readyState = 0
+  onmessage: ((event: { data: string }) => void) | null = null
+  constructor() {
+    FakeWebSocket.last = this
+  }
   close(): void {}
   send(): void {}
+}
+
+/** Deliver a realtime frame as if it came over the visitor websocket. */
+function pushRealtime(frame: unknown): void {
+  FakeWebSocket.last?.onmessage?.({ data: JSON.stringify(frame) })
 }
 
 interface FetchCall {
@@ -262,5 +274,356 @@ describe('blocked visitors', () => {
     const screen = c.getState().screen
     expect(screen.name).toBe('error')
     expect(screen.name === 'error' && screen.message).toBe('Chat is unavailable right now.')
+  })
+})
+
+// --- unread → thread routing -------------------------------------------------
+
+const unreadConv = (id: string) => ({
+  id,
+  status: 'open',
+  last_message_preview: 'Which plan are you on?',
+  last_activity_at: new Date().toISOString(),
+  unread: true,
+})
+
+function dispatchOpen(): void {
+  window.dispatchEvent(new MessageEvent('message', { data: envelope(MSG.OPEN, {}) }))
+}
+
+describe('opening the panel with unread replies', () => {
+  it('lands directly in the single conversation with unread messages', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      { method: 'GET', path: '/conversations/c1/messages', body: { items: [], next_cursor: null } },
+      { method: 'POST', path: '/conversations/c1/read', body: { ...unreadConv('c1'), unread: false } },
+      { method: 'GET', path: '/api/widget/conversations', body: [unreadConv('c1')] },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    expect(c.getState().screen).toEqual({ name: 'home' })
+
+    dispatchOpen()
+    await vi.waitFor(() => {
+      expect(c.getState().screen).toEqual({ name: 'thread', conversationId: 'c1' })
+    })
+  })
+
+  it('stays on Home when several conversations are unread', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      {
+        method: 'GET',
+        path: '/api/widget/conversations',
+        body: [unreadConv('c1'), unreadConv('c2')],
+      },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    dispatchOpen()
+    await vi.waitFor(() => {
+      expect(c.getState().conversations).toHaveLength(2)
+    })
+    expect(c.getState().screen).toEqual({ name: 'home' })
+  })
+
+  it('routes after boot when the panel opened before boot finished', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    let releaseBoot: (() => void) | null = null
+    const gate = new Promise<void>((resolve) => (releaseBoot = resolve))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/api/widget/boot')) await gate
+        const body = url.includes('/boot')
+          ? { ...bootBody, conversations: [unreadConv('c1')] }
+          : url.includes('/messages')
+            ? { items: [], next_cursor: null }
+            : url.includes('/read')
+              ? { ...unreadConv('c1'), unread: false }
+              : [unreadConv('c1')]
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'stub',
+          text: async () => JSON.stringify(body),
+        } as unknown as Response
+      }),
+    )
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    const booting = c.boot()
+    dispatchOpen() // visitor clicks the launcher while boot is in flight
+    releaseBoot!()
+    await booting
+    await vi.waitFor(() => {
+      expect(c.getState().screen).toEqual({ name: 'thread', conversationId: 'c1' })
+    })
+  })
+})
+
+// --- stale "working on the page" status --------------------------------------
+
+describe('working-on-page staleness timeout', () => {
+  it('clears the status line when no update arrives for 90s', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.stubGlobal('WebSocket', FakeWebSocket)
+      mockFetch([
+        { method: 'POST', path: '/api/widget/boot', body: bootBody },
+        {
+          method: 'GET',
+          path: '/conversations/conv1/messages',
+          body: { items: [], next_cursor: null },
+        },
+        { method: 'POST', path: '/conversations/conv1/read', body: campaignConv },
+        {
+          method: 'GET',
+          path: '/conversations/conv1/copilot/pending',
+          body: { run_id: 'r1', op_id: 'op1', tool: 'page_read', op: 'snapshot', args: {} },
+        },
+      ])
+      vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+      const c = makeController()
+      await c.boot()
+      await c.openConversation('conv1')
+      // resumePendingOp is fire-and-forget; flush it.
+      await vi.advanceTimersByTimeAsync(0)
+      expect(c.getState().workingOnPage).toBe('snapshot')
+
+      await vi.advanceTimersByTimeAsync(89_000)
+      expect(c.getState().workingOnPage).toBe('snapshot')
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(c.getState().workingOnPage).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// --- human handoff ------------------------------------------------------------
+
+describe('requestHuman', () => {
+  it('sends the handoff message and remembers the pending-human state', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const calls = mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      { method: 'POST', path: '/api/widget/conversations', body: { ...campaignConv, id: 'conv1' } },
+      {
+        method: 'GET',
+        path: '/api/widget/conversations/conv1/messages',
+        body: { items: [], next_cursor: null },
+      },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    c.startNewConversation()
+    await c.requestHuman()
+
+    const create = calls.find(
+      (call) => call.url.endsWith('/api/widget/conversations') && call.init.method === 'POST',
+    )
+    expect(create).toBeDefined()
+    expect(JSON.parse(create!.init.body!).message).toBe('I’d like to talk to a person.')
+    expect(c.getState().humanRequested['conv1']).toBe(true)
+  })
+})
+
+// --- live tour state ----------------------------------------------------------
+
+describe('tour state from the loader', () => {
+  it('consumes legacy TOUR_EVENT frames (stepIndex → 1-based step)', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([{ method: 'POST', path: '/api/widget/boot', body: bootBody }])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: envelope(MSG.TOUR_EVENT, { tourId: 't1', event: 'started', stepIndex: 0 }),
+      }),
+    )
+    expect(c.getState().tourState).toMatchObject({ status: 'started', tourId: 't1', step: 1 })
+  })
+
+  it('consumes tour:state frames and keeps the known title on later updates', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([{ method: 'POST', path: '/api/widget/boot', body: bootBody }])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    const state = (payload: unknown) =>
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: envelope(MSG_EXTRA.TOUR_STATE as unknown as MessageType, payload),
+        }),
+      )
+    state({ status: 'started', tourId: 't1', step: 1, total: 5, title: 'Widget setup' })
+    state({ status: 'blocked', tourId: 't1', step: 3 })
+    expect(c.getState().tourState).toMatchObject({
+      status: 'blocked',
+      tourId: 't1',
+      step: 3,
+      total: 5,
+      title: 'Widget setup',
+    })
+  })
+})
+
+// --- tour_event messages must stay ambient ------------------------------------
+
+describe('tour_event realtime messages', () => {
+  it('never becomes the row preview nor an unread ping', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const readConv = {
+      ...campaignConv,
+      id: 'c1',
+      unread: false,
+      last_message_preview: 'All good so far',
+    }
+    mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: { ...bootBody, conversations: [readConv] } },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    pushRealtime({
+      type: 'message.created',
+      data: {
+        message: {
+          id: 'ev1',
+          conversation_id: 'c1',
+          visibility: 'public',
+          direction: 'out',
+          author_type: 'system',
+          author_name: '',
+          content: '✕ Dismissed at step 2',
+          attachments: [{ kind: 'tour_event', event: 'dismissed', step: 2 }],
+          created_at: new Date().toISOString(),
+          meta: {},
+        },
+      },
+    })
+    const conv = c.getState().conversations[0]!
+    expect(conv.unread).toBe(false)
+    expect(conv.last_message_preview).toBe('All good so far')
+
+    // A real reply still pings as before.
+    pushRealtime({
+      type: 'message.created',
+      data: {
+        message: {
+          id: 'm2',
+          conversation_id: 'c1',
+          visibility: 'public',
+          direction: 'out',
+          author_type: 'agent',
+          author_name: 'Sage',
+          content: 'Here is the answer',
+          attachments: [],
+          created_at: new Date().toISOString(),
+          meta: {},
+        },
+      },
+    })
+    expect(c.getState().conversations[0]!.unread).toBe(true)
+    expect(c.getState().conversations[0]!.last_message_preview).toBe('Here is the answer')
+  })
+})
+
+// --- federated search ----------------------------------------------------------
+
+describe('searchEverything', () => {
+  it('merges article results with name-matched live tours for the page', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      {
+        method: 'GET',
+        path: '/api/widget/articles',
+        body: {
+          collections: [],
+          results: [{ title: 'Set up your workspace', slug: 'setup', snippet: 'How to begin' }],
+        },
+      },
+      {
+        method: 'GET',
+        path: '/api/widget/tours',
+        body: [
+          { id: 't1', name: 'Setup walkthrough', steps: [{}, {}, {}], theme: {}, version: 1 },
+          { id: 't2', name: 'Billing overview', steps: [{}], theme: {}, version: 1 },
+        ],
+      },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    // The loader reported the page — tours are fetched for it.
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: envelope(MSG.PAGE_CONTEXT, { url: 'https://app.test/settings', path: '/settings', title: 'Settings' }),
+      }),
+    )
+    await c.searchEverything('setup')
+
+    const search = c.getState().homeSearch
+    expect(search).not.toBeNull()
+    expect(search!.loading).toBe(false)
+    expect(search!.articles).toEqual([
+      { title: 'Set up your workspace', slug: 'setup', snippet: 'How to begin' },
+    ])
+    // Only the tour whose name matches the query, with its step count.
+    expect(search!.tours).toEqual([{ id: 't1', name: 'Setup walkthrough', steps: 3 }])
+  })
+
+  it('clears results when the query empties', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      { method: 'GET', path: '/api/widget/articles', body: { collections: [], results: [] } },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    await c.searchEverything('x')
+    expect(c.getState().homeSearch).not.toBeNull()
+    await c.searchEverything('')
+    expect(c.getState().homeSearch).toBeNull()
+  })
+})
+
+// --- starting tours -------------------------------------------------------------
+
+describe('startTour', () => {
+  it('posts tour:start to the loader and closes the panel', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([{ method: 'POST', path: '/api/widget/boot', body: bootBody }])
+    const posted: Array<{ type?: string; payload?: unknown }> = []
+    vi.spyOn(window, 'postMessage').mockImplementation((data: unknown) => {
+      posted.push(data as { type?: string; payload?: unknown })
+    })
+
+    const c = makeController()
+    await c.boot()
+    c.startTour('t42')
+
+    const start = posted.find((p) => p?.type === MSG.TOUR_START)
+    expect(start?.payload).toEqual({ tourId: 't42' })
+    expect(posted.some((p) => p?.type === MSG.CLOSE)).toBe(true)
   })
 })

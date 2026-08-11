@@ -8,6 +8,7 @@
 import {
   ApiError,
   errorCode,
+  fetchTours,
   sendMessageFeedback,
   triggerCampaign,
   WidgetApi,
@@ -23,12 +24,21 @@ import type {
   ConversationSummary,
   FeedbackRating,
   Identity,
+  Tour,
   WidgetArticlesResponse,
   WidgetConfig,
   WidgetMessage,
   RealtimeMessage,
 } from '../types'
 import { isRequireIdentity } from '../types'
+import {
+  MSG_EXTRA,
+  parseTourState,
+  tourEvent,
+  type FederatedResults,
+  type Starter,
+  type TourState,
+} from './api-extra'
 import { bridge } from './bridge'
 import { DEFAULT_LOCALE, ensureCatalog, getLocale, hasCatalog, setLocale, t } from '../i18n'
 import { browserLanguages, resolveLocale } from '../i18n/resolve'
@@ -102,6 +112,16 @@ export interface AppState {
   pendingAction: PendingActionCard | null
   /** Active interface language. In state so a change re-renders the tree. */
   locale: string
+  /** Live tour progress from the loader — rendered as a system line. */
+  tourState: TourState | null
+  /** Suggested-question chips for an empty conversation. Null until loaded. */
+  starters: Starter[] | null
+  /** Conversations where the visitor asked for a human this session. */
+  humanRequested: Record<string, boolean>
+  /** Home federated search (articles + tours). Null when the box is empty. */
+  homeSearch: FederatedResults | null
+  /** Which screen opened the current article, so Back returns there. */
+  articleOrigin: 'help' | 'home'
 }
 
 const INITIAL: AppState = {
@@ -126,7 +146,17 @@ const INITIAL: AppState = {
   actionsAllowed: false,
   workingOnPage: null,
   pendingAction: null,
+  tourState: null,
+  starters: null,
+  humanRequested: {},
+  homeSearch: null,
+  articleOrigin: 'help',
 }
+
+/** Hide the "working on the page…" status line after this long without an
+ * update — a crashed run must not leave a forever-spinner (defense in depth;
+ * the backend sweep is the real fix). */
+export const STATUS_STALE_MS = 90_000
 
 export class Controller {
   private state: AppState = INITIAL
@@ -139,10 +169,16 @@ export class Controller {
   private seenIds = new Set<string>()
   private typingTimer: ReturnType<typeof setTimeout> | null = null
   private agentTypingTimer: ReturnType<typeof setTimeout> | null = null
+  /** Hides a stale "working on the page…" line (see STATUS_STALE_MS). */
+  private statusTimer: ReturnType<typeof setTimeout> | null = null
   /** opId → the run waiting on it, while the loader executes the op. */
   private pendingOps = new Map<string, { runId: string; op: string }>()
   /** Client-action defs the loader last advertised (null until it has). */
   private actionDefs: ClientActionWireDef[] | null = null
+  /** Is the messenger panel visible? Tracked from the loader's OPEN/CLOSE. */
+  private panelOpen = false
+  /** Live tours for the current page, fetched once (starters + search). */
+  private toursCache: { url: string; tours: Tour[] } | null = null
 
   constructor(params: BootParams) {
     this.params = params
@@ -209,6 +245,8 @@ export class Controller {
     this.unbindBridge = null
     this.socket?.close()
     this.socket = null
+    if (this.statusTimer) clearTimeout(this.statusTimer)
+    this.statusTimer = null
   }
 
   // --- store plumbing ------------------------------------------------------
@@ -234,6 +272,9 @@ export class Controller {
       this.set({ screen: { name: 'error', message: t('error.missing_key') } })
       return
     }
+    // Bind before the fetch: an OPEN that arrives while boot is in flight must
+    // still be seen, or the unread→thread routing below misses its cue.
+    this.bindBridge()
     try {
       const result = await this.api.boot({
         widget_key: this.params.workspaceKey,
@@ -265,8 +306,10 @@ export class Controller {
     // Now that we know the contact and the workspace default, resolve again.
     this.applyLocale(boot.contact?.locale)
     this.connectRealtime()
-    this.bindBridge()
     this.emitReady()
+    // The panel was opened before boot finished (or was already open on a
+    // re-boot): route straight to the one conversation waiting on the visitor.
+    if (this.panelOpen) this.maybeOpenUnreadThread()
   }
 
   /** React to loader → app messages (refresh on open; trigger due campaigns). */
@@ -274,7 +317,17 @@ export class Controller {
     this.unbindBridge?.()
     this.unbindBridge = bridge.on((env) => {
       if (env.type === MSG.OPEN) {
-        void this.refreshConversations()
+        const wasOpen = this.panelOpen
+        this.panelOpen = true
+        void this.refreshConversations().then(() => {
+          // Route only on the closed→open transition, so a re-sent OPEN can
+          // never yank a visitor out of whatever they navigated to since.
+          if (!wasOpen) this.maybeOpenUnreadThread()
+        })
+      } else if (env.type === MSG.CLOSE) {
+        this.panelOpen = false
+      } else if (env.type === MSG.TOUR_EVENT || (env.type as string) === MSG_EXTRA.TOUR_STATE) {
+        this.onTourState((env.payload || {}) as Record<string, unknown>)
       } else if (env.type === MSG.CAMPAIGN_DUE) {
         const payload = (env.payload || {}) as { campaignId?: unknown }
         if (typeof payload.campaignId === 'string' && payload.campaignId) {
@@ -388,12 +441,12 @@ export class Controller {
         return
       }
       this.pendingOps.set(opId, { runId, op })
-      this.set({ workingOnPage: op })
+      this.setWorking(op)
       bridge.post(MSG.COPILOT_OP, { opId, op, args: { name, params } })
       return
     }
 
-    this.set({ workingOnPage: op })
+    this.setWorking(op)
 
     if (op === 'guide') {
       const tourId = typeof args.tour_id === 'string' ? args.tour_id : ''
@@ -427,7 +480,8 @@ export class Controller {
     const card = this.state.pendingAction
     if (!card) return
     this.pendingOps.set(card.opId, { runId: card.runId, op: 'action' })
-    this.set({ pendingAction: null, workingOnPage: 'action' })
+    this.set({ pendingAction: null })
+    this.setWorking('action')
     bridge.post(MSG.COPILOT_OP, {
       opId: card.opId,
       op: 'action',
@@ -456,10 +510,25 @@ export class Controller {
     void this.finishOp(pending.runId, opId, (payload.result ?? {}) as Record<string, unknown>)
   }
 
+  /**
+   * Set/clear the "working on the page…" status line — always through here, so
+   * every update re-arms the staleness timeout. A run that dies without a
+   * result (worker crash, dropped socket) then costs the visitor 90 seconds of
+   * spinner, not forever.
+   */
+  private setWorking(op: string | null): void {
+    if (this.statusTimer) clearTimeout(this.statusTimer)
+    this.statusTimer = null
+    if (op !== null) {
+      this.statusTimer = setTimeout(() => this.set({ workingOnPage: null }), STATUS_STALE_MS)
+    }
+    this.set({ workingOnPage: op })
+  }
+
   private async finishOp(runId: string, opId: string, result: unknown): Promise<void> {
     const { screen } = this.state
     const conversationId = screen.name === 'thread' ? screen.conversationId : null
-    this.set({ workingOnPage: null })
+    this.setWorking(null)
     if (!conversationId) return
     try {
       await this.api.submitOpResult(conversationId, { run_id: runId, op_id: opId, result })
@@ -533,6 +602,20 @@ export class Controller {
     this.refreshConversations()
   }
 
+  /**
+   * On open: when exactly one conversation is waiting on the visitor, land in
+   * that thread instead of making them hunt for it from Home. With several
+   * unread (or none) Home is the right place — its rows carry the badges.
+   *
+   * Never called while the panel is closed: entering the thread marks it read,
+   * which would silently clear a launcher badge nobody has seen.
+   */
+  private maybeOpenUnreadThread(): void {
+    if (this.state.screen.name !== 'home') return
+    const unread = this.state.conversations.filter((c) => c.unread)
+    if (unread.length === 1) void this.openConversation(unread[0]!.id)
+  }
+
   async refreshConversations(): Promise<void> {
     try {
       const conversations = await this.api.listConversations()
@@ -552,6 +635,7 @@ export class Controller {
       agentTyping: false,
       pendingAction: null,
     })
+    void this.loadStarters()
   }
 
   async openConversation(id: string): Promise<void> {
@@ -695,6 +779,145 @@ export class Controller {
     })
   }
 
+  // --- human handoff --------------------------------------------------------
+
+  /**
+   * "Talk to a person": sends the request as a regular visitor message (the
+   * backend already routes visitor messages to the inbox) and remembers that
+   * this conversation is waiting on a human, so the thread can set expectations
+   * instead of promising another instant AI answer.
+   */
+  async requestHuman(): Promise<void> {
+    if (this.state.screen.name !== 'thread') return
+    await this.send(t('handoff.message'))
+    const { screen } = this.state
+    // send() creates the conversation when it was a fresh thread.
+    const id = screen.name === 'thread' ? screen.conversationId : null
+    if (id) this.set({ humanRequested: { ...this.state.humanRequested, [id]: true } })
+  }
+
+  // --- tours (offers, live state) ------------------------------------------
+
+  /** Start a stored tour in the host page (tour_offer card, search result). */
+  startTour(tourId: string): void {
+    if (!tourId) return
+    bridge.post(MSG.TOUR_START, { tourId })
+    // The tour plays in the host page, underneath this panel — close it so the
+    // visitor actually sees what they just started.
+    this.requestClose()
+  }
+
+  /** Ask the loader to pick an interrupted tour back up. */
+  resumeTour(tourId: string): void {
+    if (!tourId) return
+    bridge.post(MSG_EXTRA.TOUR_RESUME, { tourId })
+    this.requestClose()
+  }
+
+  /** Live tour progress from the loader (tour:state, or legacy TOUR_EVENT). */
+  private onTourState(payload: Record<string, unknown>): void {
+    const next = parseTourState(payload)
+    if (!next) return
+    // Keep the last known title/total when a later frame omits them.
+    const prev = this.state.tourState
+    const merged: TourState =
+      prev && prev.tourId === next.tourId
+        ? {
+            ...next,
+            title: next.title || prev.title,
+            total: next.total ?? prev.total,
+            step: next.step ?? prev.step,
+          }
+        : next
+    this.set({ tourState: merged })
+  }
+
+  // --- conversation starters ------------------------------------------------
+
+  /**
+   * Suggest 3–4 openers for an empty conversation, sourced from what this
+   * workspace can actually deliver: live tours for the visitor's page and top
+   * help-center articles. Loaded once per session; an empty result renders as
+   * no chips, never an error.
+   */
+  private async loadStarters(): Promise<void> {
+    if (this.state.starters !== null) return
+    try {
+      const [tours, articles] = await Promise.all([
+        this.liveTours(),
+        this.state.articles
+          ? Promise.resolve(this.state.articles)
+          : this.api.getArticles('').catch(() => ({ collections: [], results: [] })),
+      ])
+      const starters: Starter[] = []
+      for (const tour of tours.slice(0, 2)) {
+        if (tour.name) starters.push({ kind: 'tour', text: t('starters.tour', { name: tour.name }) })
+      }
+      const titles = articles.collections.flatMap((c) => c.articles.map((a) => a.title))
+      for (const title of titles) {
+        if (starters.length >= 4) break
+        if (title) starters.push({ kind: 'article', text: title })
+      }
+      this.set({ starters })
+    } catch {
+      this.set({ starters: [] })
+    }
+  }
+
+  /** Live tours for the current page, fetched once and reused (starters +
+   * federated search). No page context yet → no tours, silently. */
+  private async liveTours(): Promise<Tour[]> {
+    const url = this.state.page?.url
+    if (!url) return []
+    if (this.toursCache?.url === url) return this.toursCache.tours
+    try {
+      const tours = await fetchTours(this.params.apiBase, this.params.workspaceKey, url, this.token)
+      this.toursCache = { url, tours }
+      return tours
+    } catch {
+      return []
+    }
+  }
+
+  // --- federated search (home) ---------------------------------------------
+
+  /**
+   * One query across articles AND live tours, grouped for the Home screen.
+   * Tours have no search endpoint, so the cached page-eligible list is
+   * filtered by name here.
+   */
+  async searchEverything(query: string): Promise<void> {
+    const q = query.trim()
+    if (!q) {
+      this.set({ homeSearch: null })
+      return
+    }
+    this.set({
+      homeSearch: { query: q, loading: true, articles: [], tours: [] },
+    })
+    const [articles, tours] = await Promise.all([
+      this.api.getArticles(q).catch(() => ({ collections: [], results: [] })),
+      this.liveTours(),
+    ])
+    // A slower response for an older query must not clobber the current one.
+    if (this.state.homeSearch?.query !== q) return
+    const needle = q.toLowerCase()
+    this.set({
+      homeSearch: {
+        query: q,
+        loading: false,
+        articles: articles.results.map((r) => ({
+          title: r.title,
+          slug: r.slug,
+          snippet: r.snippet,
+        })),
+        tours: tours
+          .filter((tour) => tour.name.toLowerCase().includes(needle))
+          .map((tour) => ({ id: tour.id, name: tour.name, steps: tour.steps.length })),
+      },
+    })
+  }
+
   // --- realtime ------------------------------------------------------------
 
   private onRealtime(msg: RealtimeMessage): void {
@@ -731,6 +954,9 @@ export class Controller {
       })
       if (raw.direction === 'out') void this.markRead(convId)
     } else if (convId && raw.direction === 'out') {
+      // Tour telemetry lines are ambient, not replies: they must not become the
+      // row's preview ("✕ Dismissed at step 2" as the teaser) nor ping unread.
+      if (tourEvent(raw)) return
       // A reply landed in a conversation we're not viewing → mark unread + refresh.
       this.set({
         conversations: this.state.conversations.map((c) =>
@@ -781,13 +1007,28 @@ export class Controller {
     }
   }
 
-  async openArticle(slug: string): Promise<void> {
-    this.set({ screen: { name: 'article', slug }, article: null, loadingArticle: true })
+  async openArticle(slug: string, origin: 'help' | 'home' = 'help'): Promise<void> {
+    this.set({
+      screen: { name: 'article', slug },
+      articleOrigin: origin,
+      article: null,
+      loadingArticle: true,
+    })
     try {
       const article = await this.api.getArticle(slug)
       this.set({ article, loadingArticle: false })
     } catch (err) {
       this.set({ loadingArticle: false, screen: { name: 'error', message: this.describe(err) } })
+    }
+  }
+
+  /** Back from an article: to the help browser, or Home when the federated
+   * search opened it — never to a screen the visitor was not on. */
+  backFromArticle(): void {
+    if (this.state.articleOrigin === 'home') {
+      this.set({ screen: { name: 'home' }, article: null })
+    } else {
+      this.backToHelp()
     }
   }
 
@@ -826,6 +1067,7 @@ export class Controller {
   // --- host bridge open/close ---------------------------------------------
 
   requestClose(): void {
+    this.panelOpen = false
     bridge.post(MSG.CLOSE, {})
   }
 

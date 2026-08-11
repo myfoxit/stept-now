@@ -93,6 +93,82 @@ describe('MessageBubble', () => {
   })
 })
 
+describe('MessageBubble agent identity', () => {
+  it('renders the agent name with the AI disclosure chip', () => {
+    const el = mount(<MessageBubble message={agentMsg} />)
+    const author = el.querySelector('.sw-author')
+    expect(author).not.toBeNull()
+    expect(author!.textContent).toContain('Sage')
+    expect(el.querySelector('.sw-ai-chip')!.textContent).toBe('AI')
+  })
+
+  it('falls back to the configured persona when the message has no author', () => {
+    const anon: UiMessage = { ...agentMsg, id: 'ai2', author_name: '' }
+    const el = mount(<MessageBubble message={anon} agentName="Northplane Guide" />)
+    expect(el.querySelector('.sw-author')!.textContent).toContain('Northplane Guide')
+    // The avatar initials follow the same resolved name.
+    expect(el.querySelector('.sw-avatar')!.textContent).toBe('NG')
+  })
+
+  it('omits the AI chip when the workspace disabled disclosure, and for humans', () => {
+    const noChip = mount(<MessageBubble message={agentMsg} aiDisclosure={false} />)
+    expect(noChip.querySelector('.sw-ai-chip')).toBeNull()
+
+    const human: UiMessage = { ...agentMsg, id: 'h2', author_type: 'user', author_name: 'Alex' }
+    const humanEl = mount(<MessageBubble message={human} />)
+    expect(humanEl.querySelector('.sw-author')!.textContent).toContain('Alex')
+    expect(humanEl.querySelector('.sw-ai-chip')).toBeNull()
+  })
+
+  it('never labels the visitor’s own messages', () => {
+    const el = mount(<MessageBubble message={base} />)
+    expect(el.querySelector('.sw-author')).toBeNull()
+  })
+})
+
+describe('MessageBubble tour attachments', () => {
+  it('renders a tour_offer as a card and starts the tour', () => {
+    const offerMsg: UiMessage = {
+      ...agentMsg,
+      id: 'offer1',
+      content: 'I can walk you through it.',
+      attachments: [
+        { kind: 'tour_offer', tour_id: 't9', title: 'Widget setup', steps: 5, est_seconds: 120 },
+      ],
+    }
+    const started: string[] = []
+    const el = mount(
+      <MessageBubble message={offerMsg} onStartTour={(id) => started.push(id)} />,
+    )
+    expect(el.textContent).toContain('Widget setup')
+    expect(el.textContent).toContain('5 steps')
+    expect(el.textContent).toContain('~2 min')
+    ;(el.querySelector('.sw-tour-card-start') as HTMLButtonElement).click()
+    expect(started).toEqual(['t9'])
+  })
+
+  it('renders a tour_event as a centered system line, not a bubble', () => {
+    const eventMsg: UiMessage = {
+      ...agentMsg,
+      id: 'ev1',
+      content: 'tour dismissed',
+      attachments: [{ kind: 'tour_event', event: 'dismissed', step: 2 }],
+    }
+    const el = mount(<MessageBubble message={eventMsg} />)
+    expect(el.querySelector('.sw-bubble')).toBeNull()
+    expect(el.querySelector('.sw-activity')!.textContent).toBe('✕ Dismissed at step 2')
+
+    const started: UiMessage = {
+      ...agentMsg,
+      id: 'ev2',
+      content: '',
+      attachments: [{ kind: 'tour_event', event: 'started', title: 'Widget setup' }],
+    }
+    const startedEl = mount(<MessageBubble message={started} />)
+    expect(startedEl.querySelector('.sw-activity')!.textContent).toBe('▶ Started “Widget setup”')
+  })
+})
+
 describe('MessageBubble feedback thumbs', () => {
   const noop = (): void => {}
 

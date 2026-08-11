@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { FeedbackRating } from '../../types'
 import type { UiMessage } from '../controller'
+import { tourEvent, tourOffer, type TourEventAttachment } from '../api-extra'
 import { clockTime, initials } from '../format'
 import { renderMarkdown } from '../md'
 import { t } from '../../i18n'
+import { TourCard } from './TourCard'
 
 /** localStorage key remembering the visitor's rating for one answer. */
 export function feedbackStorageKey(widgetKey: string, messageId: string): string {
@@ -56,24 +58,54 @@ function ThumbIcon({ down = false }: { down?: boolean }) {
   )
 }
 
+/** "▶ Started …" / "✓ Completed …" / "✕ Dismissed at step 2" for a tour_event
+ * message. The glyph is not language; the sentence is. */
+export function tourEventLine(ev: TourEventAttachment): string {
+  switch (ev.event) {
+    case 'started':
+      return `▶ ${ev.title ? t('tour.state.started', { title: ev.title }) : t('tour.state.started_plain')}`
+    case 'completed':
+      return `✓ ${ev.title ? t('tour.state.completed', { title: ev.title }) : t('tour.state.completed_plain')}`
+    case 'dismissed':
+      return `✕ ${
+        typeof ev.step === 'number'
+          ? t('tour.state.dismissed', { step: ev.step })
+          : t('tour.state.dismissed_plain')
+      }`
+    default:
+      return ''
+  }
+}
+
 /** A single chat bubble. Visitor messages sit right; agent/AI/user left. */
 export function MessageBubble({
   message,
   widgetKey = '',
+  agentName,
+  aiDisclosure = true,
   onFeedback,
   onRetry,
+  onStartTour,
 }: {
   message: UiMessage
   /** Namespaces the persisted thumb state; required for feedback to render. */
   widgetKey?: string
+  /** Boot-config agent persona — the fallback when the message has no author. */
+  agentName?: string | null
+  /** Render the "AI" chip on agent answers (boot `ai_disclosure`, default on). */
+  aiDisclosure?: boolean
   /** Present on ratable threads: posts the rating (AI answers only). */
   onFeedback?: (messageId: string, rating: FeedbackRating) => void
   /** Present when a failed send can be retried. */
   onRetry?: (messageId: string) => void
+  /** Starts a tour offered by a `tour_offer` attachment. */
+  onStartTour?: (tourId: string) => void
 }) {
   const mine = message.direction === 'in'
   const system = message.author_type === 'system'
   const citations = message.meta?.citations ?? []
+  const tourEv = tourEvent(message)
+  const offer = tourOffer(message)
 
   // AI answers (public outbound agent messages) get the feedback thumbs.
   const ratable =
@@ -105,6 +137,11 @@ export function MessageBubble({
     thanksTimer.current = window.setTimeout(() => setThanks(false), 2500)
   }
 
+  // Tour lifecycle telemetry reads as ambient activity, not as someone talking.
+  if (tourEv) {
+    return <div class="sw-activity">{tourEventLine(tourEv) || message.content}</div>
+  }
+
   if (system) {
     return (
       <div class="sw-activity">
@@ -113,14 +150,24 @@ export function MessageBubble({
     )
   }
 
+  // Who is talking: the message's own author, else the configured AI persona.
+  const displayName = message.author_name || (message.author_type === 'agent' ? agentName : '') || ''
+  const showAiChip = message.author_type === 'agent' && aiDisclosure
+
   return (
     <div class={`sw-row ${mine ? 'sw-row-mine' : 'sw-row-them'}`}>
       {!mine && (
         <div class="sw-avatar" aria-hidden="true">
-          {initials(message.author_name || t('message.agent'))}
+          {initials(displayName || t('message.agent'))}
         </div>
       )}
       <div class="sw-bubble-wrap">
+        {!mine && (displayName || showAiChip) && (
+          <div class="sw-author">
+            {displayName || t('message.agent')}
+            {showAiChip && <span class="sw-ai-chip">{t('message.ai')}</span>}
+          </div>
+        )}
         <div
           class={`sw-bubble ${mine ? 'sw-bubble-mine' : 'sw-bubble-them'} ${
             message.failed ? 'sw-bubble-failed' : ''
@@ -150,6 +197,7 @@ export function MessageBubble({
             </div>
           )}
         </div>
+        {offer && onStartTour && <TourCard offer={offer} onStart={onStartTour} />}
         {ratable && (
           <div class="sw-fb">
             <button
@@ -172,7 +220,7 @@ export function MessageBubble({
             </button>
             {thanks && (
               <span class="sw-fb-thanks" role="status">
-                Thanks for the feedback
+                {t('message.feedback_thanks')}
               </span>
             )}
           </div>
@@ -180,12 +228,12 @@ export function MessageBubble({
         <div class="sw-meta">
           {message.failed ? (
             <span class="sw-failed">
-              Not delivered
+              {t('message.not_delivered')}
               {onRetry && (
                 <>
                   {' · '}
                   <button type="button" class="sw-retry" onClick={() => onRetry(message.id)}>
-                    Retry
+                    {t('message.retry')}
                   </button>
                 </>
               )}

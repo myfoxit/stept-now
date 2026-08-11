@@ -25,6 +25,22 @@ export function clockTime(iso: string): string {
   return time.toLocaleTimeString(getLocale(), { hour: 'numeric', minute: '2-digit' })
 }
 
+/**
+ * Trim a conversation preview at a word boundary (~`max` chars).
+ *
+ * "Einrich…" mid-word reads broken; "Einrichtung deiner…" reads intentional.
+ * Only falls back to a hard cut when the text has no usable break (one giant
+ * token — a URL, or CJK text without spaces, which breaks fine anywhere).
+ */
+export function trimPreview(text: string, max = 60): string {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (clean.length <= max) return clean
+  const slice = clean.slice(0, max + 1)
+  const lastBreak = slice.lastIndexOf(' ')
+  const cut = lastBreak > max * 0.4 ? slice.slice(0, lastBreak) : clean.slice(0, max)
+  return `${cut.replace(/[\s.,;:!،、。]+$/, '')}…`
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'

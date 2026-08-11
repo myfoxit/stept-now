@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 import { useEffect } from 'preact/hooks'
 
 import type { Controller } from './controller'
+import { agentDisplayName, aiDisclosureEnabled, brandDisplayName } from './api-extra'
 import { ArticleView } from './components/ArticleView'
 import { Header } from './components/Header'
 import { HelpCenter } from './components/HelpCenter'
@@ -18,8 +19,20 @@ export function App({ controller }: { controller: Controller }) {
     void controller.boot()
   }, [controller])
 
+  // Esc anywhere inside the iframe closes the panel, same as the launcher ✕.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') controller.requestClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [controller])
+
   const accent = state.config.accent_color || '#5b46e5'
-  const workspaceName = state.workspace?.name || t('app.chat')
+  // The end customer's brand, never our workspace bookkeeping name.
+  const brandName = brandDisplayName(state.config, state.workspace) || t('app.chat')
+  const agentName = agentDisplayName(state.config)
+  const aiDisclosure = aiDisclosureEnabled(state.config)
   const close = () => controller.requestClose()
 
   const screen = state.screen
@@ -46,20 +59,24 @@ export function App({ controller }: { controller: Controller }) {
       break
 
     case 'identity':
-      header = <Header title={workspaceName} logoUrl={state.workspace?.logo_url} onClose={close} />
-      body = <IdentityGate workspaceName={workspaceName} onRetry={() => void controller.boot()} />
+      header = <Header title={brandName} logoUrl={state.workspace?.logo_url} onClose={close} />
+      body = <IdentityGate workspaceName={brandName} onRetry={() => void controller.boot()} />
       break
 
     case 'home':
-      header = <Header title={workspaceName} logoUrl={state.workspace?.logo_url} onClose={close} />
+      header = <Header title={brandName} logoUrl={state.workspace?.logo_url} onClose={close} />
       body = (
         <Home
           config={state.config}
           conversations={state.conversations}
           helpCenter={state.helpCenter}
+          search={state.homeSearch}
+          onSearch={(q) => void controller.searchEverything(q)}
           onOpenConversation={(id) => void controller.openConversation(id)}
           onNewConversation={() => controller.startNewConversation()}
           onOpenHelp={() => void controller.openHelp()}
+          onOpenArticle={(slug) => void controller.openArticle(slug, 'home')}
+          onStartTour={(id) => controller.startTour(id)}
         />
       )
       break
@@ -70,7 +87,7 @@ export function App({ controller }: { controller: Controller }) {
         : null
       header = (
         <Header
-          title={workspaceName}
+          title={brandName}
           subtitle={t('thread.header')}
           onBack={() => controller.goHome()}
           onClose={close}
@@ -86,6 +103,14 @@ export function App({ controller }: { controller: Controller }) {
           csatDone={screen.conversationId ? Boolean(state.csatDone[screen.conversationId]) : false}
           greeting={state.config.greeting || t('home.greeting')}
           widgetKey={controller.widgetKey}
+          aiEnabled={Boolean(state.config.ai_agent_id)}
+          agentName={agentName}
+          aiDisclosure={aiDisclosure}
+          starters={state.starters}
+          tourState={state.tourState}
+          humanRequested={
+            screen.conversationId ? Boolean(state.humanRequested[screen.conversationId]) : false
+          }
           pageControl={state.pageControl}
           pageTitle={state.page?.title || state.page?.path || ''}
           actionsAllowed={state.actionsAllowed}
@@ -102,6 +127,9 @@ export function App({ controller }: { controller: Controller }) {
           }
           onFeedback={(messageId, rating) => void controller.submitMessageFeedback(messageId, rating)}
           onRetry={(messageId) => void controller.retry(messageId)}
+          onStartTour={(id) => controller.startTour(id)}
+          onResumeTour={(id) => controller.resumeTour(id)}
+          onRequestHuman={() => void controller.requestHuman()}
         />
       )
       break
@@ -125,7 +153,7 @@ export function App({ controller }: { controller: Controller }) {
       header = (
         <Header
           title={state.article?.collection?.name || t('article.header')}
-          onBack={() => controller.backToHelp()}
+          onBack={() => controller.backFromArticle()}
           onClose={close}
         />
       )
