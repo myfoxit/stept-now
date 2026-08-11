@@ -34,7 +34,12 @@ export default defineContentScript({
 
     const send = (msg: ContentToBg) => {
       try {
-        chrome.runtime.sendMessage(msg);
+        // The returned promise MUST be caught: with no receiver (worker still
+        // starting, extension reloaded) it rejects, and an unhandled rejection
+        // from a content script surfaces as an Uncaught error in the CUSTOMER
+        // page's console. The try/catch only covers the synchronous
+        // "context invalidated" throw.
+        chrome.runtime.sendMessage(msg)?.catch?.(() => {});
       } catch {
         /* SW asleep or context invalidated — background keeps what it has */
       }
@@ -209,6 +214,7 @@ export default defineContentScript({
           context,
           value: isSecret ? '' : value,
           secret: isSecret,
+          url: location.href,
           pageTitle: pageTitle(),
         };
         if (inputTimer) window.clearTimeout(inputTimer);
@@ -236,6 +242,7 @@ export default defineContentScript({
               frameId: 0,
               context,
               fileName,
+              url: location.href,
               pageTitle: pageTitle(),
             });
           }
@@ -253,6 +260,7 @@ export default defineContentScript({
               context,
               value: el.value,
               label: el.selectedOptions[0]?.text,
+              url: location.href,
               pageTitle: pageTitle(),
             });
           }
@@ -267,6 +275,7 @@ export default defineContentScript({
               frameId: 0,
               context,
               checked: el.checked,
+              url: location.href,
               pageTitle: pageTitle(),
             });
           }
@@ -295,6 +304,7 @@ export default defineContentScript({
             frameId: 0,
             keys: 'Enter',
             context: el ? (capture(el) ?? undefined) : undefined,
+            url: location.href,
           });
           return;
         }
@@ -306,6 +316,7 @@ export default defineContentScript({
           frameId: 0,
           keys: keyCombo(e),
           context: el ? (capture(el) ?? undefined) : undefined,
+          url: location.href,
         });
       },
       { capture: true, passive: true },
@@ -402,6 +413,7 @@ export default defineContentScript({
               frameId: 0,
               context,
               revealedText: revealed,
+              url: location.href,
               pageTitle: pageTitle(),
             });
         }

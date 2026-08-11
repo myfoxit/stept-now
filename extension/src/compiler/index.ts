@@ -1,6 +1,6 @@
 import { simpleProjection, targetFragility, type Target } from '@stept/dom-capture';
 import type { RawEvent, StepAdvance, TourStep, TourStepType } from '../types';
-import { isInternalUrl, suggestUrlPattern, urlPatternOf } from '../url-pattern';
+import { isInternalUrl, stepPageUrl, suggestUrlPattern, urlPatternOf } from '../url-pattern';
 import { deriveTitle, humanUrl, preview, quote, slugify, targetName } from './naming';
 import { placementFor } from './placement';
 
@@ -179,6 +179,7 @@ function targetedStep(
   };
   // a modal ignores its anchor: keep the advance sane if we downgraded
   if (base.type === 'modal' && base.advance.on === 'element_click') base.advance = { on: 'button' };
+  if (base.type === 'modal' && base.advance_on_click) base.advance_on_click = null;
   return base;
 }
 
@@ -206,6 +207,8 @@ interface PendingInput {
   secret: boolean;
   t: number;
   screenshotKey?: string;
+  /** page the burst was typed on (first event wins — one field, one page) */
+  url?: string;
   pressEnter: boolean;
   indexes: number[];
 }
@@ -270,9 +273,11 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
     const name = targetName(p.target);
     const enterSuffix = p.pressEnter ? ' and press Enter' : '';
     const advance: StepAdvance = { on: 'input' };
+    const url = stepPageUrl(p.url);
     const step = p.secret
       ? targetedStep(nextId(), 'tooltip', p.target, `Enter your ${quote(name)}`, {
           advance,
+          url,
           body: 'This value was kept private during recording — enter your own here.',
         })
       : targetedStep(
@@ -280,7 +285,7 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
           'action',
           p.target,
           `Type ${quote(preview(p.value))} into ${quote(name)}${enterSuffix}`,
-          { advance, action: { kind: 'fill', value: p.value } },
+          { advance, url, action: { kind: 'fill', value: p.value } },
         );
     if (p.screenshotKey) step.screenshot_key = p.screenshotKey;
     steps.push(step);
@@ -321,6 +326,9 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
               : `Click on ${quote(name)}`;
         const step = targetedStep(nextId(), 'tooltip', ev.context, title, {
           advance: { on: 'element_click' },
+          // a real recorded click: clicking the anchored element advances
+          advance_on_click: true,
+          url: stepPageUrl(ev.url),
           screenshot_key: ev.screenshotKey ?? null,
         });
         steps.push(step);
@@ -343,6 +351,7 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
           t: ev.t,
           // keep the FIRST screenshot of the burst: it shows the empty field
           screenshotKey: same?.screenshotKey ?? ev.screenshotKey,
+          url: same?.url ?? ev.url,
           pressEnter: same?.pressEnter || enterIdx !== undefined,
           indexes: [...(same?.indexes ?? []), i, ...(enterIdx !== undefined ? [enterIdx] : [])],
         };
@@ -361,7 +370,10 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
         flushInput();
         const title = `Press ${ev.keys}`;
         const step = ev.context
-          ? targetedStep(nextId(), 'tooltip', ev.context, title, { advance: { on: 'button' } })
+          ? targetedStep(nextId(), 'tooltip', ev.context, title, {
+              advance: { on: 'button' },
+              url: stepPageUrl(ev.url),
+            })
           : ({
               id: nextId(),
               type: 'modal',
@@ -374,6 +386,7 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
               screenshot_key: null,
               placement: 'center',
               advance: { on: 'button' },
+              url: stepPageUrl(ev.url),
             } satisfies TourStep);
         steps.push(step);
         attribute(step.id, i);
@@ -388,7 +401,11 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
           'tooltip',
           ev.context,
           `Select ${quote(ev.label ?? ev.value)} in ${quote(targetName(ev.context))}`,
-          { advance: { on: 'input' }, screenshot_key: ev.screenshotKey ?? null },
+          {
+            advance: { on: 'input' },
+            url: stepPageUrl(ev.url),
+            screenshot_key: ev.screenshotKey ?? null,
+          },
         );
         steps.push(step);
         attribute(step.id, i);
@@ -403,7 +420,12 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
           'tooltip',
           ev.context,
           `${ev.checked ? 'Check' : 'Uncheck'} ${quote(targetName(ev.context))}`,
-          { advance: { on: 'element_click' }, screenshot_key: ev.screenshotKey ?? null },
+          {
+            advance: { on: 'element_click' },
+            advance_on_click: true,
+            url: stepPageUrl(ev.url),
+            screenshot_key: ev.screenshotKey ?? null,
+          },
         );
         steps.push(step);
         attribute(step.id, i);
@@ -418,7 +440,12 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
           'tooltip',
           ev.context,
           `Upload ${quote(ev.fileName)}`,
-          { advance: { on: 'element_click' }, screenshot_key: ev.screenshotKey ?? null },
+          {
+            advance: { on: 'element_click' },
+            advance_on_click: true,
+            url: stepPageUrl(ev.url),
+            screenshot_key: ev.screenshotKey ?? null,
+          },
         );
         steps.push(step);
         attribute(step.id, i);
@@ -440,7 +467,11 @@ export function compile(events: readonly RawEvent[], opts: CompileOptions = {}):
           'tooltip',
           ev.context,
           `Hover ${quote(targetName(ev.context))}`,
-          { advance: { on: 'button' }, screenshot_key: ev.screenshotKey ?? null },
+          {
+            advance: { on: 'button' },
+            url: stepPageUrl(ev.url),
+            screenshot_key: ev.screenshotKey ?? null,
+          },
         );
         steps.push(step);
         attribute(step.id, i);

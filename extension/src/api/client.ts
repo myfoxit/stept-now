@@ -286,6 +286,9 @@ function wireStep(step: TourStep): Record<string, unknown> {
   if (step.media) out.media = step.media;
   if (step.screenshot_key) out.screenshot_key = step.screenshot_key;
   if (step.sandbox_key) out.sandbox_key = step.sandbox_key;
+  // per-step page + click-advance (recorder-stamped; the player navigates on them)
+  if (step.url) out.url = step.url;
+  if (step.advance_on_click != null) out.advance_on_click = step.advance_on_click;
   if (step.type === 'action' && step.action) out.action = step.action;
   if (step.type === 'wait' && step.wait) out.wait = step.wait;
   return out;

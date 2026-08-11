@@ -18,8 +18,12 @@ can monkeypatch the seam.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import inspect
-from typing import Any
+from typing import Any, Literal, overload
+
+from mcp.server.mcpserver import Image
 
 from app.core.permissions import Perm
 from app.mcp.server import mcp
@@ -41,6 +45,11 @@ SCROLL_DIRS = ("up", "down")
 
 # Interactive-elements listing cap (chars) — contract-fixed, line-safe truncation.
 ELEMENTS_CAP = 14000
+
+# browser_wait_for timeout clamp (seconds) — bounded so a bad arg can't park
+# the gateway dispatch on its own 60s ceiling.
+WAIT_FOR_MIN_S = 0.5
+WAIT_FOR_MAX_S = 15.0
 
 
 def _auth_module() -> Any:
@@ -78,10 +87,14 @@ def _truncate_lines(text: str, cap: int = ELEMENTS_CAP) -> str:
     return text[:cut] if cut > 0 else text[:cap]
 
 
-def _snapshot_payload(result: dict[str, Any]) -> dict[str, Any]:
-    """Shape a drive-op ack for the LLM (old-stept ``_snapshot_payload`` parity):
-    numbered interactive elements + screenshot as base64 (clients render
-    data-URI images inline) + the coordinate space that screenshot defines."""
+def _snapshot_payload(
+    result: dict[str, Any], include_screenshot: bool = False
+) -> dict[str, Any] | tuple[dict[str, Any], Image]:
+    """Shape a drive-op ack for the LLM: numbered interactive elements + url +
+    note — a compact text digest by default. The screenshot (large even after
+    the extension downscales it) is returned ONLY on request, and then as a
+    proper MCP image content block riding next to the JSON payload, so it never
+    bloats the text the model has to carry between calls."""
     data = result.get("data") or {}
     if not isinstance(data, dict):
         return {"data": data}
@@ -92,14 +105,20 @@ def _snapshot_payload(result: dict[str, Any]) -> dict[str, Any]:
     }
     if data.get("note"):
         out["note"] = data["note"]
-    if data.get("screenshot"):
+    shot = data.get("screenshot")
+    if include_screenshot and shot:
         size = data.get("screenshotSize") or {}
-        out["screenshot_base64_jpeg"] = data["screenshot"]
         out["screenshot_size"] = size
         out["coordinate_space"] = (
             f"screenshot is {size.get('w')}x{size.get('h')}px; "
             "for coordinate clicks pass x,y in this pixel space (0,0 = top-left)"
         )
+        try:
+            return out, Image(data=base64.b64decode(shot), format="jpeg")
+        except (binascii.Error, ValueError):
+            # Unparseable base64 from the extension — degrade to the old inline
+            # field rather than dropping the picture the caller asked for.
+            out["screenshot_base64_jpeg"] = shot
     return out
 
 
@@ -111,12 +130,30 @@ async def _exec(op: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
     return await remote_drive.gateway.exec_op(gate, op, args or {})
 
 
-async def _exec_snapshot(op: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Run a drive op and shape the resulting snapshot."""
-    result = await _exec(op, args)
+@overload
+async def _exec_snapshot(
+    op: str, args: dict[str, Any] | None = None, include_screenshot: Literal[False] = False
+) -> dict[str, Any]: ...
+
+
+@overload
+async def _exec_snapshot(
+    op: str, args: dict[str, Any] | None, include_screenshot: bool
+) -> dict[str, Any] | tuple[dict[str, Any], Image]: ...
+
+
+async def _exec_snapshot(
+    op: str, args: dict[str, Any] | None = None, include_screenshot: bool = False
+) -> dict[str, Any] | tuple[dict[str, Any], Image]:
+    """Run a drive op and shape the resulting snapshot. ``include_screenshot``
+    both asks the extension to capture (op arg) and gates the image block."""
+    op_args = dict(args or {})
+    if include_screenshot:
+        op_args["screenshot"] = True
+    result = await _exec(op, op_args)
     if "error" in result:
         return result
-    return _snapshot_payload(result)
+    return _snapshot_payload(result, include_screenshot)
 
 
 def _data(result: dict[str, Any]) -> dict[str, Any]:
@@ -146,24 +183,30 @@ async def browser_list() -> dict[str, Any]:
 
 
 @mcp.tool()
-async def browser_open(url: str) -> dict[str, Any]:
-    """Open a new tab in the user's logged-in Chrome (via the Stept extension)
-    and start a drive session. Returns a fresh snapshot: the page's interactive
-    elements as a numbered list — each line starts with an [index] you pass to
-    browser_act — plus a viewport screenshot whose pixel space is used for
-    coordinate clicks. Drive the page with browser_act / browser_navigate /
-    browser_scroll / browser_key, read it with browser_page_text /
-    browser_find / browser_extract, and end the session with browser_close."""
-    return await _exec_snapshot("open", {"url": url})
+async def browser_open(url: str, include_screenshot: bool = False) -> Any:
+    """Open a drive session in the user's logged-in Chrome (via the Stept
+    extension). If a driven tab already exists from an earlier session it is
+    REUSED (navigated to `url`) instead of opening another tab. Returns a fresh
+    snapshot: the page's interactive elements as a numbered list — each line
+    starts with an [index] you pass to browser_act; indexes are stable for the
+    page's lifetime. Screenshots are NOT included by default (they are large);
+    pass include_screenshot=True when you need to see the page, and its pixel
+    space is then used for coordinate clicks. Drive the page with browser_act /
+    browser_navigate / browser_scroll / browser_key, read it with
+    browser_page_text / browser_find / browser_extract, wait for slow UI with
+    browser_wait_for, and end the session with browser_close."""
+    return await _exec_snapshot("open", {"url": url}, include_screenshot)
 
 
 @mcp.tool()
-async def browser_snapshot() -> dict[str, Any]:
+async def browser_snapshot(include_screenshot: bool = False) -> Any:
     """Take a fresh snapshot of the driven tab: interactive elements as
-    [index]-numbered lines (the handles browser_act targets) plus a screenshot.
-    Element indexes go stale after navigation or page changes — re-snapshot
-    before acting if the page may have moved under you."""
-    return await _exec_snapshot("snapshot")
+    [index]-numbered lines (the handles browser_act targets). Indexes are
+    stable for the page's lifetime — the same element keeps its number across
+    snapshots until a real navigation. Pass include_screenshot=True to also get
+    a viewport screenshot (returned as an image, not inline JSON) when you need
+    to SEE the page rather than read it."""
+    return await _exec_snapshot("snapshot", None, include_screenshot)
 
 
 @mcp.tool()
@@ -174,13 +217,18 @@ async def browser_act(
     submit: bool = False,
     x: float | None = None,
     y: float | None = None,
-) -> dict[str, Any]:
+    role: str | None = None,
+    name: str | None = None,
+    include_screenshot: bool = False,
+) -> Any:
     """Act on the driven tab, then return a fresh snapshot. Target an element
-    by its [index] from the latest snapshot (preferred) or by raw screenshot
-    pixels x,y in the snapshot's coordinate space. kind: click (default),
-    double-click, right-click, hover, type (needs text; submit=True also
-    presses Enter), select (text = the option's label), check, uncheck,
-    drag."""
+    by its [index] from the latest snapshot (preferred), by accessible name —
+    pass name (visible label/aria name) and optionally role (button, link,
+    textbox, …) to find it at act time even if indexes went stale — or by raw
+    screenshot pixels x,y (only meaningful after an include_screenshot=True
+    snapshot). kind: click (default), double-click, right-click, hover, type
+    (needs text; submit=True also presses Enter), select (text = the option's
+    label), check, uncheck, drag."""
     if kind not in ACT_KINDS:
         return {"error": f"kind must be one of: {', '.join(ACT_KINDS)}"}
     args: dict[str, Any] = {"kind": kind, "submit": submit}
@@ -192,7 +240,32 @@ async def browser_act(
         args["x"] = x
     if y is not None:
         args["y"] = y
-    return await _exec_snapshot("act", args)
+    if role is not None:
+        args["role"] = role
+    if name is not None:
+        args["name"] = name
+    return await _exec_snapshot("act", args, include_screenshot)
+
+
+@mcp.tool()
+async def browser_wait_for(
+    selector: str | None = None,
+    text: str | None = None,
+    timeout_s: float = 5.0,
+) -> Any:
+    """Wait until the driven tab settles — for a CSS selector to appear, for
+    visible text to appear, or (with neither) for the page to finish loading
+    and go render-quiet. Use it after opening a slow SPA or an action that
+    triggers async UI, instead of snapshotting a half-rendered page. Returns a
+    fresh snapshot plus whether the condition was met within timeout_s
+    (0.5–15s, default 5)."""
+    timeout = min(max(float(timeout_s), WAIT_FOR_MIN_S), WAIT_FOR_MAX_S)
+    args: dict[str, Any] = {"timeoutMs": int(timeout * 1000)}
+    if selector is not None:
+        args["selector"] = selector
+    if text is not None:
+        args["text"] = text
+    return await _exec_snapshot("wait-for", args)
 
 
 @mcp.tool()

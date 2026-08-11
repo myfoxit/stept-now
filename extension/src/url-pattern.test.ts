@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isInternalUrl, suggestUrlPattern, urlPatternOf, wildcardMatch } from './url-pattern';
+import {
+  isInternalUrl,
+  stepPageUrl,
+  suggestUrlPattern,
+  urlPatternOf,
+  wildcardMatch,
+} from './url-pattern';
 
 describe('suggestUrlPattern', () => {
   it('suggests "this page and anything under it"', () => {
@@ -56,5 +62,21 @@ describe('isInternalUrl', () => {
     expect(isInternalUrl('chrome-extension://abc/page.html')).toBe(true);
     expect(isInternalUrl(undefined)).toBe(true);
     expect(isInternalUrl('https://app.example.com')).toBe(false);
+  });
+});
+
+describe('stepPageUrl', () => {
+  it('keeps origin+path and drops query/hash', () => {
+    expect(stepPageUrl('https://app.example.com/settings/billing?tab=cards#top')).toBe(
+      'https://app.example.com/settings/billing',
+    );
+  });
+
+  it('is null for internal, non-http and unparseable urls', () => {
+    expect(stepPageUrl('chrome://newtab')).toBeNull();
+    expect(stepPageUrl('about:blank')).toBeNull();
+    expect(stepPageUrl('file:///tmp/x.html')).toBeNull();
+    expect(stepPageUrl('not a url')).toBeNull();
+    expect(stepPageUrl(undefined)).toBeNull();
   });
 });

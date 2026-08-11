@@ -69,16 +69,25 @@ Resources: `stept://articles/{id}`, `stept://documents/{id}`, `stept://tours/{id
 
 Browser tools (owner BE-B, `app/mcp/tools_browser.py`) — ALL require TOURS_MANAGE; delegate to
 `app.services.remote_drive`; friendly errors when no extension is connected (wording below).
-`browser_list` · `browser_open(url)` · `browser_snapshot()` · `browser_act(index?, kind=click,
-text?, submit?, x?, y?)` · `browser_navigate(url)` · `browser_scroll(dir, amount=600)` ·
-`browser_key(key)` · `browser_page_text(max_chars?)` · `browser_find(query, limit=10)` ·
-`browser_console(pattern?, limit=40)` · `browser_network(pattern?, limit=40)` ·
-`browser_extract(index, kind=text, attr?)` · `browser_close()` ·
-`browser_record_start(url?)` / `browser_record_stop(title, description?)` → draft tour ·
-`browser_run_tour(tour_id)` (driven mode in the user's browser, 15 min cap).
-Snapshot payload shape (old `_snapshot_payload` parity): `{url, note?, interactive_elements
-(≤14000 chars, line-safe truncation), element_count, screenshot_base64_jpeg?, screenshot_size?,
-coordinate_space: "screenshot is WxHpx; for coordinate clicks pass x,y in this pixel space"}`.
+`browser_list` · `browser_open(url, include_screenshot=False)` ·
+`browser_snapshot(include_screenshot=False)` · `browser_act(index?, kind=click, text?, submit?,
+x?, y?, role?, name?, include_screenshot=False)` · `browser_navigate(url)` ·
+`browser_scroll(dir, amount=600)` · `browser_key(key)` ·
+`browser_wait_for(selector?, text?, timeout_s=5 [0.5–15])` · `browser_page_text(max_chars?)` ·
+`browser_find(query, limit=10)` · `browser_console(pattern?, limit=40)` ·
+`browser_network(pattern?, limit=40)` · `browser_extract(index, kind=text, attr?)` ·
+`browser_close()` · `browser_record_start(url?)` / `browser_record_stop(title, description?)`
+→ draft tour · `browser_run_tour(tour_id)` (driven mode in the user's browser, 15 min cap).
+Snapshot payload shape: `{url, note?, interactive_elements (≤14000 chars, line-safe
+truncation), element_count}` — a text digest ONLY by default. Screenshots are opt-in
+(`include_screenshot=True` on open/snapshot/act): the JSON then adds `screenshot_size` +
+`coordinate_space` ("screenshot is WxHpx; for coordinate clicks pass x,y in this pixel space")
+and the JPEG itself rides a separate MCP image content block, never base64 inside the JSON.
+Element indexes are STABLE for the page's lifetime (extension-side registry; invalidated by
+real navigation); `browser_act(role?, name?)` targets by accessible name at act time as the
+staleness-proof alternative. Routing: implicit ops pin to the browser that owns the active
+drive session (claimed on any successful exec op, released by close) — a twin registration's
+heartbeat can never steal a live session.
 
 ## Surface 2 — `/mcp/agents/{agent_id}` (owner BE-C, `app/mcp/agent_endpoint.py`)
 
@@ -140,13 +149,19 @@ Hand-rolled JSON-RPC POST route (registered before the mount; `include_in_schema
   · `record_start(ws, url?, 30s)` · `record_stop(ws, title, 60s)` · `run_tour(ws, tour_id,
   900s)`. ctrl_id = uuid7; futures resolved by ctrl_id; timeout → error "the browser did not
   respond in time". No browser → error "no browser extension is connected for this workspace —
-  open the Stept extension side panel and sign in". Device pick: explicit device_id, else most
-  recently seen.
+  open the Stept extension side panel and sign in". Device pick: explicit device_id, else the
+  drive-session owner while its socket is connected (owner claimed on any successful exec op,
+  released by close; announced on `drive:ctrl` as `drive-owner` and piggybacked on
+  discover-replies so every worker converges), else most recently seen.
 - Drive op vocabulary the extension executes (superset of widget page-agent):
-  `open,snapshot,act,navigate,scroll,key,wait,close,page-text,find,console,network,extract,
-  back,forward,resize`. act kinds: `click,double-click,right-click,hover,type,select,check,
-  uncheck,drag` (+x,y coordinate space = screenshot px). Snapshot data: `{url, elements, count,
-  screenshot (b64 jpeg, longest edge ≤1568, clipped to viewport), screenshotSize:{w,h}, note?}`.
+  `open,snapshot,act,navigate,scroll,key,wait,wait-for,close,page-text,find,console,network,
+  extract,back,forward,resize`. act kinds: `click,double-click,right-click,hover,type,select,
+  check,uncheck,drag` (+x,y coordinate space = screenshot px; or `role`/`name` accessible-name
+  targeting). `open` REATTACHES to a still-alive driven tab (navigating it if a different url
+  was asked) instead of creating another. `wait-for` args: `{selector?, text?, timeoutMs}` →
+  settle/condition wait. Snapshot data: `{url, elements, count, screenshot? (b64 jpeg, longest
+  edge ≤1280, q60, clipped to viewport — ONLY when args.screenshot), screenshotSize?:{w,h},
+  note?}`; element indexes are stable per page lifetime.
 
 ## Extension (owners EXT-1 executor / EXT-2 transport) — port from old repo
 

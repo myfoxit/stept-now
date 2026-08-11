@@ -14,8 +14,9 @@ import {
   stampIndex,
   topmostOverlay,
   visibleText,
+  type IndexedElement,
 } from '@stept/dom-capture';
-import { waitForDomSettle } from '../dom-settle';
+import { waitForPageSettled } from '../dom-settle';
 import type { BgToExec, ExecOpName, ExecResult } from '../messages';
 
 /** Remote drive's in-page island: the DOM half of the exec-op contract
@@ -67,6 +68,95 @@ const EXCLUDE_SELECTOR = '[data-stept-drive],[data-stept-guide],[data-stept-pick
 
 const isExcluded = (el: Element): boolean => Boolean(el.closest(EXCLUDE_SELECTOR));
 
+// ---------------------------------------------------------------------------
+// stable element identity — an [index] lives as long as the page does
+// ---------------------------------------------------------------------------
+//
+// `indexInteractive` numbers elements by their position in the current
+// serialization order, so any page change RENUMBERED everything and an index
+// from the immediately-preceding snapshot could point at the wrong element (or
+// nothing). Instead, each element is assigned a stable id the first time it is
+// seen and keeps it across snapshots; new elements get fresh ids, removed
+// elements retire theirs. A full navigation reloads this script, which is
+// exactly the "invalidate on navigation" boundary the contract wants.
+
+interface StableDescriptor {
+  tag: string;
+  role: string;
+  name: string;
+  text: string;
+}
+
+let nextStableId = 0;
+const stableIdOf = new WeakMap<Element, number>();
+const stableRefs = new Map<number, WeakRef<Element>>();
+/** What each id looked like at extraction — the heal fuel when a framework
+ * re-render replaced the node (same control, new DOM identity). */
+const stableDescriptors = new Map<number, StableDescriptor>();
+
+/** Rewrite `entry.index` to stable ids (assigning fresh ones as needed) so the
+ * serialization, the stamps and `find` all speak the same durable address. */
+function assignStableIds(index: IndexedElement[]): void {
+  for (const entry of index) {
+    let id = stableIdOf.get(entry.el);
+    if (id === undefined) {
+      id = nextStableId++;
+      stableIdOf.set(entry.el, id);
+    }
+    entry.index = id;
+    stableRefs.set(id, new WeakRef(entry.el));
+    stableDescriptors.set(id, {
+      tag: entry.tag,
+      role: entry.role,
+      name: entry.name,
+      text: entry.text,
+    });
+  }
+  if (stableRefs.size > 4 * INDEX_CAP) pruneStableRefs();
+}
+
+function pruneStableRefs(): void {
+  for (const [id, ref] of stableRefs) {
+    const el = ref.deref();
+    if (!el || !el.isConnected) {
+      stableRefs.delete(id);
+      stableDescriptors.delete(id);
+    }
+  }
+}
+
+/** Test seam: back to a blank registry (a fresh page load, in effect). */
+export function resetStableIndexForTests(): void {
+  nextStableId = 0;
+  stableRefs.clear();
+  stableDescriptors.clear();
+}
+
+/** The node a framework re-render put where the indexed one used to be: same
+ * tag and same accessible name / visible text, and UNAMBIGUOUS (exactly one
+ * candidate) — guessing between twins would click the wrong control. */
+function healIndex(id: number): Element | null {
+  const desc = stableDescriptors.get(id);
+  const needle = desc && (desc.name || desc.text);
+  if (!desc || !needle) return null;
+  const wanted = normText(needle, 120).toLowerCase();
+  const index = indexInteractive(document, { cap: INDEX_CAP, exclude: isExcluded });
+  const matches = index.filter((entry) => {
+    if (entry.tag !== desc.tag) return false;
+    const name = normText(entry.name, 120).toLowerCase();
+    const text = normText(entry.text, 120).toLowerCase();
+    return name === wanted || text === wanted;
+  });
+  if (matches.length !== 1) return null;
+  const el = matches[0]!.el;
+  // Restore identity: a node that never had an id inherits this one; a node
+  // already known under another id is merely aliased (both addresses work).
+  if (!stableIdOf.has(el)) stableIdOf.set(el, id);
+  stableRefs.set(id, new WeakRef(el));
+  el.setAttribute(INDEX_ATTR, String(id));
+  return el;
+}
+
 /** Execute one exec-op against the live document. Throws on failure — the
  * listener maps a throw to `{ok:false, error}`. */
 export async function handleExecOp(op: ExecOpName, args: Record<string, unknown>): Promise<unknown> {
@@ -76,6 +166,7 @@ export async function handleExecOp(op: ExecOpName, args: Record<string, unknown>
 
     case 'compact-dom': {
       const index = indexInteractive(document, { cap: INDEX_CAP, exclude: isExcluded });
+      assignStableIds(index);
       stampIndex(document, index);
       const offset = Math.max(0, Math.trunc(Number(args.offset ?? 0)) || 0);
       return { text: serializeCompact(index, ELEMENTS_BUDGET, offset), count: index.length };
@@ -85,6 +176,31 @@ export async function handleExecOp(op: ExecOpName, args: Record<string, unknown>
       const el = byIndex(args);
       if (!el) return { found: false };
       return measure(el);
+    }
+
+    case 'resolve-semantic': {
+      // Find-by-accessible-name at act time: index staleness cannot bite when
+      // the target is named the way the user (and the model) sees it.
+      const name = normText(String(args.name ?? ''), 120);
+      if (!name) throw new Error('semantic targeting needs a name (the visible label)');
+      const role = String(args.role ?? '')
+        .trim()
+        .toLowerCase();
+      const index = indexInteractive(document, { cap: INDEX_CAP, exclude: isExcluded });
+      assignStableIds(index);
+      const pool = role
+        ? index.filter((entry) => entry.role === role || entry.tag === role)
+        : index;
+      const hit = findByText(pool, name, 1)[0];
+      const el = hit ? pool.find((entry) => entry.index === hit.index)?.el : undefined;
+      if (!el) {
+        throw new Error(
+          role
+            ? `no ${role} matching "${name}" on this page — take a fresh snapshot or try browser_find`
+            : `nothing matching "${name}" on this page — take a fresh snapshot or try browser_find`,
+        );
+      }
+      return { ...measure(el), index: hit!.index };
     }
 
     case 'describe':
@@ -171,20 +287,16 @@ export async function handleExecOp(op: ExecOpName, args: Record<string, unknown>
       const query = String(args.query ?? '').trim();
       if (!query) return [];
       const limit = clampInt(args.limit, 1, 50, 10);
-      // A fresh index (same exclusions as compact-dom), but report each hit
-      // under its STAMPED idx when the last snapshot numbered it — so the
-      // returned index is the one `resolve-index`/act can actually address.
+      // A fresh index (same exclusions as compact-dom) carrying the STABLE ids,
+      // so every hit's index is the durable address `resolve-index`/act uses.
       const index = indexInteractive(document, { cap: INDEX_CAP, exclude: isExcluded });
-      return findByText(index, query, limit).map((f) => {
-        const el = index[f.index]?.el;
-        const stamped = el?.getAttribute(INDEX_ATTR);
-        return {
-          index: stamped != null && stamped !== '' ? Number(stamped) : f.index,
-          text: f.text || f.name,
-          tag: f.tag,
-          visible: f.visible,
-        };
-      });
+      assignStableIds(index);
+      return findByText(index, query, limit).map((f) => ({
+        index: f.index,
+        text: f.text || f.name,
+        tag: f.tag,
+        visible: f.visible,
+      }));
     }
 
     case 'page-text':
@@ -251,13 +363,48 @@ export async function handleExecOp(op: ExecOpName, args: Record<string, unknown>
     }
 
     case 'dom-settle': {
-      // MutationObserver quiet-window before a snapshot serialize — readyState
-      // settling can't see SPA renders that land after 'complete'. quietMs is
-      // capped by the hard ceiling so a silly arg can't out-wait maxMs.
+      // Full hydration gate before a snapshot serialize: readyState (initial
+      // parse) + one rAF (first paint) + a MutationObserver quiet-window (SPA
+      // renders that land after 'complete'). quietMs is capped by the hard
+      // ceiling so a silly arg can't out-wait maxMs.
       const requested = Number(args.ms);
       const quietMs = Math.min(Number.isFinite(requested) && requested > 0 ? requested : 400, 3000);
-      await waitForDomSettle({ quietMs, maxMs: 3000 });
+      await waitForPageSettled({ quietMs, maxMs: 3000 });
       return true;
+    }
+
+    case 'wait-for': {
+      // Wait for a selector / visible text / plain settle, bounded. The result
+      // says whether the condition was met — the caller reports a timeout
+      // honestly instead of snapshotting and hoping.
+      const timeoutMs = clampInt(args.timeoutMs, 100, 20_000, 5000);
+      const selector = firstString(args.selector)?.trim() || null;
+      const text = selector ? null : firstString(args.text, args.query)?.trim() || null;
+      const startedAt = Date.now();
+      if (!selector && !text) {
+        await waitForPageSettled({ maxMs: timeoutMs });
+        return { met: true, waited_ms: Date.now() - startedAt };
+      }
+      const needle = text ? normText(text, 200).toLowerCase() : '';
+      const check = (): boolean => {
+        if (selector) {
+          try {
+            return [...document.querySelectorAll(selector)].some(
+              (el) => !isExcluded(el) && isVisibleLenient(el),
+            );
+          } catch {
+            throw new Error(`"${selector}" is not a valid CSS selector`);
+          }
+        }
+        return pageText(document, 60_000, isExcluded).toLowerCase().includes(needle);
+      };
+      for (;;) {
+        if (check()) return { met: true, waited_ms: Date.now() - startedAt };
+        if (Date.now() - startedAt >= timeoutMs) {
+          return { met: false, waited_ms: Date.now() - startedAt };
+        }
+        await sleep(120);
+      }
     }
   }
 }
@@ -266,11 +413,19 @@ export async function handleExecOp(op: ExecOpName, args: Record<string, unknown>
 // helpers (exported where a test exercises them directly)
 // ---------------------------------------------------------------------------
 
-/** The element the last `compact-dom` stamped with this index, or null. */
+/** The element behind a stable index: the live registry reference first, the
+ * stamped attribute second (covers a worker that missed the registry write),
+ * and a descriptor-based heal last — a framework re-render that replaced the
+ * node no longer voids an index taken one snapshot ago. */
 function byIndex(args: Record<string, unknown>): Element | null {
   const idx = Number(args.index);
   if (!Number.isFinite(idx)) return null;
-  return document.querySelector(`[${INDEX_ATTR}="${Math.trunc(idx)}"]`);
+  const id = Math.trunc(idx);
+  const held = stableRefs.get(id)?.deref();
+  if (held?.isConnected) return held;
+  const stamped = document.querySelector(`[${INDEX_ATTR}="${id}"]`);
+  if (stamped) return stamped;
+  return healIndex(id);
 }
 
 function requireIndex(args: Record<string, unknown>): Element {

@@ -222,6 +222,13 @@ class TourStepIn(BaseModel):
     sandbox_key: str | None = Field(default=None, max_length=500)
     placement: StepPlacement = "auto"
     advance: StepAdvance = Field(default_factory=StepAdvance)
+    # The page this step lives on (origin+path or path) — the player navigates
+    # there before resolving the anchor, which is what makes recorded multi-page
+    # tours replayable. Recorder-stamped; tolerated absent on older steps.
+    url: str | None = Field(default=None, max_length=2000)
+    # Recorder opt-in: a real click was recorded, so clicking the anchored
+    # element advances the tour (equivalent to advance.on == "element_click").
+    advance_on_click: bool | None = None
     cta: StepCta | None = None
     secondary_cta: StepCta | None = None
     action: StepAction | None = None
@@ -231,6 +238,11 @@ class TourStepIn(BaseModel):
     @classmethod
     def _clip_hint(cls, value: str) -> str:
         return value.strip()[:80]
+
+    @field_validator("url")
+    @classmethod
+    def _clean_url(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
 
     @field_validator("fallback_selectors")
     @classmethod
@@ -296,6 +308,8 @@ class TourStepOut(BaseModel):
     sandbox_key: str | None = None
     placement: str = "auto"
     advance: StepAdvance = Field(default_factory=StepAdvance)
+    url: str | None = None
+    advance_on_click: bool | None = None
     cta: StepCta | None = None
     secondary_cta: StepCta | None = None
     action: StepAction | None = None

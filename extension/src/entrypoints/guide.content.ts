@@ -45,7 +45,9 @@ export default defineContentScript({
 
 function send(msg: ContentToBg): void {
   try {
-    chrome.runtime.sendMessage(msg);
+    // Catch the promise too: a no-receiver rejection would otherwise land as
+    // an Uncaught error in the customer page's console (see recorder.content).
+    chrome.runtime.sendMessage(msg)?.catch?.(() => {});
   } catch {
     /* SW asleep — the background re-drives the step on the next navigation */
   }

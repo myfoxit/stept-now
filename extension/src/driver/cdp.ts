@@ -237,10 +237,12 @@ export class CdpSession {
     return session;
   }
 
-  /** Claude-in-Chrome's vision budget: longest screenshot edge ≤ 1568 px. */
-  private static readonly MAX_SHOT_DIM = 1568;
+  /** Vision budget: longest screenshot edge ≤ 1280 px. Snapshots ride MCP
+   * responses into agent contexts, so smaller-but-legible beats pixel-perfect
+   * (screenshots are opt-in per op on top of this). */
+  private static readonly MAX_SHOT_DIM = 1280;
 
-  /** Viewport-clipped base64 JPEG, longest edge ≤ 1568 px.
+  /** Viewport-clipped base64 JPEG, longest edge ≤ 1280 px.
    *
    * `fromSurface:true` + `captureBeyondViewport:false` captures from the
    * compositor SURFACE, which reliably grabs a BACKGROUND/unfocused tab — the
@@ -251,7 +253,7 @@ export class CdpSession {
    * coordinate clicks land in the wrong place. `scale` downscales server-side
    * when the viewport exceeds the vision budget; the returned w/h are measured
    * from the ACTUAL jpeg so coordinate mapping never trusts the request. */
-  async screenshot(quality = 70): Promise<{ data: string; w: number; h: number }> {
+  async screenshot(quality = 60): Promise<{ data: string; w: number; h: number }> {
     const params: Record<string, unknown> = {
       format: 'jpeg',
       quality,

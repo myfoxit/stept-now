@@ -71,3 +71,20 @@ export function suggestUrlPattern(href: string): string {
     return '';
   }
 }
+
+/**
+ * The page a recorded step lives on, as the player should navigate to it:
+ * origin + path, query and hash dropped (they are session noise — auth codes,
+ * scroll anchors — far more often than routing). Null for internal/unparseable
+ * URLs so a step never carries a chrome:// address.
+ */
+export function stepPageUrl(href: string | undefined): string | null {
+  if (!href || isInternalUrl(href)) return null;
+  try {
+    const url = new URL(href);
+    if (!/^https?:$/.test(url.protocol)) return null;
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return null;
+  }
+}

@@ -53,6 +53,12 @@ export interface TourStep {
   sandbox_key?: string | null;
   placement: StepPlacement;
   advance: StepAdvance;
+  /** The page this step lives on (origin+path) — lets the player navigate
+   * between pages. Stamped by the recorder on every captured step. */
+  url?: string | null;
+  /** Step was recorded from a real click: clicking the anchored element
+   * advances the tour (mirrors `advance.on === 'element_click'`). */
+  advance_on_click?: boolean | null;
   action?: StepAction | null;
   wait?: StepWait | null;
 }
@@ -222,6 +228,7 @@ export interface DriveOp {
     | 'scroll'
     | 'key'
     | 'wait'
+    | 'wait-for'
     | 'close'
     | 'page-text'
     | 'find'
@@ -251,6 +258,10 @@ export interface DriveOp {
     y?: number;
     toX?: number;
     toY?: number;
+    /** semantic act targeting: find by accessible name (+ optional role) at
+     * act time — survives index staleness across re-renders */
+    role?: string;
+    name?: string;
     query?: string;
     pattern?: string;
     limit?: number;
@@ -260,6 +271,11 @@ export interface DriveOp {
     key?: string;
     ms?: number;
     offset?: number;
+    /** wait-for: CSS selector / visible text / settle timeout */
+    selector?: string;
+    timeoutMs?: number;
+    /** capture (downscaled) screenshot with this snapshot — off by default */
+    screenshot?: boolean;
     extractKind?: 'text' | 'attr' | 'url';
     attr?: string;
     width?: number;
@@ -273,7 +289,8 @@ export interface DriveSnapshot {
   /** compact indexed listing — `[n]<role name …>` lines from @stept/dom-capture */
   elements: string;
   count: number;
-  /** base64 JPEG, viewport-clipped, longest edge ≤ 1568 */
+  /** base64 JPEG, viewport-clipped, longest edge ≤ 1280 — captured only when
+   * the op asked for it (`args.screenshot`), never by default */
   screenshot?: string;
   screenshotSize?: { w: number; h: number };
   note?: string;
