@@ -416,6 +416,52 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
   - **Totals after W13:** backend 1714 (+8 skipped), frontend 498, widget 251.
     `make verify` green.
 
+- [x] **Dogfood fix wave (2026-08-11, dated — not numbered, landed while another wave
+  was in flight)** — a live dogfood of the widget + Northplane tours on doktrace.com
+  produced a 23-item backlog; this wave fixed the P0/P1 core in four parallel worktrees
+  (`agent-truthful`, `tour-runtime`, `messenger-shell`, `bridge-extension`) merged via
+  `integrate/dogfood-fixes`. Highlights:
+  - **The false-failure loop is dead.** The engine's only tour-success signal was the
+    messenger-iframe round trip (dropped whenever the thread was closed or the iframe
+    reloaded); the 90s sweep then fabricated "timed out waiting for the page" and the
+    model apologised while the tour played. Loader-fired tour telemetry
+    (`started/step_viewed/step_blocked/completed/dismissed/step_error`) is now the
+    authoritative signal: runs resume on `started`, finalize silently on
+    `dismissed`/`completed`, and lifecycle lines are mirrored into the transcript
+    (localized, 13 locales). `dismissed` is intent, never an error.
+  - **Agent discipline:** 1 inbound → exactly 1 reply (`meta.reply_to`, cancel-and-merge),
+    reply language follows the *latest visitor message* (stored locale only tiebreaks),
+    `tour_autostart_policy` ask|auto|never (default ask → answer + `tour_offer` card;
+    imperatives start immediately), auto-title, 24h auto-resolve → existing CSAT,
+    `agent_run.updated {terminal}` clears the widget status line (90s client fallback).
+  - **Tours travel:** per-step `url` recorded, persisted (normalize passthrough +
+    content-signature) and honored by the player (navigate / "finding it…" wait ≤3s /
+    explicit blocked card with Skip step · End tour, `step_blocked` telemetry — green
+    tours can no longer be silently unplayable; blocked ⇒ at least yellow in
+    `tours_health`). Resume pill instead of step-1 restarts; final-step CTA url works;
+    modal steps always center; `advance_on_click` steps let the real click through the
+    scrim and advance on it.
+  - **Coexistence:** tour start collapses an open panel to a progress pill (restored
+    after), launcher sits above the scrim, tooltip placement avoids widget surfaces,
+    Esc dismisses the tour without leaking to the host.
+  - **Messenger shell:** per-widget `brand_display_name`, agent name + AI chip on
+    bubbles, unread opens the thread, word-boundary previews (tour events excluded),
+    starter chips, "Talk to a person", federated Home search (articles + tours),
+    localized times/labels (+27 keys × 13 locales), single close affordance.
+  - **Bridge:** duplicate device registrations fixed (single-flight device id +
+    epoch-guarded run client), drive-session owner affinity (heartbeats can't steal
+    routing), `browser_open` reattaches instead of stacking tabs, snapshots are ~7 KB
+    by default (screenshots opt-in as MCP image blocks, 1280px/q60), page-lifetime
+    element ids + `browser_act(role=,name=)`, settle-before-extract + `browser_wait_for`,
+    recorder stamps `url`/`advance_on_click`, content scripts no longer throw into
+    customer consoles.
+  - **Deliberately deferred** (still open from the backlog): token streaming, composer
+    attachments, identify/HMAC wiring on customer sites, Home/Messages/Help full IA,
+    campaigns surface in-widget, mobile-viewport pass, host-side loader strings i18n.
+  - **Measured on the merged tree:** backend **1799** passed (+8 pg-skipped), frontend
+    **498**, widget **326**, extension **233**; ruff/mypy/tsc clean; all builds green;
+    alembic heads still **one** (no new migrations — JSON-attribute state only).
+
 - [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
   `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
   untouched. Postgres containers used for migration validation may still be up on 54329
