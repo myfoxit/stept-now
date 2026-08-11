@@ -42,7 +42,16 @@ export interface SteptSettings {
    * interface than by the one the site owner assumed.
    */
   lockLocale?: boolean
+  /**
+   * What happens when the backend pushes an auto-triggered tour: `ask` (default)
+   * offers it as a compact pill, `auto` plays it immediately (the pre-policy
+   * behaviour), `never` suppresses autostart entirely. Explicit starts —
+   * `Stept('startTour', …)`, the messenger, previews, resume — always play.
+   */
+  tourAutostartPolicy?: TourAutostartPolicy
 }
+
+export type TourAutostartPolicy = 'ask' | 'auto' | 'never'
 
 /** Public widget-inbox theming/config (inbox.config passed through boot). */
 export interface WidgetConfig {
@@ -210,6 +219,17 @@ export interface TourStep {
   sandbox_key?: string | null
   placement: StepPlacement
   advance?: StepAdvance
+  /**
+   * The page this step lives on (anchored steps: navigate there before
+   * resolving; the LAST step: navigate there after Done). Path or absolute URL.
+   */
+  url?: string | null
+  /**
+   * Recorder opt-in: a click on the anchored element advances the tour (the
+   * spotlight cutout is click-through, so the host app's own handler fires
+   * too). Equivalent to `advance.on === 'element_click'`.
+   */
+  advance_on_click?: boolean | null
   /** Author-supplied button copy. An empty label falls back to Next / Got it. */
   cta?: StepCta | null
   secondary_cta?: StepCta | null
@@ -261,6 +281,7 @@ export interface Tour {
 export type TourEventName =
   | 'started'
   | 'step_viewed'
+  | 'step_blocked'
   | 'completed'
   | 'dismissed'
   | 'step_error'
@@ -271,7 +292,7 @@ export interface TourEventMeta {
   viewport_w?: number
   /** true when the step resolved via anything but its primary selector. */
   healed?: boolean
-  /** step_error only: `not_found` | `in_iframe` | `timeout`. */
+  /** step_error / step_blocked only: `not_found` | `in_iframe` | `timeout`. */
   reason?: string
   [key: string]: unknown
 }

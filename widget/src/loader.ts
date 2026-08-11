@@ -39,6 +39,7 @@ import {
   campaignSeenKey,
   firstDueCampaign,
   installStept,
+  normalizeAutostartPolicy,
   parsePreviewHash,
   patchHistory,
   pruneSeenCampaigns,
@@ -53,7 +54,15 @@ import { ActionRegistry } from './actions'
 import { PageAgent, type PageOp } from './page-agent'
 import { envelope, MSG, type MessageType, parseEnvelope } from './protocol'
 import { selectFirstEligibleSurvey, SurveyWidget, surveySeenKey } from './survey-widget'
-import { selectFirstEligibleTour, TourPlayer, tourProgressKey } from './tour-player'
+import {
+  clearTourProgress,
+  readTourProgress,
+  selectFirstEligibleTour,
+  TourPlayer,
+  tourProgressKey,
+  type Rect,
+  type TourProgress,
+} from './tour-player'
 import type {
   Campaign,
   Checklist,
@@ -63,6 +72,7 @@ import type {
   Survey,
   SurveyAnswer,
   Tour,
+  TourAutostartPolicy,
   TourEventMeta,
   TourEventName,
   TourStep,
@@ -84,10 +94,14 @@ function scriptOrigin(): string {
 
 const LAUNCHER_ID = 'stept-launcher'
 const FRAME_ID = 'stept-frame'
+const PILL_ID = 'stept-tour-pill'
 const STYLE_ID = 'stept-loader-style'
 
+/* The launcher and pill sit ABOVE the tour chrome (root/scrim 2147483000, tip
+   2147483001): a visitor mid-tour must always be able to reach chat or the
+   Stop button. Tooltip placement treats both as exclusion zones instead. */
 const CSS = `
-#${LAUNCHER_ID}{position:fixed;bottom:20px;z-index:2147482900;width:60px;height:60px;
+#${LAUNCHER_ID}{position:fixed;bottom:20px;z-index:2147483002;width:60px;height:60px;
   border-radius:50%;border:0;cursor:pointer;box-shadow:0 6px 20px rgba(15,23,42,.28);
   background:var(--stept-accent,#5b46e5);color:#fff;display:flex;align-items:center;
   justify-content:center;transition:transform .15s ease,opacity .15s ease}
@@ -98,13 +112,32 @@ const CSS = `
 #${LAUNCHER_ID} .stept-badge{position:absolute;top:-2px;right:-2px;min-width:20px;height:20px;
   padding:0 5px;border-radius:10px;background:#ef4444;color:#fff;font:600 11px/20px system-ui,sans-serif;
   text-align:center;box-sizing:border-box;box-shadow:0 0 0 2px #fff}
-#${FRAME_ID}{position:fixed;bottom:92px;z-index:2147482901;width:400px;height:640px;
+#${FRAME_ID}{position:fixed;bottom:92px;z-index:2147483003;width:400px;height:640px;
   max-height:calc(100vh - 112px);border:0;border-radius:16px;overflow:hidden;
   box-shadow:0 12px 48px rgba(15,23,42,.32);background:transparent;opacity:0;
   transform:translateY(12px);pointer-events:none;transition:opacity .2s ease,transform .2s ease}
 #${FRAME_ID}.stept-right{right:20px}
 #${FRAME_ID}.stept-left{left:20px}
 #${FRAME_ID}.stept-open{opacity:1;transform:translateY(0);pointer-events:auto}
+#${PILL_ID}{position:fixed;bottom:30px;z-index:2147483002;display:flex;align-items:center;gap:8px;
+  padding:8px 10px 8px 16px;border-radius:999px;background:#fff;color:#0f172a;
+  box-shadow:0 8px 28px rgba(15,23,42,.24);box-sizing:border-box;
+  font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  max-width:min(420px,calc(100vw - 130px))}
+#${PILL_ID}.stept-right{right:92px}
+#${PILL_ID}.stept-left{left:92px}
+#${PILL_ID} .stept-pill-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#${PILL_ID} .stept-pill-btn{flex:none;border:0;border-radius:999px;padding:6px 12px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;line-height:1.2;
+  background:var(--stept-accent,#5b46e5);color:#fff}
+#${PILL_ID} .stept-pill-ghost{background:transparent;color:#475569}
+#${PILL_ID} .stept-pill-close{padding:6px 8px;font-size:15px;line-height:1}
+#${PILL_ID} .stept-pill-btn:focus-visible{outline:2px solid var(--stept-accent,#5b46e5);
+  outline-offset:2px}
+@media (prefers-color-scheme:dark){
+  #${PILL_ID}{background:#1e293b;color:#f1f5f9}
+  #${PILL_ID} .stept-pill-ghost{color:#cbd5e1}
+}
 @media (max-width:480px){
   #${FRAME_ID}{inset:0;width:100%;height:100%;max-height:100%;border-radius:0;bottom:0}
   #${FRAME_ID}.stept-open ~ #${LAUNCHER_ID},#${LAUNCHER_ID}.stept-hidden-mobile{opacity:0}
@@ -117,7 +150,7 @@ const CHAT_ICON =
 const CLOSE_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
 
-class WidgetHost {
+export class WidgetHost {
   private settings: SteptSettings
   private apiBase: string
   private widgetKey: string
@@ -135,6 +168,13 @@ class WidgetHost {
   private survey: SurveyWidget | null = null
   private lastExperienceUrl = ''
   private previewing = false
+
+  /** The compact tour pill (offer / resume / in-flight progress + Stop). */
+  private pill: HTMLDivElement | null = null
+  /** Did a tour collapse the messenger panel (restore it when the tour ends)? */
+  private panelWasOpen = false
+  /** What a backend-pushed (offered) tour may do; explicit starts bypass it. */
+  private autostartPolicy: TourAutostartPolicy = 'ask'
 
   /** Ongoing campaigns, fetched once per page session (reset on re-boot). */
   private campaigns: Campaign[] | null = null
@@ -205,6 +245,7 @@ class WidgetHost {
       apiBase: this.apiBase,
       progressKey: tourProgressKey(this.widgetKey),
       onEvent: (event, stepIndex, meta) => this.onTourEvent(event, stepIndex, meta),
+      getObstructions: () => this.obstructionRects(),
     })
     this.checklist = new ChecklistWidget({
       widgetKey: this.widgetKey,
@@ -335,6 +376,9 @@ class WidgetHost {
     this.survey?.close(false)
     this.tourPlayer = this.checklist = this.survey = null
     this.activeTourId = null
+    this.activeTour = null
+    this.hidePill()
+    this.panelWasOpen = false
     this.launcher?.remove()
     this.frame?.remove()
     this.launcher = this.frame = this.badge = null
@@ -381,9 +425,13 @@ class WidgetHost {
         if (payload.position === 'left' || payload.position === 'right') {
           this.applyPosition(payload.position)
         }
+        // Host-page setting wins over the workspace config the app forwards.
+        this.autostartPolicy = normalizeAutostartPolicy(
+          this.settings.tourAutostartPolicy ?? payload.tour_autostart_policy,
+        )
         this.setUnread(Number(payload.unread ?? 0))
         this.pushPageContext()
-        void this.checkExperiences(true)
+        void this.bootstrapExperiences()
         void this.checkCampaigns(true)
         break
       case MSG.UNREAD:
@@ -402,6 +450,9 @@ class WidgetHost {
         break
       case MSG.TOUR_START:
         void this.startTour(String(payload.tourId ?? ''), String(payload.opId ?? '') || undefined)
+        break
+      case MSG.TOUR_RESUME:
+        void this.resumeTour(String(payload.tourId ?? ''))
         break
       case MSG.COPILOT_OP:
         void this.runCopilotOp(payload)
@@ -573,6 +624,8 @@ class WidgetHost {
   // --- experiences ---------------------------------------------------------
 
   private activeTourId: string | null = null
+  /** The playing tour itself — the pill and `tour:state` need name + length. */
+  private activeTour: Tour | null = null
 
   private onLocationChange = (): void => {
     this.pushPageContext()
@@ -604,14 +657,17 @@ class WidgetHost {
     }
   }
 
+  /** Resume takes precedence over fresh offers on every full page load. */
+  private async bootstrapExperiences(): Promise<void> {
+    await this.checkResume()
+    await this.checkExperiences(true)
+  }
+
   private applyExperiences(data: ExperiencesResponse, url: string): void {
-    let claimed = this.hasOverlay()
+    let claimed = this.hasOverlay() || this.pill !== null
     if (!claimed) {
       const tour = selectFirstEligibleTour(data.tours ?? [], this.seenIds(this.toursSeenKey()))
-      if (tour) {
-        this.play(tour)
-        claimed = true
-      }
+      if (tour) claimed = this.offerTour(tour)
     }
     if (!claimed) {
       const survey = selectFirstEligibleSurvey(
@@ -633,6 +689,94 @@ class WidgetHost {
   }
 
   // --- tours ---------------------------------------------------------------
+
+  /**
+   * Policy gate for a backend-PUSHED tour (an offer, never a command):
+   * `auto` plays it, `ask` (default) shows a compact offer pill, `never`
+   * drops it. Returns true when the tour claimed this page view.
+   */
+  private offerTour(tour: Tour): boolean {
+    if (this.autostartPolicy === 'never') return false
+    if (this.autostartPolicy === 'auto') {
+      this.play(tour)
+      return true
+    }
+    this.showPill({
+      text: tour.name,
+      actions: [{ label: t('tour.start'), primary: true, onClick: () => this.play(tour) }],
+      onDismiss: () => {
+        // A declined offer stays declined — otherwise every SPA navigation
+        // would re-offer the same tour.
+        this.rememberSeen(this.toursSeenKey(), tour.id)
+        this.hidePill()
+      },
+    })
+    return true
+  }
+
+  /**
+   * In-flight progress found in localStorage (24h TTL, shared across tabs).
+   * Our OWN navigation (`navigating` flag) continues the tour automatically;
+   * anything else — the visitor navigated, closed the tab, opened a new one —
+   * gets a resume pill instead of a restart at step 1.
+   */
+  private async checkResume(): Promise<void> {
+    if (this.previewing || this.tourPlayer?.active) return
+    const key = tourProgressKey(this.widgetKey)
+    const progress = readTourProgress(this.storage(), key)
+    if (!progress) return
+    if (this.seenIds(this.toursSeenKey()).has(progress.tourId)) {
+      // Completed/dismissed elsewhere (another tab): a leftover record must
+      // never resurrect the tour.
+      clearTourProgress(this.storage(), key)
+      return
+    }
+    let tour: Tour
+    try {
+      tour = await fetchTour(this.apiBase, this.widgetKey, progress.tourId, this.token)
+    } catch {
+      clearTourProgress(this.storage(), key) // unpublished/deleted — stop offering
+      return
+    }
+    if (this.tourPlayer?.active) return // something started while we fetched
+    if (progress.navigating) {
+      this.play(tour) // the player itself resumes at the persisted step
+      return
+    }
+    this.showResumePill(tour, progress)
+  }
+
+  private showResumePill(tour: Tour, progress: TourProgress): void {
+    const total = tour.steps.length
+    const stepIndex = Math.min(progress.stepIndex, Math.max(0, total - 1))
+    this.showPill({
+      text: `Continue tour — step ${stepIndex + 1} of ${total}`,
+      actions: [{ label: 'Continue', primary: true, onClick: () => this.play(tour) }],
+      onDismiss: () => {
+        // Declining a half-done tour IS a dismissal — reported as one, so the
+        // AI never apologises for a "failed" tour the visitor closed on
+        // purpose (that is what `step_error` is for).
+        postTourEvent(this.apiBase, this.widgetKey, tour.id, 'dismissed', stepIndex, this.token, {
+          resume_declined: true,
+        }).catch(() => {})
+        clearTourProgress(this.storage(), tourProgressKey(this.widgetKey))
+        this.rememberSeen(this.toursSeenKey(), tour.id)
+        this.hidePill()
+      },
+    })
+  }
+
+  /** `stept:tour:resume` from the messenger — continue at the persisted step. */
+  async resumeTour(tourId: string): Promise<void> {
+    if (!tourId) return
+    if (this.tourPlayer?.active && this.activeTourId === tourId) return
+    try {
+      const tour = await fetchTour(this.apiBase, this.widgetKey, tourId, this.token)
+      this.play(tour)
+    } catch (err) {
+      console.warn(`[stept] resumeTour ${tourId} failed`, err)
+    }
+  }
 
   /**
    * `Stept('startTour', id)`: fetch THAT tour (manual triggers included).
@@ -682,11 +826,26 @@ class WidgetHost {
 
   /** Begin a tour, tagging telemetry with its id (set before 'started' fires). */
   private play(tour: Tour, preview = false): void {
+    if (this.tourPlayer?.active) {
+      if (this.activeTourId === tour.id) return // pushed again — already playing
+      // An explicit start replaces the active tour. Dismissing it FIRST keeps
+      // its telemetry (and its seen-mark) attributed to ITS id, and clears its
+      // progress so it cannot come back as a zombie resume offer.
+      this.tourPlayer.dismiss()
+    }
+    this.hidePill()
     // One overlay at a time: a tour takes the screen from a survey/checklist.
     this.survey?.close(false)
     this.checklist?.closePanel()
+    this.activeTour = tour
     this.activeTourId = tour.id
     this.tourPlayer?.start(tour, { preview })
+    if (!this.tourPlayer?.active) return
+    // The open panel would cover the anchors the tour points at: shrink the
+    // messenger to the pill for the duration.
+    this.collapsePanel()
+    this.showProgressPill(tour, this.tourPlayer.stepIndex)
+    this.postTourState('started')
   }
 
   private onTourEvent(
@@ -706,11 +865,16 @@ class WidgetHost {
       meta ?? null,
     ).catch(() => {})
     this.post(MSG.TOUR_EVENT, { tourId, event, stepIndex, meta })
+    if (event === 'step_viewed' && this.activeTour) {
+      this.showProgressPill(this.activeTour, stepIndex ?? 0)
+    }
+    if (event === 'step_blocked') this.postTourState('blocked')
     if (event === 'completed') {
       // Optimistic locally; the server does it authoritatively for contacts.
       this.checklist?.onTourCompleted(tourId)
     }
     if (event === 'completed' || event === 'dismissed') {
+      this.postTourState(event)
       if (this.previewing) {
         // Preview over: let the normal bootstrap run again on this same URL.
         this.previewing = false
@@ -719,7 +883,100 @@ class WidgetHost {
         this.rememberSeen(this.toursSeenKey(), tourId)
       }
       this.activeTourId = null
+      this.activeTour = null
+      this.restoreAfterTour()
     }
+  }
+
+  /** `stept:tour:state` — the app collapses on `started`, restores on the rest. */
+  private postTourState(status: 'started' | 'completed' | 'dismissed' | 'blocked'): void {
+    const tour = this.activeTour
+    if (!tour) return
+    this.post(MSG.TOUR_STATE, {
+      status,
+      tourId: tour.id,
+      step: (this.tourPlayer?.stepIndex ?? 0) + 1,
+      total: tour.steps.length,
+      title: tour.name,
+    })
+  }
+
+  // --- tour pill + panel choreography --------------------------------------
+
+  private collapsePanel(): void {
+    if (!this.open) return
+    this.panelWasOpen = true
+    this.close()
+  }
+
+  private restoreAfterTour(): void {
+    this.hidePill()
+    if (this.panelWasOpen) {
+      this.panelWasOpen = false
+      this.openPanel()
+    }
+  }
+
+  private showProgressPill(tour: Tour, stepIndex: number): void {
+    this.showPill({
+      text: `${tour.name} · ${stepIndex + 1}/${tour.steps.length}`,
+      actions: [{ label: 'Stop', onClick: () => this.tourPlayer?.dismiss() }],
+    })
+  }
+
+  private showPill(opts: {
+    text: string
+    actions: Array<{ label: string; primary?: boolean; onClick: () => void }>
+    onDismiss?: () => void
+  }): void {
+    this.hidePill()
+    const pill = document.createElement('div')
+    pill.id = PILL_ID
+    pill.className = `stept-${this.position}`
+    pill.style.setProperty('--stept-accent', this.accent)
+    const text = document.createElement('span')
+    text.className = 'stept-pill-text'
+    text.textContent = opts.text
+    text.title = opts.text
+    pill.appendChild(text)
+    for (const action of opts.actions) {
+      const btn = document.createElement('button')
+      btn.className = action.primary ? 'stept-pill-btn' : 'stept-pill-btn stept-pill-ghost'
+      btn.textContent = action.label
+      btn.addEventListener('click', action.onClick)
+      pill.appendChild(btn)
+    }
+    if (opts.onDismiss) {
+      const close = document.createElement('button')
+      close.className = 'stept-pill-btn stept-pill-ghost stept-pill-close'
+      close.setAttribute('aria-label', t('tour.dismiss'))
+      close.textContent = '×'
+      close.addEventListener('click', opts.onDismiss)
+      pill.appendChild(close)
+    }
+    document.body.appendChild(pill)
+    this.pill = pill
+  }
+
+  private hidePill(): void {
+    this.pill?.remove()
+    this.pill = null
+  }
+
+  /** The widget's own surfaces — exclusion zones for tooltip placement. */
+  private obstructionRects(): Rect[] {
+    const rects: Rect[] = []
+    const push = (el: HTMLElement | null, visible: boolean): void => {
+      if (!el || !visible) return
+      const r = el.getBoundingClientRect()
+      if (r.width > 0 || r.height > 0) {
+        rects.push({ top: r.top, left: r.left, width: r.width, height: r.height })
+      }
+    }
+    push(this.launcher, !this.launcher?.classList.contains('stept-gone'))
+    push(this.pill, true)
+    push(this.frame, this.open)
+    return rects
   }
 
   // --- checklists + surveys ------------------------------------------------

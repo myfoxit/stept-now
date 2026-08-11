@@ -8,6 +8,7 @@ import {
   firstDueCampaign,
   globMatch,
   installStept,
+  normalizeAutostartPolicy,
   parsePreviewHash,
   patchHistory,
   pruneSeenCampaigns,
@@ -117,6 +118,18 @@ function memoryStorage(): Storage {
     setItem: (k: string, v: string) => void map.set(k, String(v)),
   }
 }
+
+describe('normalizeAutostartPolicy', () => {
+  it('passes the known policies through and defaults everything else to ask', () => {
+    expect(normalizeAutostartPolicy('auto')).toBe('auto')
+    expect(normalizeAutostartPolicy('never')).toBe('never')
+    expect(normalizeAutostartPolicy('ask')).toBe('ask')
+    expect(normalizeAutostartPolicy(undefined)).toBe('ask')
+    expect(normalizeAutostartPolicy(null)).toBe('ask')
+    expect(normalizeAutostartPolicy('sometimes')).toBe('ask')
+    expect(normalizeAutostartPolicy(42)).toBe('ask')
+  })
+})
 
 describe('globMatch', () => {
   it('matches * wildcards anywhere in the URL', () => {

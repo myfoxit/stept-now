@@ -6,11 +6,14 @@ import {
   clearTourProgress,
   computeTooltipPosition,
   fillElement,
+  isDifferentPage,
   performAction,
   readTourProgress,
+  rectsIntersect,
   resolveAutoPlacement,
   resolveMediaUrl,
   selectFirstEligibleTour,
+  TOUR_PROGRESS_TTL_MS,
   TourPlayer,
   tourProgressKey,
   writeTourProgress,
@@ -46,6 +49,39 @@ describe('computeTooltipPosition', () => {
     const pos = computeTooltipPosition('left', target, tip, vp)
     expect(pos.left).toBeGreaterThanOrEqual(8)
     expect(pos.top).toBeGreaterThanOrEqual(8)
+  })
+
+  it('trades a side hidden under widget chrome for a clear one', () => {
+    const target = { top: 400, left: 440, width: 120, height: 40 }
+    const preferred = computeTooltipPosition('auto', target, tip, vp)
+    expect(preferred.side).toBe('bottom')
+    // Park an obstruction (the messenger pill, say) exactly where the tooltip
+    // would land: placement must move rather than hide its own tooltip.
+    const avoid = [{ top: preferred.top, left: preferred.left, width: 300, height: 140 }]
+    const pos = computeTooltipPosition('auto', target, tip, vp, 12, avoid)
+    expect(pos.side).not.toBe('bottom')
+    expect(
+      rectsIntersect({ top: pos.top, left: pos.left, width: tip.width, height: tip.height }, avoid[0]!),
+    ).toBe(false)
+  })
+
+  it('keeps the requested side when every side collides', () => {
+    const target = { top: 400, left: 440, width: 120, height: 40 }
+    const everything = [{ top: 0, left: 0, width: 1000, height: 800 }]
+    expect(computeTooltipPosition('bottom', target, tip, vp, 12, everything).side).toBe('bottom')
+  })
+})
+
+describe('isDifferentPage', () => {
+  it('compares origin + path + search, ignoring the hash', () => {
+    expect(isDifferentPage('/oncall', 'https://app.test/')).toBe(true)
+    expect(isDifferentPage('/oncall', 'https://app.test/oncall')).toBe(false)
+    expect(isDifferentPage('/oncall#section', 'https://app.test/oncall')).toBe(false)
+    expect(isDifferentPage('/oncall?tab=1', 'https://app.test/oncall')).toBe(true)
+    expect(isDifferentPage('https://other.test/oncall', 'https://app.test/oncall')).toBe(true)
+    // Unparseable input must never trigger a navigation loop.
+    expect(isDifferentPage('http://[invalid', 'https://app.test/')).toBe(false)
+    expect(isDifferentPage('/oncall', 'not a url')).toBe(false)
   })
 })
 
@@ -170,6 +206,28 @@ function makePlayer(
 
 const tipEl = (): HTMLElement | null => document.querySelector('.stept-tour-tip')
 const tipText = (): string => tipEl()?.textContent ?? ''
+const tipButton = (label: string): HTMLButtonElement => {
+  const hit = [...(tipEl()?.querySelectorAll('button') ?? [])].find(
+    (b) => b.textContent === label,
+  )
+  if (!hit) throw new Error(`no "${label}" button on the card`)
+  return hit as HTMLButtonElement
+}
+
+/** `window`, but with a recording `location.assign` (jsdom's is not spyable). */
+function navWindow(assigned: string[]): Window & typeof globalThis {
+  return new Proxy(window, {
+    get(target, prop) {
+      if (prop === 'location') {
+        return { href: window.location.href, assign: (url: string) => assigned.push(url) }
+      }
+      const value = Reflect.get(target, prop) as unknown
+      return typeof value === 'function'
+        ? (value as (...args: unknown[]) => unknown).bind(target)
+        : value
+    },
+  }) as Window & typeof globalThis
+}
 
 afterEach(() => {
   player?.stop()
@@ -214,6 +272,26 @@ describe('TourPlayer rendering', () => {
     expect(tipEl()!.getAttribute('aria-modal')).toBe('true')
     expect(tipEl()!.getAttribute('aria-labelledby')).toBe('stept-tour-title-0')
     expect(document.querySelector('.stept-tour-hole')!.hasAttribute('hidden')).toBe(true)
+  })
+
+  it('re-centres a modal after an anchored step instead of pinning it at old coords', () => {
+    document.body.innerHTML = '<button id="a">A</button>'
+    makePlayer([]).start(
+      tourOf([
+        step({ id: 's1', selector: '#a', title: 'Anchored' }),
+        step({ id: 's2', type: 'modal', title: 'Final modal' }),
+      ]),
+    )
+    const tipNode = tipEl()!
+    // The anchored step positions with inline coords…
+    expect(tipNode.style.top).not.toBe('')
+    tipButton('Next').click()
+    // …which MUST be dropped for the modal, or they outrank the centred class
+    // and the "centred" card renders clipped in the old corner.
+    expect(tipNode.classList.contains('stept-centered')).toBe(true)
+    expect(tipNode.style.top).toBe('')
+    expect(tipNode.style.left).toBe('')
+    expect(tipText()).toContain('Final modal')
   })
 
   it('renders a banner bar that never blocks the page', () => {
@@ -503,6 +581,62 @@ describe('TourPlayer advance semantics', () => {
     expect(tipText()).toContain('Done step')
   })
 
+  it('advances on the real click when the step opts in via advance_on_click', () => {
+    document.body.innerHTML = '<button id="a">A</button>'
+    const clicks: string[] = []
+    document.getElementById('a')!.addEventListener('click', () => clicks.push('host'))
+    const events: Recorded[] = []
+    makePlayer(events).start(
+      tourOf([
+        step({ id: 's1', selector: '#a', title: 'Tap it', advance_on_click: true }),
+        step({ id: 's2', type: 'modal', title: 'After' }),
+      ]),
+    )
+    // No Next button — the taught click is the advance…
+    expect(tipEl()!.querySelector('.stept-tour-btn.primary')).toBeNull()
+    expect(tipText()).toContain('Click the highlighted element to continue')
+    document.getElementById('a')!.click()
+    // …and the host app's own handler saw the click too.
+    expect(clicks).toEqual(['host'])
+    expect(tipText()).toContain('After')
+  })
+
+  it('keeps the spotlighted element clickable under a backdrop, blocking around it', () => {
+    document.body.innerHTML = '<button id="a">A</button>'
+    const clicks: string[] = []
+    document.getElementById('a')!.addEventListener('click', () => clicks.push('host'))
+    makePlayer([]).start(
+      tourOf([
+        step({ id: 's1', selector: '#a', title: 'Spot' }),
+        step({ id: 's2', type: 'modal', title: 'x' }),
+      ]),
+    )
+    const blockers = [...document.querySelectorAll('.stept-tour-blocker')] as HTMLElement[]
+    expect(blockers).toHaveLength(4)
+    expect(blockers.every((b) => !b.hidden)).toBe(true)
+    // The panels surround the cutout (target rect ± 6px pad; zero-sized in
+    // jsdom, so the cutout spans -6..6): below starts at 6, right starts at 6.
+    expect(blockers[0]!.style.top).toBe('0px')
+    expect(blockers[1]!.style.top).toBe('6px')
+    expect(blockers[3]!.style.left).toBe('6px')
+    // The anchored element itself still receives the pointer.
+    document.getElementById('a')!.click()
+    expect(clicks).toEqual(['host'])
+    // And the full-screen veil stays off for anchored steps.
+    expect(document.querySelector('.stept-tour-root')!.classList.contains('stept-veil')).toBe(false)
+  })
+
+  it('drops the blockers when the tour renders without a backdrop', () => {
+    document.body.innerHTML = '<button id="a">A</button>'
+    makePlayer([]).start(
+      tourOf([step({ id: 's1', selector: '#a', title: 'Free' })], {
+        settings: { mode: 'guided', backdrop: false, show_progress: true, dismissable: true },
+      }),
+    )
+    const blockers = [...document.querySelectorAll('.stept-tour-blocker')] as HTMLElement[]
+    expect(blockers.every((b) => b.hidden)).toBe(true)
+  })
+
   it('completes on the last Next and clears the stored progress', () => {
     const storage = memoryStorage()
     const events: Recorded[] = []
@@ -531,6 +665,24 @@ describe('TourPlayer keyboard + a11y', () => {
     expect(tipText()).toContain('One')
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(events.at(-1)!.event).toBe('dismissed')
+  })
+
+  it('consumes the Escape that dismisses the tour before the host app sees it', () => {
+    const events: Recorded[] = []
+    const hostSaw: string[] = []
+    const hostListener = (e: Event): void => {
+      if ((e as KeyboardEvent).key === 'Escape') hostSaw.push('esc')
+    }
+    document.body.addEventListener('keydown', hostListener)
+    makePlayer(events).start(tourOf([step({ id: 's1', type: 'modal', title: 'One' })]))
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
+    document.body.removeEventListener('keydown', hostListener)
+    // The tour is dismissed — and the host app's own Escape handler never ran,
+    // so it cannot close ITS dialog on the tour's Escape.
+    expect(events.at(-1)!.event).toBe('dismissed')
+    expect(hostSaw).toEqual([])
   })
 
   it('ignores Escape when the tour is not dismissable', () => {
@@ -635,8 +787,8 @@ describe('TourPlayer action steps', () => {
   })
 })
 
-describe('TourPlayer wait + error steps', () => {
-  it('emits step_error(not_found) and skips a step whose element is gone', () => {
+describe('TourPlayer blocked steps', () => {
+  it('blocks on a missing anchor with an explicit card instead of silently skipping', () => {
     document.body.innerHTML = '<button id="b">B</button>'
     const events: Recorded[] = []
     makePlayer(events).start(
@@ -645,11 +797,128 @@ describe('TourPlayer wait + error steps', () => {
         step({ id: 's2', selector: '#b', title: 'Present' }),
       ]),
     )
-    const error = events.find((e) => e.event === 'step_error')!
-    expect(error.stepIndex).toBe(0)
-    expect(error.meta!.reason).toBe('not_found')
+    const blocked = events.find((e) => e.event === 'step_blocked')!
+    expect(blocked.stepIndex).toBe(0)
+    expect(blocked.meta!.reason).toBe('not_found')
+    expect(tipText()).toContain("Can't find this element on this page")
+    expect(events.some((e) => e.event === 'step_error')).toBe(false)
+    // Skip is the visitor's choice, not the player's.
+    tipButton('Skip step').click()
     expect(tipText()).toContain('Present')
+    expect(events.filter((e) => e.event === 'step_viewed').map((e) => e.stepIndex)).toEqual([1])
   })
+
+  it('ends a blocked tour from the card as dismissed, never as an error', () => {
+    const events: Recorded[] = []
+    makePlayer(events).start(tourOf([step({ id: 's1', selector: '#gone', title: 'Missing' })]))
+    tipButton('End tour').click()
+    expect(events.at(-1)!.event).toBe('dismissed')
+    expect(events.some((e) => e.event === 'step_error')).toBe(false)
+    expect(tipEl()).toBeNull()
+  })
+
+  it('shows a finding-it state and presents an anchor that hydrates late', async () => {
+    const events: Recorded[] = []
+    makePlayer(events, { resolveTimeoutMs: 1500 }).start(
+      tourOf([step({ id: 's1', selector: '#late', title: 'Hydrated' })]),
+    )
+    expect(tipText()).toContain('Finding it on this page')
+    expect(events.some((e) => e.event === 'step_viewed')).toBe(false)
+    const el = document.createElement('button')
+    el.id = 'late'
+    el.textContent = 'Late'
+    document.body.appendChild(el)
+    await flush(40)
+    expect(tipText()).toContain('Hydrated')
+    expect(events.filter((e) => e.event === 'step_viewed').map((e) => e.stepIndex)).toEqual([0])
+    expect(events.some((e) => e.event === 'step_blocked')).toBe(false)
+  })
+
+  it('blocks once the wait budget expires', async () => {
+    const events: Recorded[] = []
+    makePlayer(events, { resolveTimeoutMs: 40 }).start(
+      tourOf([step({ id: 's1', selector: '#never', title: 'Nope' })]),
+    )
+    expect(tipText()).toContain('Finding it on this page')
+    await flush(120)
+    expect(events.find((e) => e.event === 'step_blocked')!.meta!.reason).toBe('timeout')
+    expect(tipText()).toContain("Can't find this element on this page")
+  })
+})
+
+describe('TourPlayer cross-page steps', () => {
+  it('navigates to the next step\'s url, persisting progress with the navigating flag', () => {
+    const storage = memoryStorage()
+    const assigned: string[] = []
+    const events: Recorded[] = []
+    makePlayer(events, { storage, win: navWindow(assigned) }).start(
+      tourOf([
+        step({ id: 's1', type: 'modal', title: 'Intro' }),
+        step({ id: 's2', selector: '#oncall-only', url: '/oncall', title: 'Elsewhere' }),
+      ]),
+    )
+    expect(tipText()).toContain('Intro')
+    tipButton('Next').click()
+    expect(assigned).toEqual(['/oncall'])
+    // Persisted BEFORE leaving, so the next load continues at this step.
+    expect(readTourProgress(storage, tourProgressKey('wk_test'))).toMatchObject({
+      tourId: 'tour-1',
+      stepIndex: 1,
+      navigating: true,
+    })
+    expect(events.some((e) => e.event === 'step_blocked')).toBe(false)
+  })
+
+  it('presents the step (no navigation) when its anchor is already here', () => {
+    document.body.innerHTML = '<button id="oncall-only">Go</button>'
+    const assigned: string[] = []
+    makePlayer([], { win: navWindow(assigned) }).start(
+      tourOf([step({ id: 's1', selector: '#oncall-only', url: '/oncall', title: 'Here' })]),
+    )
+    expect(assigned).toEqual([])
+    expect(tipText()).toContain('Here')
+  })
+
+  it('resumes at the navigated-to step after the load, consuming the flag', () => {
+    const storage = memoryStorage()
+    writeTourProgress(storage, tourProgressKey('wk_test'), {
+      tourId: 'tour-1',
+      stepIndex: 1,
+      startedAt: 5,
+      updatedAt: Date.now(),
+      navigating: true,
+    })
+    document.body.innerHTML = '<button id="oncall-only">Go</button>'
+    const events: Recorded[] = []
+    makePlayer(events, { storage }).start(
+      tourOf([
+        step({ id: 's1', type: 'modal', title: 'Intro' }),
+        step({ id: 's2', selector: '#oncall-only', url: '/oncall', title: 'Elsewhere' }),
+      ]),
+    )
+    expect(tipText()).toContain('Elsewhere')
+    expect(events.some((e) => e.event === 'started')).toBe(false)
+    // A plain persist consumed the flag: the NEXT load offers, not hijacks.
+    expect(readTourProgress(storage, tourProgressKey('wk_test'))!.navigating).toBeUndefined()
+  })
+
+  it('Done on the final step completes first, then navigates to its url', () => {
+    const assigned: string[] = []
+    const storage = memoryStorage()
+    const events: Recorded[] = []
+    makePlayer(events, { storage, win: navWindow(assigned) }).start(
+      tourOf([step({ id: 's1', type: 'modal', title: 'End', url: '/maintenance' })]),
+    )
+    tipButton('Done').click()
+    expect(events.map((e) => e.event)).toEqual(['started', 'step_viewed', 'completed'])
+    expect(assigned).toEqual(['/maintenance'])
+    // Progress went down with the completion — the destination page cannot
+    // resurrect the finished tour.
+    expect(readTourProgress(storage, tourProgressKey('wk_test'))).toBeNull()
+  })
+})
+
+describe('TourPlayer wait + error steps', () => {
 
   it('holds on a wait-for-element step and advances when it appears', async () => {
     const events: Recorded[] = []
@@ -719,13 +988,28 @@ describe('tour progress persistence', () => {
     const storage = memoryStorage()
     const key = tourProgressKey('wk_a')
     expect(key).toBe('stept:tour-progress:wk_a')
-    writeTourProgress(storage, key, { tourId: 't1', stepIndex: 2, startedAt: 1000 })
-    expect(readTourProgress(storage, key)).toEqual({ tourId: 't1', stepIndex: 2, startedAt: 1000 })
+    const now = Date.now()
+    writeTourProgress(storage, key, { tourId: 't1', stepIndex: 2, startedAt: 1000, updatedAt: now })
+    expect(readTourProgress(storage, key)).toEqual({
+      tourId: 't1',
+      stepIndex: 2,
+      startedAt: 1000,
+      updatedAt: now,
+    })
     storage.setItem(key, '{nope')
     expect(readTourProgress(storage, key)).toBeNull()
     clearTourProgress(storage, key)
     expect(readTourProgress(storage, key)).toBeNull()
     expect(readTourProgress(null, key)).toBeNull()
+  })
+
+  it('expires a record after the 24h TTL', () => {
+    const storage = memoryStorage()
+    const key = tourProgressKey('wk_a')
+    writeTourProgress(storage, key, { tourId: 't1', stepIndex: 2, startedAt: 1000, updatedAt: 1000 })
+    expect(readTourProgress(storage, key, 1000 + 60_000)).toMatchObject({ tourId: 't1' })
+    // A day later the half-finished tour stops offering itself.
+    expect(readTourProgress(storage, key, 1000 + TOUR_PROGRESS_TTL_MS + 1)).toBeNull()
   })
 
   it('resumes mid-tour after a reload WITHOUT re-emitting started', () => {
@@ -757,6 +1041,7 @@ describe('tour progress persistence', () => {
       tourId: 'other-tour',
       stepIndex: 3,
       startedAt: 1,
+      updatedAt: Date.now(),
     })
     const events: Recorded[] = []
     makePlayer(events, { storage }).start(tourOf([step({ id: 's1', type: 'modal', title: 'One' })]))
