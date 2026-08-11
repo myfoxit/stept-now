@@ -802,16 +802,14 @@ export class Controller {
   startTour(tourId: string): void {
     if (!tourId) return
     bridge.post(MSG.TOUR_START, { tourId })
-    // The tour plays in the host page, underneath this panel — close it so the
-    // visitor actually sees what they just started.
-    this.requestClose()
+    // The loader collapses the panel to its tour-progress pill and restores it
+    // when the tour ends — closing here would opt out of that restore.
   }
 
   /** Ask the loader to pick an interrupted tour back up. */
   resumeTour(tourId: string): void {
     if (!tourId) return
     bridge.post(MSG_EXTRA.TOUR_RESUME, { tourId })
-    this.requestClose()
   }
 
   /** Live tour progress from the loader (tour:state, or legacy TOUR_EVENT). */

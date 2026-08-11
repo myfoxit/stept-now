@@ -610,7 +610,7 @@ describe('searchEverything', () => {
 // --- starting tours -------------------------------------------------------------
 
 describe('startTour', () => {
-  it('posts tour:start to the loader and closes the panel', async () => {
+  it('posts tour:start and leaves panel choreography to the loader', async () => {
     vi.stubGlobal('WebSocket', FakeWebSocket)
     mockFetch([{ method: 'POST', path: '/api/widget/boot', body: bootBody }])
     const posted: Array<{ type?: string; payload?: unknown }> = []
@@ -624,6 +624,8 @@ describe('startTour', () => {
 
     const start = posted.find((p) => p?.type === MSG.TOUR_START)
     expect(start?.payload).toEqual({ tourId: 't42' })
-    expect(posted.some((p) => p?.type === MSG.CLOSE)).toBe(true)
+    // The loader collapses the panel to its pill and restores it after the
+    // tour — the app must not post CLOSE and forfeit that restore.
+    expect(posted.some((p) => p?.type === MSG.CLOSE)).toBe(false)
   })
 })
