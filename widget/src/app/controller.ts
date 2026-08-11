@@ -923,6 +923,14 @@ export class Controller {
     else if (msg.type === 'typing') this.onTyping(msg.data)
     else if (msg.type === 'conversation.updated') this.onConversationUpdated(msg.data)
     else if (msg.type === 'copilot.op') this.onCopilotOp(msg.data)
+    else if (msg.type === 'agent_run.updated') this.onAgentRunUpdated(msg.data)
+  }
+
+  /** Backend agent-run status on the conversation topic: a terminal run clears
+   *  the "working on the page…" line immediately (the staleness timer in
+   *  setWorking stays as the offline fallback). */
+  private onAgentRunUpdated(data: Record<string, unknown>): void {
+    if (data.terminal === true) this.setWorking(null)
   }
 
   private onMessageCreated(data: Record<string, unknown>): void {

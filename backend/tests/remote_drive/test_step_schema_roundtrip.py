@@ -7,15 +7,15 @@ navigates between pages on them. The extension PUTs steps through
 ``model_dump(by_alias=True)``) and reads them back as ``TourStepOut`` — both
 directions must keep the fields, and tolerate their absence (older steps).
 
-NOTE: ``app.services.tours._normalize_steps`` (owned by the tour-runtime
-slice) rebuilds a fixed field set at persist time and must ALSO pass these two
-fields through for the end-to-end round trip; the schema layer covered here is
-the contract it feeds on.
+``app.services.tours._normalize_steps`` rebuilds a fixed field set at persist
+time and passes both fields through as well — covered at the bottom of this
+file, completing the end-to-end round trip.
 """
 
 from __future__ import annotations
 
 from app.schemas.tours import TourStepIn, TourStepOut
+from app.services.tours import _CONTENT_FIELDS, _normalize_steps
 
 
 def _recorded_step(**extra: object) -> dict[str, object]:
@@ -59,6 +59,24 @@ def test_old_steps_without_the_fields_stay_valid():
 def test_blank_url_normalizes_to_none():
     step = TourStepIn.model_validate(_recorded_step(url="   "))
     assert step.url is None
+
+
+def test_normalize_steps_keeps_url_and_advance_on_click():
+    """Persist-time normalization must not strip the recorder's page context."""
+    [normalized] = _normalize_steps(
+        [_recorded_step(url="https://app.example.com/settings", advance_on_click=True)]
+    )
+    assert normalized["url"] == "https://app.example.com/settings"
+    assert normalized["advance_on_click"] is True
+
+    [legacy] = _normalize_steps([_recorded_step()])
+    assert legacy["url"] is None
+    assert legacy["advance_on_click"] is False
+
+    # Editing either field is a content change: it must bump the tour version
+    # (both participate in the content signature).
+    assert "url" in _CONTENT_FIELDS
+    assert "advance_on_click" in _CONTENT_FIELDS
 
 
 def test_wire_key_for_wait_steps_is_untouched_by_the_new_fields():

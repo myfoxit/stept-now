@@ -124,6 +124,11 @@ def _normalize_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "secondary_cta": _norm_cta(step.get("secondary_cta")),
                 "action": _norm_action(step.get("action"), step_type),
                 "wait": _norm_wait(step.get("wait"), step_type),
+                # Recorder-captured page context: the player navigates with `url`
+                # when the next anchor lives on another page, and treats a
+                # recorded click as the advance gesture via `advance_on_click`.
+                "url": (step.get("url") or "").strip() or None,
+                "advance_on_click": bool(step.get("advance_on_click")),
             }
         )
     return out
@@ -146,6 +151,8 @@ _CONTENT_FIELDS = (
     "secondary_cta",
     "action",
     "wait",
+    "url",
+    "advance_on_click",
 )
 _ALL_FIELDS = (*_CONTENT_FIELDS, "target", "screenshot_key", "sandbox_key")
 

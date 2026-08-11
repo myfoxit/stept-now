@@ -93,6 +93,27 @@ async def test_tours_health_single_tour_red_with_broken_steps(client, workspace_
     assert health["last_played_at"] is not None
 
 
+async def test_tours_health_blocked_visitors_mean_yellow(client, workspace_ctx):
+    """A tour nobody can finish (step_blocked: Next pressed, next anchor not on
+    the page) must not report green — the dogfooded tour 6 did exactly that."""
+    tour_id = await create_tour(client, workspace_ctx, publish=True)
+    await insert_events(
+        workspace_ctx.id,
+        tour_id,
+        [
+            ("c1", "started", None, {}),
+            ("c1", "step_viewed", 0, {}),
+            ("c1", "step_blocked", 1, {"url": "https://app.example.com/"}),
+        ],
+    )
+    key = (await make_api_key(client, workspace_ctx))["key"]
+    health = await call_tool(client, "tours_health", {"tour_id": tour_id}, key=key)
+    assert health["health"] == "yellow"
+    assert health["broken_steps"] == []
+    assert health["step_blocked"] == 1
+    assert health["blocked_steps"] == [{"index": 1, "title": "AI", "count": 1}]
+
+
 async def test_tours_health_workspace_aggregate(client, workspace_ctx):
     healed_id = await create_tour(client, workspace_ctx, name="Drifting", publish=True)
     clean_id = await create_tour(client, workspace_ctx, name="Clean", publish=True)

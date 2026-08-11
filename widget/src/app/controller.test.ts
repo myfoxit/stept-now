@@ -407,6 +407,54 @@ describe('working-on-page staleness timeout', () => {
       vi.useRealTimers()
     }
   })
+
+  it('clears immediately when the backend reports the run terminal', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.stubGlobal('WebSocket', FakeWebSocket)
+      mockFetch([
+        { method: 'POST', path: '/api/widget/boot', body: bootBody },
+        {
+          method: 'GET',
+          path: '/conversations/conv1/messages',
+          body: { items: [], next_cursor: null },
+        },
+        { method: 'POST', path: '/conversations/conv1/read', body: campaignConv },
+        {
+          method: 'GET',
+          path: '/conversations/conv1/copilot/pending',
+          body: { run_id: 'r1', op_id: 'op1', tool: 'page_read', op: 'snapshot', args: {} },
+        },
+      ])
+      vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+      const c = makeController()
+      await c.boot()
+      await c.openConversation('conv1')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(c.getState().workingOnPage).toBe('snapshot')
+
+      pushRealtime({
+        type: 'agent_run.updated',
+        data: { run_id: 'r1', conversation_id: 'conv1', status: 'failed', terminal: true },
+      })
+      expect(c.getState().workingOnPage).toBeNull()
+
+      // Non-terminal updates must not clear it.
+      pushRealtime({
+        type: 'copilot.op',
+        data: { run_id: 'r2', op_id: 'op2', tool: 'page_read', op: 'snapshot', args: {} },
+      })
+      expect(c.getState().workingOnPage).toBe('snapshot')
+      pushRealtime({
+        type: 'agent_run.updated',
+        data: { run_id: 'r2', conversation_id: 'conv1', status: 'awaiting_client', terminal: false },
+      })
+      expect(c.getState().workingOnPage).toBe('snapshot')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 // --- human handoff ------------------------------------------------------------

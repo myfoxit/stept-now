@@ -367,16 +367,15 @@ async def get_tour_steps(tour_id: str) -> dict[str, Any]:
 
 
 async def _tour_health_rollup(session: Any, tour: Tour) -> dict[str, Any]:
-    """Breakage rollup from playback telemetry: step_error events mark broken
-    steps (red); healed step views mean self-healing is masking selector drift
-    (yellow); otherwise green."""
+    """Breakage rollup from playback telemetry.
+
+    Classification (red = step_error, yellow = visitors stuck on step_blocked
+    or self-healing masking selector drift, green = clean) is delegated to
+    ``services.tours.tour_health`` — the one source of truth — while this tool
+    keeps its richer per-step healed counts and ``last_played_at``.
+    """
+    rollup = await tours_service.tour_health(session, tour.workspace_id, tour)
     scoped = (TourEvent.workspace_id == tour.workspace_id, TourEvent.tour_id == tour.id)
-    error_rows = await session.execute(
-        select(TourEvent.step_index, func.count())
-        .where(*scoped, TourEvent.event == "step_error")
-        .group_by(TourEvent.step_index)
-    )
-    errors: dict[int | None, int] = {index: count for index, count in error_rows.all()}
     healed_rows = await session.execute(
         select(TourEvent.step_index, func.count())
         .where(
@@ -393,24 +392,24 @@ async def _tour_health_rollup(session: Any, tour: Tour) -> dict[str, Any]:
         )
     ).scalar_one_or_none()
 
-    step_titles = [step.get("title") or "" for step in tour.steps or []]
     broken_steps = [
         {
-            "index": index,
-            "title": (step_titles[index] if index is not None and index < len(step_titles) else ""),
-            "errors": count,
-            "healed": healed.get(index, 0),
+            "index": step["index"],
+            "title": step["title"],
+            "errors": step["count"],
+            "healed": healed.get(step["index"], 0),
         }
-        for index, count in sorted(errors.items(), key=lambda item: (item[0] is None, item[0]))
+        for step in rollup["broken_steps"]
     ]
-    health = "red" if errors else ("yellow" if any(healed.values()) else "green")
     return {
         "tour_id": tour.id,
         "name": tour.name,
         "status": tour.status,
-        "health": health,
+        "health": rollup["health"],
         "broken_steps": broken_steps,
-        "healed_step_views": sum(healed.values()),
+        "blocked_steps": rollup["blocked_steps"],
+        "step_blocked": rollup["step_blocked"],
+        "healed_step_views": rollup["healed_step_views"],
         "last_played_at": _iso(last_played),
     }
 
@@ -420,8 +419,10 @@ async def tours_health(tour_id: str | None = None) -> dict[str, Any]:
     """Playback health of tours, from breakage telemetry.
 
     health per tour: "red" = steps failed to play (step_error events, listed
-    in broken_steps), "yellow" = no failures but the self-healing engine had
-    to recover steps via fallback selectors (selector drift), "green" = clean.
+    in broken_steps), "yellow" = no hard failures but visitors got stuck
+    (step_blocked — Next pressed while the next step's anchor wasn't on the
+    page, listed in blocked_steps) or the self-healing engine had to recover
+    steps via fallback selectors (selector drift), "green" = clean.
     Pass tour_id for one tour's rollup; omit it for the workspace aggregate
     {workspace_health, totals, tours}.
     """
