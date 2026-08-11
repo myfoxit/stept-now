@@ -87,6 +87,13 @@ HEARTBEAT_INTERVAL = 15.0
 HEARTBEAT_FIRST = 1.0
 NODE_TTL = 45.0
 
+# How long a drive-session ownership claim stays routable without being
+# refreshed by another successful op. Generous: an interactive MCP session can
+# idle for a long time between tool calls, and honouring a stale claim is
+# harmless — it only matters while that browser is still CONNECTED, in which
+# case it may well still hold the driven tab (the extension reattaches to it).
+DRIVE_OWNER_TTL = 6 * 3600.0
+
 _EPOCH = datetime.min.replace(tzinfo=UTC)
 
 
@@ -159,6 +166,17 @@ class _Round:
     done: asyncio.Event
 
 
+@dataclass
+class _DriveOwner:
+    """Which device owns a workspace's active drive session (None = released).
+
+    ``at`` orders competing claims across workers (wall clock — the same basis
+    every worker already uses for connected_at/last_seen ordering)."""
+
+    device_id: str | None
+    at: datetime
+
+
 class RemoteDriveGateway:
     """Local socket registry + pub/sub-routed discovery and ctrl dispatch.
 
@@ -179,6 +197,11 @@ class RemoteDriveGateway:
         self._rounds: dict[str, _Round] = {}
         # node_id -> roster expiry (loop clock), siblings only
         self._nodes: dict[str, float] = {}
+        # workspace_id -> who owns the active drive session (newest claim wins).
+        # Implicit routing (no explicit device_id) pins to this device for as
+        # long as it stays connected — a twin registration's heartbeat must
+        # never steal a live session's ops (the "most recently seen" flap).
+        self._drive_owner: dict[str, _DriveOwner] = {}
         self._subscriptions: list[Subscription] = []
         self._tasks: list[asyncio.Task[None]] = []
         self._start_task: asyncio.Task[None] | None = None
@@ -287,6 +310,12 @@ class RemoteDriveGateway:
             await self._on_discover(frame)
         elif kind == "discover-reply":
             self._on_discover_reply(frame, node_id)
+        elif kind == "drive-owner":
+            self._merge_drive_owner(
+                str(frame.get("workspace_id") or ""),
+                frame.get("device_id"),
+                _parse(frame.get("at")),
+            )
         elif kind == "supersede":
             await self._on_supersede(frame)
         elif kind == "dispatch":
@@ -437,6 +466,7 @@ class RemoteDriveGateway:
                 round_.done.set()
         self._rounds.clear()
         self._nodes.clear()
+        self._drive_owner.clear()
         for task in self._tasks:
             with contextlib.suppress(Exception):
                 task.cancel()
@@ -510,16 +540,17 @@ class RemoteDriveGateway:
         workspace_id = str(frame.get("workspace_id") or "")
         if not reply_to or not req_id:
             return
-        await self._publish(
-            reply_to,
-            {
-                "kind": "discover-reply",
-                "node": self.node_id,
-                "req": req_id,
-                "workspace_id": workspace_id,
-                "browsers": self.local_browsers(workspace_id),
-            },
-        )
+        reply: dict[str, Any] = {
+            "kind": "discover-reply",
+            "node": self.node_id,
+            "req": req_id,
+            "workspace_id": workspace_id,
+            "browsers": self.local_browsers(workspace_id),
+        }
+        owner = self._drive_owner.get(workspace_id)
+        if owner is not None:
+            reply["drive_owner"] = {"device_id": owner.device_id, "at": owner.at.isoformat()}
+        await self._publish(reply_to, reply)
 
     def _on_discover_reply(self, frame: dict[str, Any], node_id: str) -> None:
         round_ = self._rounds.get(str(frame.get("req") or ""))
@@ -533,9 +564,57 @@ class RemoteDriveGateway:
                 if isinstance(browser, dict):
                     # The publisher's node id wins over anything in the payload.
                     round_.entries.append({**browser, "node": node_id})
+        # Owner knowledge rides discovery replies so a worker that missed the
+        # claim broadcast (it started later) still converges before routing.
+        owner = frame.get("drive_owner")
+        if isinstance(owner, dict):
+            self._merge_drive_owner(
+                round_.workspace_id, owner.get("device_id"), _parse(owner.get("at"))
+            )
         round_.awaiting.discard(node_id)
         if round_.strict and not round_.awaiting:
             round_.done.set()
+
+    # -- drive-session affinity ---------------------------------------------
+
+    def drive_owner(self, workspace_id: str) -> str | None:
+        """Device pinned for this workspace's implicit routing, if any."""
+        owner = self._drive_owner.get(workspace_id)
+        if owner is None:
+            return None
+        if (utcnow() - owner.at).total_seconds() > DRIVE_OWNER_TTL:
+            del self._drive_owner[workspace_id]
+            return None
+        return owner.device_id
+
+    def _merge_drive_owner(self, workspace_id: str, device_id: Any, at: datetime) -> None:
+        """Adopt an ownership claim/release if it is newer than what we hold."""
+        if not workspace_id or at is _EPOCH:
+            return
+        device = str(device_id) if isinstance(device_id, str) and device_id else None
+        current = self._drive_owner.get(workspace_id)
+        if current is not None and current.at >= at:
+            return
+        self._drive_owner[workspace_id] = _DriveOwner(device_id=device, at=at)
+
+    async def _claim_drive_owner(self, workspace_id: str, device_id: str | None) -> None:
+        """Record (and announce) who holds the workspace's drive session now.
+
+        ``device_id=None`` releases the pin (browser_close): implicit routing
+        falls back to most-recently-seen until the next successful session op.
+        """
+        at = utcnow()
+        self._merge_drive_owner(workspace_id, device_id, at)
+        await self._publish(
+            CTRL_TOPIC,
+            {
+                "kind": "drive-owner",
+                "node": self.node_id,
+                "workspace_id": workspace_id,
+                "device_id": device_id,
+                "at": at.isoformat(),
+            },
+        )
 
     # -- inbound (extension → server) ---------------------------------------
 
@@ -617,14 +696,24 @@ class RemoteDriveGateway:
         self, workspace_id: str, device_id: str | None
     ) -> tuple[dict[str, Any] | None, str | None]:
         """Pick the target socket across all workers: explicit device_id, else
-        most recently seen. Resolving BEFORE dispatching is what keeps a
-        dispatch addressed to exactly one worker."""
+        the drive-session owner while it is connected, else most recently seen.
+        Resolving BEFORE dispatching is what keeps a dispatch addressed to
+        exactly one worker — and owner-pinning is what keeps a live session's
+        ops on ONE browser even when a twin registration heartbeats more
+        recently (session affinity, not "most recently seen")."""
         browsers = await self._discover(workspace_id)
         if device_id is not None:
             match = next((b for b in browsers if b.get("device_id") == device_id), None)
             return (match, None) if match is not None else (None, DEVICE_GONE_ERROR)
         if not browsers:
             return None, NO_BROWSER_ERROR
+        owner_device = self.drive_owner(workspace_id)
+        if owner_device is not None:
+            pinned = next((b for b in browsers if b.get("device_id") == owner_device), None)
+            if pinned is not None:
+                return pinned, None
+            # The owner's socket is gone right now — fall through to the most
+            # recently seen browser (the claim stays; the owner may reconnect).
         return browsers[0], None
 
     async def _send_local(self, workspace_id: str, device_id: str, frame: dict[str, Any]) -> bool:
@@ -651,15 +740,17 @@ class RemoteDriveGateway:
         *,
         device_id: str | None,
         timeout: float,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], str | None]:
         """Send one ctrl_id-keyed message and await its ack.
 
-        Returns the raw ack frame (has a ``type`` key) or a gateway-level
-        ``{"error": …}`` (no browser / device gone / timeout).
+        Returns ``(ack, target_device)``: the raw ack frame (has a ``type``
+        key) or a gateway-level ``{"error": …}`` (no browser / device gone /
+        timeout), plus which device the op was addressed to (None when no
+        target could be resolved) — the seam drive-session affinity hangs on.
         """
         target, error = await self._resolve_target(workspace_id, device_id)
         if target is None:
-            return {"error": error}
+            return {"error": error}, None
         gone = DEVICE_GONE_ERROR if device_id is not None else NO_BROWSER_ERROR
         target_device = str(target.get("device_id") or "")
         target_node = str(target.get("node") or "")
@@ -672,7 +763,7 @@ class RemoteDriveGateway:
                     workspace_id, target_device, {**message, "ctrl_id": ctrl_id}
                 )
                 if not sent:
-                    return {"error": gone}
+                    return {"error": gone}, target_device
             else:
                 await self._publish(
                     node_topic(target_node),
@@ -689,9 +780,9 @@ class RemoteDriveGateway:
                     },
                 )
             async with asyncio.timeout(timeout):
-                return await future
+                return await future, target_device
         except TimeoutError:
-            return {"error": TIMEOUT_ERROR}
+            return {"error": TIMEOUT_ERROR}, target_device
         finally:
             self._pending.pop(ctrl_id, None)
 
@@ -762,7 +853,7 @@ class RemoteDriveGateway:
 
         Returns ``{"ok": True, "data": <DriveSnapshot>}`` or ``{"error": …}``.
         """
-        ack = await self._control(
+        ack, target_device = await self._control(
             workspace_id,
             {"type": "exec-op", "op": op, "args": args or {}},
             device_id=device_id,
@@ -772,6 +863,14 @@ class RemoteDriveGateway:
             return ack  # gateway-level {"error": …}
         if not ack.get("ok"):
             return {"error": str(ack.get("error") or "the browser reported a failure")}
+        if target_device:
+            # A successful session op PROVES this browser holds the driven tab
+            # (every non-open op errors "no driven tab" otherwise) — pin
+            # implicit routing to it; a successful close releases the pin.
+            if op == "close":
+                await self._claim_drive_owner(workspace_id, None)
+            else:
+                await self._claim_drive_owner(workspace_id, target_device)
         return {"ok": True, "data": ack.get("data") or {}}
 
     async def record_start(
@@ -785,7 +884,7 @@ class RemoteDriveGateway:
         message: dict[str, Any] = {"type": "record-start"}
         if url is not None:
             message["url"] = url
-        ack = await self._control(workspace_id, message, device_id=device_id, timeout=timeout)
+        ack, _ = await self._control(workspace_id, message, device_id=device_id, timeout=timeout)
         return self._shape_record_ack(ack, failure="the browser could not start recording")
 
     async def record_stop(
@@ -800,7 +899,7 @@ class RemoteDriveGateway:
         message: dict[str, Any] = {"type": "record-stop", "title": title}
         if description is not None:
             message["description"] = description
-        ack = await self._control(workspace_id, message, device_id=device_id, timeout=timeout)
+        ack, _ = await self._control(workspace_id, message, device_id=device_id, timeout=timeout)
         return self._shape_record_ack(ack, failure="the browser could not save the recording")
 
     async def run_tour(
@@ -811,7 +910,7 @@ class RemoteDriveGateway:
         timeout: float = 900,
     ) -> dict[str, Any]:
         """Play a tour in driven mode in the user's browser (long-running)."""
-        ack = await self._control(
+        ack, _ = await self._control(
             workspace_id,
             {"type": "run-tour", "tour_id": tour_id, "mode": "driven"},
             device_id=device_id,

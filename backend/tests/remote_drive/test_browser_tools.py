@@ -68,12 +68,16 @@ async def test_extract_validates_kind_and_attr(mcp_caller):
     assert "attr is required" in missing_attr["error"]
 
 
-async def test_open_returns_shaped_snapshot_with_coordinate_space(mcp_caller):
+async def test_open_returns_text_digest_without_screenshot_by_default(mcp_caller):
+    """Screenshots overflowed agent contexts (85–277KB per call) — the default
+    response is now elements + url + note only, and the op arg does not ask the
+    extension to capture at all."""
     mcp_caller("ws-1", scopes=["write"])
     data = {
         "url": "https://app.example/settings",
         "elements": "[0]<button Create key>\n[1]<a Members>",
         "count": 2,
+        # an older extension might still send one — the server must strip it
         "screenshot": "aGVsbG8=",
         "screenshotSize": {"w": 1200, "h": 800},
         "note": "opened in a new tab",
@@ -81,16 +85,67 @@ async def test_open_returns_shaped_snapshot_with_coordinate_space(mcp_caller):
     _, sent = await register_auto_peer("ws-1", data=data)
 
     payload = await tools_browser.browser_open(url="https://app.example/settings")
+    assert isinstance(payload, dict)
     assert sent[0]["op"] == "open"
-    assert sent[0]["args"] == {"url": "https://app.example/settings"}
+    assert sent[0]["args"] == {"url": "https://app.example/settings"}  # no screenshot flag
     assert payload["url"] == "https://app.example/settings"
     assert payload["interactive_elements"] == data["elements"]
     assert payload["element_count"] == 2
     assert payload["note"] == "opened in a new tab"
-    assert payload["screenshot_base64_jpeg"] == "aGVsbG8="
+    assert "screenshot_base64_jpeg" not in payload
+    assert "screenshot_size" not in payload
+    assert "coordinate_space" not in payload
+
+
+async def test_include_screenshot_returns_an_image_block_not_inline_base64(mcp_caller):
+    mcp_caller("ws-1", scopes=["write"])
+    data = {
+        "url": "https://app.example/settings",
+        "elements": "[0]<button Create key>",
+        "count": 1,
+        "screenshot": "aGVsbG8=",  # b"hello"
+        "screenshotSize": {"w": 1200, "h": 800},
+    }
+    _, sent = await register_auto_peer("ws-1", data=data)
+
+    result = await tools_browser.browser_snapshot(include_screenshot=True)
+    assert isinstance(result, tuple)
+    payload, image = result
+    assert sent[0]["args"] == {"screenshot": True}  # the extension is ASKED to capture
     assert payload["screenshot_size"] == {"w": 1200, "h": 800}
     assert "1200x800px" in payload["coordinate_space"]
     assert "x,y in this pixel space" in payload["coordinate_space"]
+    assert "screenshot_base64_jpeg" not in payload  # rides the image block instead
+    assert image.data == b"hello"
+    assert image._mime_type == "image/jpeg"
+
+
+async def test_wait_for_forwards_clamped_condition_and_shapes_snapshot(mcp_caller):
+    mcp_caller("ws-1", scopes=["write"])
+    _, sent = await register_auto_peer("ws-1")
+
+    payload = await tools_browser.browser_wait_for(selector=".toast", timeout_s=99)
+    assert sent[0]["op"] == "wait-for"
+    assert sent[0]["args"] == {"timeoutMs": 15_000, "selector": ".toast"}  # clamped to 15s
+    assert payload["element_count"] == DEFAULT_SNAPSHOT["count"]
+
+    await tools_browser.browser_wait_for(text="Welcome back", timeout_s=0.1)
+    assert sent[1]["args"] == {"timeoutMs": 500, "text": "Welcome back"}  # floor 0.5s
+
+    await tools_browser.browser_wait_for()
+    assert sent[2]["args"] == {"timeoutMs": 5000}  # bare settle, default 5s
+
+
+async def test_act_forwards_semantic_targeting(mcp_caller):
+    mcp_caller("ws-1", scopes=["write"])
+    _, sent = await register_auto_peer("ws-1")
+    await tools_browser.browser_act(kind="click", role="button", name="Save draft")
+    assert sent[0]["args"] == {
+        "kind": "click",
+        "submit": False,
+        "role": "button",
+        "name": "Save draft",
+    }
 
 
 async def test_act_forwards_targeting_args_and_omits_screenshot_keys(mcp_caller):
@@ -198,6 +253,7 @@ BROWSER_TOOL_NAMES = {
     "browser_navigate",
     "browser_scroll",
     "browser_key",
+    "browser_wait_for",
     "browser_page_text",
     "browser_find",
     "browser_console",
@@ -282,3 +338,41 @@ async def test_rpc_act_validation_needs_no_browser(client, workspace_ctx):
     key = await _mint_key(client, workspace_ctx, ["write"])
     payload = await _call_tool(client, key, "browser_act", {"kind": "explode"})
     assert "kind must be one of" in payload["error"]
+
+
+async def test_rpc_snapshot_with_screenshot_returns_a_real_image_content_block(
+    client, workspace_ctx
+):
+    """End-to-end through the mounted /mcp app: include_screenshot=True yields a
+    JSON text block (small) plus a proper MCP image block — never base64 inside
+    the JSON the model has to re-read on every turn."""
+    key = await _mint_key(client, workspace_ctx, ["write"])
+    data = {
+        "url": "https://app.example/x",
+        "elements": "[0]<button Go>",
+        "count": 1,
+        "screenshot": "aGVsbG8=",
+        "screenshotSize": {"w": 640, "h": 480},
+    }
+    await register_auto_peer(workspace_ctx.id, data=data)
+
+    result = await _rpc(
+        client,
+        key,
+        "tools/call",
+        {"name": "browser_snapshot", "arguments": {"include_screenshot": True}},
+    )
+    kinds = [block["type"] for block in result["content"]]
+    assert "image" in kinds
+    image = next(block for block in result["content"] if block["type"] == "image")
+    assert image["mimeType"] == "image/jpeg"
+    assert image["data"] == "aGVsbG8="
+    text = next(block for block in result["content"] if block["type"] == "text")
+    payload = json.loads(text["text"])
+    assert payload["screenshot_size"] == {"w": 640, "h": 480}
+    assert "screenshot_base64_jpeg" not in payload
+
+    # …and WITHOUT the flag the response is a single small text block.
+    plain = await _rpc(client, key, "tools/call", {"name": "browser_snapshot", "arguments": {}})
+    assert [block["type"] for block in plain["content"]] == ["text"]
+    assert "screenshot" not in plain["content"][0]["text"]
