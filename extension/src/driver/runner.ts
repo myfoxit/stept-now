@@ -40,6 +40,14 @@ export interface DriveRunnerOptions {
   steps: readonly TourStep[];
   /** pushed to the panel after every meaningful transition */
   report: (patch: DriveReport) => void;
+  /**
+   * What a failed step does. `ask` (default) parks the run on the side panel's
+   * Skip/Retry/Abort prompt — right when a human is watching. `abort` fails the
+   * run immediately: remote (MCP) runs have no operator at the panel, so asking
+   * would block forever on a decision nobody is there to make, holding the
+   * browser's drive lock with it.
+   */
+  onStepFailure?: 'ask' | 'abort';
 }
 
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, Math.max(0, ms)));
@@ -69,11 +77,13 @@ export class DriveRunner {
   private speed = 1;
   private index = 0;
   private decide: ((d: DriveDecision) => void) | null = null;
+  private readonly onStepFailure: 'ask' | 'abort';
 
   constructor(opts: DriveRunnerOptions) {
     this.tabId = opts.tabId;
     this.steps = opts.steps;
     this.report = opts.report;
+    this.onStepFailure = opts.onStepFailure ?? 'ask';
   }
 
   setSpeed(speed: number): void {
@@ -148,6 +158,12 @@ export class DriveRunner {
         failure = err instanceof Error ? err.message : String(err);
       }
       if (!failure || this.stopped) return this.stopped ? 'abort' : 'done';
+      if (this.onStepFailure === 'abort') {
+        // No operator to prompt — surface the reason and end the run. Never
+        // set awaitingDecision here: nothing would ever clear it.
+        this.report({ status: 'error', error: failure, awaitingDecision: false, stepStatus: 'error' });
+        return 'abort';
+      }
       this.report({ status: 'error', error: failure, awaitingDecision: true, stepStatus: 'error' });
       const decision = await new Promise<DriveDecision>((res) => {
         this.decide = res;

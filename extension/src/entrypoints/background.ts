@@ -124,9 +124,20 @@ export default defineBackground(() => {
     if (Array.isArray(stored['rectabs'])) recordedTabIds = new Set(stored['rectabs'] as number[]);
     if (Array.isArray(stored['guidesteps'])) guideSteps = stored['guidesteps'] as TourStep[];
     if (Array.isArray(stored['drivesteps'])) driveSteps = stored['drivesteps'] as TourStep[];
-    // a drive cannot survive a worker teardown (the CDP session went with it)
-    if (state.drive && state.drive.status === 'running') {
-      state.drive = { ...state.drive, status: 'error', error: 'The run was interrupted.' };
+    // A drive cannot survive a worker teardown (the CDP session went with it).
+    // `paused` and `awaitingDecision` have to be cleared alongside `running`:
+    // both keep driveActive() true, and the DriveRunner that would answer the
+    // prompt is gone for good — leaving either set locks every later session
+    // out of the browser until the extension is reloaded.
+    if (state.drive && (state.drive.status === 'running' || state.drive.status === 'paused')) {
+      state.drive = {
+        ...state.drive,
+        status: 'error',
+        error: 'The run was interrupted.',
+        awaitingDecision: false,
+      };
+    } else if (state.drive?.awaitingDecision) {
+      state.drive = { ...state.drive, awaitingDecision: false };
     }
 
     state.auth.apiBase = await loadApiBase();
@@ -1156,6 +1167,10 @@ export default defineBackground(() => {
     const runner = new DriveRunner({
       tabId,
       steps: tour.steps,
+      // `onDone` is only supplied by the gateway's run-tour path, so it doubles
+      // as "nobody is watching the side panel" — fail fast instead of parking
+      // the run on a prompt no one can answer.
+      onStepFailure: onDone ? 'abort' : 'ask',
       report: (patch) => {
         const drive = state.drive;
         if (!drive) return;
@@ -1197,6 +1212,10 @@ export default defineBackground(() => {
   function driveActive(): boolean {
     const drive = state.drive;
     if (!drive) return false;
+    // An error prompt only holds the browser while a live runner is there to
+    // receive the answer. Without one the flag is residue from a run that died
+    // with its worker, and honouring it would block the browser forever.
+    if (drive.awaitingDecision && !driveRunner) return false;
     return drive.status === 'running' || drive.status === 'paused' || drive.awaitingDecision;
   }
 
