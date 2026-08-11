@@ -83,9 +83,15 @@ def downgrade() -> None:
         # Going back to a workspace-wide unique slug cannot succeed while two
         # locales share one; keep the first row per slug and drop the rest,
         # which is the only reversal that can complete without inventing slugs.
+        #
+        # `CAST(id AS TEXT)` rather than `MIN(id)`: on Postgres `id` is a real
+        # UUID column and there is no `min(uuid)` aggregate, so the bare form
+        # fails at runtime. CAST is valid on both dialects, and our ids are
+        # uuid7 strings, so lexical order is time order — "the first row" means
+        # the oldest one.
         op.execute(  # noqa: S608 — table is a literal
-            f"DELETE FROM {table} WHERE id NOT IN "
-            f"(SELECT MIN(id) FROM {table} GROUP BY workspace_id, slug)"
+            f"DELETE FROM {table} WHERE CAST(id AS TEXT) NOT IN "
+            f"(SELECT MIN(CAST(id AS TEXT)) FROM {table} GROUP BY workspace_id, slug)"
         )
         op.create_unique_constraint(old_uq, table, ["workspace_id", "slug"])
 
