@@ -21,5 +21,12 @@
 
   "widget.greeting": "مرحبًا 👋",
   "widget.tagline.ai": "اسألنا عن أي شيء — يجيبك الذكاء الاصطناعي فورًا.",
-  "widget.tagline.human": "عادةً ما نرد خلال بضع دقائق."
+  "widget.tagline.human": "عادةً ما نرد خلال بضع دقائق.",
+
+  "tour.transcript.starting": "جارٍ بدء الجولة: «{{name}}»",
+  "tour.transcript.started": "بدأت الجولة: «{{name}}»",
+  "tour.transcript.completed": "اكتملت الجولة: «{{name}}»",
+  "tour.transcript.dismissed": "أُغلقت الجولة: «{{name}}»",
+  "tour.congrats": "أحسنت — لقد أكملت «{{name}}»!",
+  "tour.congrats_next": "خطوة تالية جيدة: «{{name}}» — اضغط على البطاقة أدناه لبدئها."
 }

@@ -24,7 +24,9 @@ TourStatus = Literal["draft", "live", "paused"]
 TourKind = Literal["flow", "banner", "announcement"]
 TourStepType = Literal["tooltip", "modal", "banner", "hotspot", "action", "wait"]
 StepPlacement = Literal["auto", "top", "bottom", "left", "right", "center"]
-TourEventName = Literal["started", "step_viewed", "completed", "dismissed", "step_error"]
+TourEventName = Literal[
+    "started", "step_viewed", "step_blocked", "completed", "dismissed", "step_error"
+]
 FrequencyType = Literal["once", "until_completed", "until_dismissed", "every_time"]
 
 MAX_TARGET_BYTES = 8 * 1024  # opaque @stept/dom-capture Target descriptor cap
@@ -395,6 +397,8 @@ class TourStats(BaseModel):
     completion_rate: float
     unique_starts: int = 0
     step_errors: int = 0
+    #: Visitor pressed Next but the next step's anchor was missing on the page.
+    step_blocked: int = 0
     by_day: list[TourDayStat] = Field(default_factory=list)
     steps: list[TourStepStat]
 
@@ -520,7 +524,11 @@ class WidgetTourOut(BaseModel):
 
 
 class WidgetTourEventIn(BaseModel):
-    event: TourEventName
+    """Telemetry intake is TOLERANT by contract: `event` is a free string so an
+    unknown type is accepted (and ignored server-side, see
+    `tours.KNOWN_TOUR_EVENTS`) instead of 422ing a newer widget build."""
+
+    event: str = Field(min_length=1, max_length=40)
     step_index: int | None = Field(None, ge=0)
     meta: dict[str, Any] | None = None
 

@@ -153,11 +153,23 @@ async def test_widget_event_recording_and_validation(client, workspace_ctx):
     assert ok.status_code == 200
     assert ok.json()["message"] == "recorded"
 
-    bad_event = await client.post(
+    # Tolerant ingestion (lifecycle contract): an unknown event type from a
+    # newer/odd widget build is accepted and IGNORED — never a 422, never a row.
+    unknown_event = await client.post(
         f"/api/widget/tours/{tour['id']}/events?widget_key={key}",
         json={"event": "clicked"},
     )
-    assert bad_event.status_code == 422
+    assert unknown_event.status_code == 200
+    assert unknown_event.json()["message"] == "ignored"
+
+    # `step_blocked` (visitor pressed Next, next anchor missing) is a first-
+    # class lifecycle event and records like any other.
+    blocked = await client.post(
+        f"/api/widget/tours/{tour['id']}/events?widget_key={key}",
+        json={"event": "step_blocked", "step_index": 1},
+    )
+    assert blocked.status_code == 200
+    assert blocked.json()["message"] == "recorded"
 
     missing_key = await client.post(
         f"/api/widget/tours/{tour['id']}/events",

@@ -75,6 +75,11 @@ class ToolContext:
     actor: Actor
     mode: str = "live"  # "live" | "sandbox"
     action_ids: dict[str, str] = field(default_factory=dict)  # spec name -> CustomAction id
+    #: Widget-inbox `tour_autostart_policy` ("ask" | "auto" | "never") plus
+    #: whether the triggering message explicitly asked to be shown — together
+    #: they decide if `show_guide` plays a tour or attaches an offer card.
+    tour_policy: str = "auto"
+    tour_imperative: bool = False
 
     @property
     def sandbox(self) -> bool:
@@ -141,6 +146,13 @@ async def _activity(ctx: ToolContext, text: str) -> None:
         actor=ctx.actor,
         deliver=False,
     )
+
+
+def _reply_meta(ctx: ToolContext) -> dict[str, Any]:
+    """Message meta linking an outbound reply to the inbound it addresses."""
+    if ctx.run.trigger_message_id:
+        return {"reply_to": ctx.run.trigger_message_id}
+    return {}
 
 
 def _retrieval_settings(agent: Agent) -> tuple[int, list[str] | None]:
@@ -270,6 +282,21 @@ async def _exec_find_guide(ctx: ToolContext, tool_input: dict[str, Any]) -> Tool
     matches = await search_guides(
         ctx.session, ctx.workspace_id, query, url=url if isinstance(url, str) else None
     )
+    top_tour = next((match for match in matches if match.kind == "tour"), None)
+    if top_tour is not None and ctx.conversation is not None and not ctx.sandbox:
+        # Remember the best tour hit on the conversation (JSON attrs — survives
+        # pause/resume). Under `tour_autostart_policy: ask` the engine attaches
+        # it to the final reply as a one-tap offer card, so an answered-in-text
+        # question still carries its tour even if the model never calls
+        # show_guide. Cleared on every final reply; harmless otherwise.
+        from app.agents.tour_events import offer_payload
+
+        ctx.conversation.attributes = {
+            **ctx.conversation.attributes,
+            "tour_offer_candidate": offer_payload(
+                tour_id=top_tour.id, title=top_tour.name, steps=top_tour.step_count
+            ),
+        }
     return ToolOutcome({"guides": [match.to_tool_payload() for match in matches]})
 
 
@@ -298,6 +325,7 @@ async def _exec_handoff(ctx: ToolContext, tool_input: dict[str, Any]) -> ToolOut
         author_name=ctx.agent.name,
         content=handoff_note,
         actor=ctx.actor,
+        meta=_reply_meta(ctx),
     )
     reply_message_id = message.id
     await conversations_service.update_status(
@@ -337,6 +365,7 @@ async def _exec_close(ctx: ToolContext, tool_input: dict[str, Any]) -> ToolOutco
             author_name=ctx.agent.name,
             content=closing,
             actor=ctx.actor,
+            meta=_reply_meta(ctx),
         )
         reply_message_id = message.id
     await conversations_service.update_status(

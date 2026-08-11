@@ -17,5 +17,12 @@
 
   "widget.greeting": "Merhaba 👋",
   "widget.tagline.ai": "Bize her şeyi sorun — yapay zekâmız anında yanıtlıyor.",
-  "widget.tagline.human": "Genellikle birkaç dakika içinde yanıt veriyoruz."
+  "widget.tagline.human": "Genellikle birkaç dakika içinde yanıt veriyoruz.",
+
+  "tour.transcript.starting": "Tur başlatılıyor: “{{name}}”",
+  "tour.transcript.started": "Tur başladı: “{{name}}”",
+  "tour.transcript.completed": "Tur tamamlandı: “{{name}}”",
+  "tour.transcript.dismissed": "Tur kapatıldı: “{{name}}”",
+  "tour.congrats": "Tebrikler — “{{name}}” turunu tamamladınız!",
+  "tour.congrats_next": "İyi bir sonraki adım: “{{name}}” — başlatmak için aşağıdaki karta dokunun."
 }

@@ -314,7 +314,8 @@ async def test_a_page_tool_parks_the_run_and_pushes_the_op(actx):
     assert run.messages_snapshot, "the loop must be resumable from the DB alone"
     assert await step_kinds(run_id) == ["llm_call", "client_request"]
     # Nothing was said to the visitor yet — the guide is mid-flight.
-    assert public_messages(conversation_id) is not None
+    outbound = [m for m in await public_messages(conversation_id) if m.direction == "out"]
+    assert outbound == []
 
 
 async def test_the_widget_result_resumes_the_run_and_reaches_a_reply(actx):
@@ -574,15 +575,18 @@ async def test_a_show_only_agent_is_told_it_cannot_click(actx):
     assert "do it FOR them" not in prompt
 
 
-async def test_a_second_message_does_not_start_a_run_while_one_waits_on_the_page(actx):
-    """A visitor who keeps typing mid-guide must not get two agents on the page."""
+async def test_a_second_message_queues_behind_the_run_waiting_on_the_page(actx):
+    """A visitor who keeps typing mid-guide must not get two agents on the page —
+    and must not have the second message silently dropped either. It queues a
+    follow-up run that only executes once the parked one reaches a terminal
+    status."""
     agent_id = await make_agent(actx, settings=PAGE_CONTROL)
     conversation_id, message_id = await conversation_with_message(
         actx, "Look [[tool:page_snapshot {}]]"
     )
     await allow_page_control(conversation_id)
-    await run_now(actx, agent_id, conversation_id, trigger_message_id=message_id)
-    assert (await get_run((await latest_run(conversation_id)).id)).status == "awaiting_client"
+    first_run_id = await run_now(actx, agent_id, conversation_id, trigger_message_id=message_id)
+    assert (await get_run(first_run_id)).status == "awaiting_client"
 
     # The engine's message trigger only fires for an AI-owned conversation.
     async with session_scope() as session:
@@ -596,10 +600,38 @@ async def test_a_second_message_does_not_start_a_run_while_one_waits_on_the_page
         runs = (
             (
                 await session.execute(
-                    select(AgentRun).where(AgentRun.conversation_id == conversation_id)
+                    select(AgentRun)
+                    .where(AgentRun.conversation_id == conversation_id)
+                    .order_by(AgentRun.created_at, AgentRun.id)
                 )
             )
             .scalars()
             .all()
         )
-    assert len(runs) == 1, "the parked run must not be joined by a second concurrent run"
+        statuses = [run.status for run in runs]
+    assert statuses == ["awaiting_client", "queued"], (
+        "the parked run must not be joined by a concurrent run, and the new "
+        "message must not be dropped"
+    )
+
+    # Once the parked run finishes, the follow-up executes (it is no longer
+    # queued). The mock provider re-reads the page_snapshot directive from the
+    # rebuilt history, so the follow-up parks on the page in turn — what
+    # matters here is that the chain ran it at all.
+    await resume_with(first_run_id, {"ok": True, "url": "https://app.test/", "elements": "[]"})
+    await drain_tasks()
+    async with session_scope() as session:
+        runs = (
+            (
+                await session.execute(
+                    select(AgentRun)
+                    .where(AgentRun.conversation_id == conversation_id)
+                    .order_by(AgentRun.created_at, AgentRun.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        statuses = [run.status for run in runs]
+    assert statuses[0] == "completed"
+    assert statuses[1] != "queued", "the follow-up must execute once the parked run finished"

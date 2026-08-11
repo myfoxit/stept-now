@@ -39,6 +39,12 @@ from app.services import audit
 from app.services import segments as segments_service
 
 _FINISHED_EVENTS = ("completed", "dismissed")
+#: The playback lifecycle vocabulary the widget emits. Ingestion is tolerant:
+#: anything else is accepted and IGNORED (a newer widget must never 422 an
+#: older backend, and a hostile page must not fill telemetry with junk types).
+KNOWN_TOUR_EVENTS = frozenset(
+    {"started", "step_viewed", "step_blocked", "completed", "dismissed", "step_error"}
+)
 DEFAULT_ACCENT = "#6366f1"
 DEFAULT_FREQUENCY = {"type": "until_dismissed"}
 MAX_DELIVERED = 5  # widget bootstrap cap
@@ -470,6 +476,7 @@ async def compute_stats(session: AsyncSession, workspace_id: str, tour_id: str) 
     completions = counts.get("completed", 0)
     dismissals = counts.get("dismissed", 0)
     step_errors = counts.get("step_error", 0)
+    step_blocked = counts.get("step_blocked", 0)
 
     # Unique starts: distinct known contacts + each anonymous start counted once.
     distinct_contacts, anonymous_starts = (
@@ -531,6 +538,7 @@ async def compute_stats(session: AsyncSession, workspace_id: str, tour_id: str) 
         completion_rate=round(completions / starts, 4) if starts else 0.0,
         unique_starts=unique_starts,
         step_errors=step_errors,
+        step_blocked=step_blocked,
         by_day=by_day,
         steps=step_stats,
     )
@@ -787,8 +795,19 @@ async def record_event(
     step_index: int | None = None,
     contact_id: str | None = None,
     meta: dict[str, Any] | None = None,
-) -> TourEvent:
+) -> TourEvent | None:
+    """Record one playback telemetry event (the widget's lifecycle channel).
+
+    Tolerant by contract: an event type outside `KNOWN_TOUR_EVENTS` is accepted
+    and ignored (returns None) — never a 422, never a junk row. Lifecycle
+    events of agent-initiated tours additionally feed the conversation that
+    started them (`app.agents.tour_events`): resuming the parked run, mirroring
+    into the transcript, congrats on completion. That glue must never be able
+    to fail the telemetry insert itself.
+    """
     tour = await get_tour(session, workspace_id, tour_id)
+    if event not in KNOWN_TOUR_EVENTS:
+        return None
     row = TourEvent(
         workspace_id=workspace_id,
         tour_id=tour.id,
@@ -827,7 +846,100 @@ async def record_event(
             await checklists.mark_tour_completed(session, workspace_id, contact_id, tour_id)
         except (ImportError, AttributeError):
             pass
+    # Agent-conversation seam: lifecycle truth for tours the AI started.
+    try:
+        from app.agents import tour_events
+
+        await tour_events.process_event(
+            session,
+            workspace_id,
+            tour,
+            event=event,
+            contact_id=contact_id,
+            step_index=step_index,
+            meta=meta,
+        )
+    except Exception:  # noqa: BLE001 — telemetry must record even if the seam breaks
+        import logging
+
+        logging.getLogger("stept.tours").exception(
+            "tour lifecycle seam failed for tour %s event %s", tour.id, event
+        )
     return row
+
+
+# ---------------------------------------------------------------------------
+# playback health
+# ---------------------------------------------------------------------------
+
+
+async def tour_health(session: AsyncSession, workspace_id: str, tour: Tour) -> dict[str, Any]:
+    """Playback-health rollup for one tour, from breakage telemetry.
+
+    - "red":    steps failed to play (`step_error` — anchor missing at play
+                time, action failed);
+    - "yellow": no hard failures, but visitors got STUCK (`step_blocked` — they
+                pressed Next and the next step's anchor was not on the page) or
+                self-healing had to recover steps via fallback selectors;
+    - "green":  clean.
+
+    `step_blocked` is deliberately at-least-yellow: a tour people cannot finish
+    is broken for them even when every step that *did* render resolved fine.
+    """
+    scoped = (TourEvent.workspace_id == workspace_id, TourEvent.tour_id == tour.id)
+    count_rows = await session.execute(
+        select(TourEvent.event, TourEvent.step_index, func.count())
+        .where(*scoped, TourEvent.event.in_(("step_error", "step_blocked")))
+        .group_by(TourEvent.event, TourEvent.step_index)
+    )
+    errors: dict[int | None, int] = {}
+    blocked: dict[int | None, int] = {}
+    for event, index, count in count_rows.all():
+        bucket = errors if event == "step_error" else blocked
+        bucket[index] = bucket.get(index, 0) + count
+    healed = (
+        await session.execute(
+            select(func.count()).where(
+                *scoped,
+                TourEvent.event == "step_viewed",
+                TourEvent.meta["healed"].as_boolean().is_(True),
+            )
+        )
+    ).scalar_one()
+
+    step_titles = [str(step.get("title") or "") for step in tour.steps or []]
+
+    def _steps_out(bucket: dict[int | None, int]) -> list[dict[str, Any]]:
+        return [
+            {
+                "index": index,
+                "title": (
+                    step_titles[index]
+                    if index is not None and 0 <= index < len(step_titles)
+                    else ""
+                ),
+                "count": count,
+            }
+            for index, count in sorted(bucket.items(), key=lambda i: (i[0] is None, i[0]))
+        ]
+
+    if errors:
+        health = "red"
+    elif blocked or healed:
+        health = "yellow"
+    else:
+        health = "green"
+    return {
+        "tour_id": tour.id,
+        "name": tour.name,
+        "status": tour.status,
+        "health": health,
+        "step_errors": sum(errors.values()),
+        "step_blocked": sum(blocked.values()),
+        "broken_steps": _steps_out(errors),
+        "blocked_steps": _steps_out(blocked),
+        "healed_step_views": int(healed or 0),
+    }
 
 
 # ---------------------------------------------------------------------------

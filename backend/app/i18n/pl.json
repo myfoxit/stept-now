@@ -19,5 +19,12 @@
 
   "widget.greeting": "Cześć 👋",
   "widget.tagline.ai": "Zapytaj nas o cokolwiek — nasza AI odpowiada natychmiast.",
-  "widget.tagline.human": "Zwykle odpowiadamy w ciągu kilku minut."
+  "widget.tagline.human": "Zwykle odpowiadamy w ciągu kilku minut.",
+
+  "tour.transcript.starting": "Uruchamianie przewodnika: „{{name}}”",
+  "tour.transcript.started": "Przewodnik uruchomiony: „{{name}}”",
+  "tour.transcript.completed": "Przewodnik ukończony: „{{name}}”",
+  "tour.transcript.dismissed": "Przewodnik zamknięty: „{{name}}”",
+  "tour.congrats": "Świetna robota — ukończono „{{name}}”!",
+  "tour.congrats_next": "Dobry następny krok: „{{name}}” — dotknij karty poniżej, aby go uruchomić."
 }

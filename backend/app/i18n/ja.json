@@ -16,5 +16,12 @@
 
   "widget.greeting": "こんにちは 👋",
   "widget.tagline.ai": "何でもお尋ねください — AI がすぐにお答えします。",
-  "widget.tagline.human": "通常、数分以内に返信します。"
+  "widget.tagline.human": "通常、数分以内に返信します。",
+
+  "tour.transcript.starting": "ツアーを開始しています：「{{name}}」",
+  "tour.transcript.started": "ツアーが開始されました：「{{name}}」",
+  "tour.transcript.completed": "ツアーが完了しました：「{{name}}」",
+  "tour.transcript.dismissed": "ツアーが閉じられました：「{{name}}」",
+  "tour.congrats": "お疲れさまでした。「{{name}}」を完了しました！",
+  "tour.congrats_next": "次のおすすめは「{{name}}」です。下のカードをタップして開始できます。"
 }
