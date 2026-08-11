@@ -368,7 +368,7 @@ class WidgetHost {
         }
         break
       case MSG.TOUR_START:
-        void this.startTour(String(payload.tourId ?? ''))
+        void this.startTour(String(payload.tourId ?? ''), String(payload.opId ?? '') || undefined)
         break
       case MSG.COPILOT_OP:
         void this.runCopilotOp(payload)
@@ -601,14 +601,35 @@ class WidgetHost {
 
   // --- tours ---------------------------------------------------------------
 
-  /** `Stept('startTour', id)`: fetch THAT tour (manual triggers included). */
-  async startTour(tourId: string): Promise<void> {
+  /**
+   * `Stept('startTour', id)`: fetch THAT tour (manual triggers included).
+   *
+   * `opId` is set when the agent's `show_guide` asked for it: the outcome then
+   * has to travel back as that op's result, so the model finds out whether the
+   * tour really started instead of assuring the visitor it did.
+   */
+  async startTour(tourId: string, opId?: string): Promise<void> {
     if (!tourId) return
     try {
       const tour = await fetchTour(this.apiBase, this.widgetKey, tourId, this.token)
       this.play(tour)
+      if (opId) {
+        this.post(MSG.COPILOT_RESULT, {
+          opId,
+          result: { ok: true, note: 'the guide is now playing on the page' },
+        })
+      }
     } catch (err) {
       console.warn(`[stept] startTour ${tourId} failed`, err)
+      if (opId) {
+        this.post(MSG.COPILOT_RESULT, {
+          opId,
+          result: {
+            ok: false,
+            error: `could not start tour ${tourId} — it may be unpublished or not available here`,
+          },
+        })
+      }
     }
   }
 

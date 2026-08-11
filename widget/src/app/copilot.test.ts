@@ -253,12 +253,47 @@ describe('page ops', () => {
       args: { tour_id: 'tour-7' },
     })
 
-    expect(posted.find((p) => p.type === MSG.TOUR_START)!.payload).toEqual({ tourId: 'tour-7' })
+    expect(posted.find((p) => p.type === MSG.TOUR_START)!.payload).toEqual({
+      tourId: 'tour-7',
+      opId: 'op2',
+    })
+    // The op stays parked until the loader says the tour really started —
+    // acking early let the assistant announce a guide that never appeared.
+    expect(calls.some((call) => call.url.includes('/copilot/result'))).toBe(false)
+
+    fromLoader(MSG.COPILOT_RESULT, { opId: 'op2', result: { ok: true, note: 'playing' } })
     await vi.waitFor(() => {
       expect(calls.some((call) => call.url.includes('/copilot/result'))).toBe(true)
     })
     const body = JSON.parse(calls.find((call) => call.url.includes('/copilot/result'))!.init.body!)
     expect(body.result.ok).toBe(true)
+  })
+
+  it('tells the model when the tour could not be started', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const calls = mockFetch(copilotRoutes())
+    capturePosts()
+
+    const c = makeController()
+    await c.boot()
+    await c.openConversation('conv1')
+    pushRealtime(c, {
+      run_id: 'run2b',
+      op_id: 'op2b',
+      op: 'guide',
+      args: { tour_id: 'tour-gone' },
+    })
+    fromLoader(MSG.COPILOT_RESULT, {
+      opId: 'op2b',
+      result: { ok: false, error: 'could not start tour tour-gone' },
+    })
+
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('/copilot/result'))).toBe(true)
+    })
+    const body = JSON.parse(calls.find((call) => call.url.includes('/copilot/result'))!.init.body!)
+    expect(body.result.ok).toBe(false)
+    expect(body.result.error).toContain('could not start tour')
   })
 
   it('reports a missing tour id as a failure the model can read', async () => {

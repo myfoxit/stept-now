@@ -337,11 +337,16 @@ export class Controller {
 
     if (op === 'guide') {
       const tourId = typeof args.tour_id === 'string' ? args.tour_id : ''
-      bridge.post(MSG.TOUR_START, { tourId })
-      void this.finishOp(runId, opId, {
-        ok: Boolean(tourId),
-        ...(tourId ? { note: 'the guide is now playing on the page' } : { error: 'missing tour_id' }),
-      })
+      if (!tourId) {
+        void this.finishOp(runId, opId, { ok: false, error: 'missing tour_id' })
+        return
+      }
+      // Wait for the loader to report whether the tour actually started. Acking
+      // optimistically let the assistant announce "the guide is now playing"
+      // when nothing had — the visitor is then told to watch a tour that never
+      // appears, and the model has no idea anything went wrong.
+      this.pendingOps.set(opId, { runId, op })
+      bridge.post(MSG.TOUR_START, { tourId, opId })
       return
     }
     if (op === 'steps') {

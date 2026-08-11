@@ -747,15 +747,22 @@ async def deliverable_tour_by_id(
     *,
     contact: Contact | None,
 ) -> Tour:
-    """Manual start: a single live tour of ANY trigger type. Frequency and
-    audience still apply; anything undeliverable is a plain 404."""
+    """Manual start: a single live tour of ANY trigger type.
+
+    Audience still applies — it is a targeting rule, and a tour aimed at
+    enterprise trials should not play for everyone else just because something
+    asked for it by id.
+
+    Frequency deliberately does NOT apply. It governs *unsolicited* delivery
+    ("stop auto-showing this to someone who already finished it"), and this path
+    is only reached when the tour was explicitly asked for: `stept('startTour',
+    id)` from the host app, or the agent's `show_guide` after the visitor asked
+    to be shown. Re-applying it here meant "show me the on-call tour again"
+    answered 404 and the widget silently played nothing.
+    """
     tour = await get_tour(session, workspace_id, tour_id)
     if tour.status != "live":
         raise NotFoundError("Tour not found")
-    if contact is not None:
-        history = await _event_history(session, workspace_id, contact.id, [tour.id])
-        if not _frequency_allows(tour.frequency or {}, history.get(tour.id, {}), utcnow()):
-            raise NotFoundError("Tour not found")
     if not await _audience_matches(session, workspace_id, tour.audience or {}, contact):
         raise NotFoundError("Tour not found")
     return tour

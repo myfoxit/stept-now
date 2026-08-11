@@ -212,18 +212,37 @@ async def test_manual_tour_fetchable_by_id(client, workspace_ctx):
     }
 
 
-async def test_manual_fetch_404s_for_draft_and_frequency_exclusion(client, workspace_ctx):
+async def test_manual_fetch_404s_for_draft(client, workspace_ctx):
     key = await widget_key_for(client, workspace_ctx)
     draft = await create_tour(client, workspace_ctx, name="Draft")
     assert (
         await client.get(f"/api/widget/tours/{draft['id']}?widget_key={key}")
     ).status_code == 404
 
+
+async def test_manual_fetch_replays_a_tour_the_contact_already_finished(client, workspace_ctx):
+    """Frequency governs *unsolicited* delivery only.
+
+    Asking for a tour by id — `stept('startTour', id)`, or the agent's
+    `show_guide` after the visitor asked to be shown — must replay it. Gating
+    this on frequency made "show me that tour again" a silent no-op: the widget
+    404s and plays nothing while the assistant claims it started.
+    """
+    key = await widget_key_for(client, workspace_ctx)
     contact, headers = await _identified(client, workspace_ctx)
     seen = await _live(client, workspace_ctx, name="Seen", frequency={"type": "once"})
-    await insert_events(workspace_ctx.id, seen["id"], [(contact["id"], "started", None)])
-    excluded = await client.get(f"/api/widget/tours/{seen['id']}?widget_key={key}", headers=headers)
-    assert excluded.status_code == 404
+    await insert_events(
+        workspace_ctx.id,
+        seen["id"],
+        [(contact["id"], "started", None), (contact["id"], "completed", None)],
+    )
+
+    # auto-delivery still respects the frequency rule …
+    assert seen["id"] not in await _delivered(client, key, headers=headers)
+    # … while an explicit fetch replays it.
+    replay = await client.get(f"/api/widget/tours/{seen['id']}?widget_key={key}", headers=headers)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["id"] == seen["id"]
 
 
 async def test_manual_fetch_requires_a_key(client, workspace_ctx):
