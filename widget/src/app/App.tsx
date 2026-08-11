@@ -8,6 +8,7 @@ import { HelpCenter } from './components/HelpCenter'
 import { Home } from './components/Home'
 import { IdentityGate } from './components/IdentityGate'
 import { Thread } from './components/Thread'
+import { dir, t } from '../i18n'
 import { useController } from './hooks'
 
 export function App({ controller }: { controller: Controller }) {
@@ -18,7 +19,7 @@ export function App({ controller }: { controller: Controller }) {
   }, [controller])
 
   const accent = state.config.accent_color || '#5b46e5'
-  const workspaceName = state.workspace?.name || 'Chat'
+  const workspaceName = state.workspace?.name || t('app.chat')
   const close = () => controller.requestClose()
 
   const screen = state.screen
@@ -27,7 +28,7 @@ export function App({ controller }: { controller: Controller }) {
 
   switch (screen.name) {
     case 'loading':
-      body = <div class="sw-loading sw-loading-full">Loading…</div>
+      body = <div class="sw-loading sw-loading-full">{t('app.loading')}</div>
       break
 
     case 'error':
@@ -38,7 +39,7 @@ export function App({ controller }: { controller: Controller }) {
           </div>
           <p class="sw-gate-body">{screen.message}</p>
           <button type="button" class="sw-btn sw-btn-primary" onClick={() => void controller.boot()}>
-            Try again
+            {t('app.try_again')}
           </button>
         </div>
       )
@@ -70,7 +71,7 @@ export function App({ controller }: { controller: Controller }) {
       header = (
         <Header
           title={workspaceName}
-          subtitle="Conversation"
+          subtitle={t('thread.header')}
           onBack={() => controller.goHome()}
           onClose={close}
         />
@@ -83,7 +84,7 @@ export function App({ controller }: { controller: Controller }) {
           loading={state.loadingMessages}
           status={active?.status ?? null}
           csatDone={screen.conversationId ? Boolean(state.csatDone[screen.conversationId]) : false}
-          greeting={state.config.greeting || 'Hi there 👋'}
+          greeting={state.config.greeting || t('home.greeting')}
           widgetKey={controller.widgetKey}
           pageControl={state.pageControl}
           pageTitle={state.page?.title || state.page?.path || ''}
@@ -94,7 +95,7 @@ export function App({ controller }: { controller: Controller }) {
           onRunAction={() => controller.confirmPendingAction()}
           onDismissAction={() => controller.declinePendingAction()}
           onSend={(text) => void controller.send(text)}
-          onTyping={(t) => controller.emitTyping(t)}
+          onTyping={(isTyping) => controller.emitTyping(isTyping)}
           onLoadMore={() => void controller.loadOlderMessages()}
           onCsat={(rating, feedback) =>
             screen.conversationId && void controller.submitCsat(screen.conversationId, rating, feedback)
@@ -107,7 +108,9 @@ export function App({ controller }: { controller: Controller }) {
     }
 
     case 'help':
-      header = <Header title="Help" onBack={() => controller.goHome()} onClose={close} />
+      header = (
+        <Header title={t('help.header')} onBack={() => controller.goHome()} onClose={close} />
+      )
       body = (
         <HelpCenter
           articles={state.articles}
@@ -121,7 +124,7 @@ export function App({ controller }: { controller: Controller }) {
     case 'article':
       header = (
         <Header
-          title={state.article?.collection?.name || 'Article'}
+          title={state.article?.collection?.name || t('article.header')}
           onBack={() => controller.backToHelp()}
           onClose={close}
         />
@@ -131,7 +134,7 @@ export function App({ controller }: { controller: Controller }) {
   }
 
   return (
-    <div class="sw-app" style={`--sw-accent:${accent}`}>
+    <div class="sw-app" dir={dir()} lang={state.locale} style={`--sw-accent:${accent}`}>
       {header}
       <main class="sw-body">{body}</main>
     </div>

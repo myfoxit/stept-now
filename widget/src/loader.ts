@@ -67,6 +67,8 @@ import type {
   TourEventName,
   TourStep,
 } from './types'
+import { ensureCatalog, setLocale, t } from './i18n'
+import { browserLanguages, resolveLocale } from './i18n/resolve'
 
 const currentScript = document.currentScript as HTMLScriptElement | null
 
@@ -150,6 +152,35 @@ class WidgetHost {
     this.settings = settings
     this.apiBase = (settings.apiBase || scriptOrigin()).replace(/\/+$/, '')
     this.widgetKey = settings.workspaceKey || settings.widgetKey || ''
+    this.applyLocale()
+  }
+
+  /**
+   * The launcher, tours, checklists and surveys render in the host page, in a
+   * different JS context from the iframe app, so this bundle keeps its own copy
+   * of the active locale. There is no contact here — only the host's setting
+   * and the browser — so it resolves once and stays put; the iframe re-resolves
+   * with what the visitor writes and pushes any change over the bridge.
+   */
+  private applyLocale(): void {
+    const code = setLocale(
+      resolveLocale({
+        explicit: this.settings.locale,
+        lockLocale: this.settings.lockLocale,
+        browser: browserLanguages(),
+      }),
+    )
+    // Only English ships inside the bundle; anything else is a small fetch.
+    // The launcher renders in English for that instant and relabels itself
+    // when the catalog lands — a visible-but-correct label beats blocking the
+    // host page's first paint on our network call.
+    void ensureCatalog(code, this.apiBase).then(() => this.relabel())
+  }
+
+  /** Re-apply translated labels to host-page chrome after a late catalog load. */
+  private relabel(): void {
+    if (!this.launcher) return
+    this.launcher.setAttribute('aria-label', this.open ? t('launcher.close') : t('launcher.open'))
   }
 
   init(): void {
@@ -220,7 +251,7 @@ class WidgetHost {
     const btn = document.createElement('button')
     btn.id = LAUNCHER_ID
     btn.className = `stept-${this.position}`
-    btn.setAttribute('aria-label', 'Open chat')
+    btn.setAttribute('aria-label', t('launcher.open'))
     btn.style.setProperty('--stept-accent', this.accent)
     btn.innerHTML = CHAT_ICON
     const badge = document.createElement('span')
@@ -237,7 +268,7 @@ class WidgetHost {
     const frame = document.createElement('iframe')
     frame.id = FRAME_ID
     frame.className = `stept-${this.position}`
-    frame.title = 'Stept messenger'
+    frame.title = t('launcher.title')
     frame.allow = 'clipboard-write'
     frame.src = this.frameSrc()
     document.body.appendChild(frame)
@@ -249,6 +280,8 @@ class WidgetHost {
       workspaceKey: this.widgetKey,
       apiBase: this.apiBase,
       identity: this.settings.identity,
+      locale: this.settings.locale,
+      lockLocale: this.settings.lockLocale,
     }
     const hash = encodeURIComponent(JSON.stringify(params))
     return `${this.apiBase}/widget-assets/app.html#${hash}`
@@ -264,7 +297,7 @@ class WidgetHost {
   openPanel(): void {
     this.open = true
     this.frame?.classList.add('stept-open')
-    this.launcher?.setAttribute('aria-label', 'Close chat')
+    this.launcher?.setAttribute('aria-label', t('launcher.close'))
     if (this.launcher) this.launcher.innerHTML = CLOSE_ICON
     this.reattachBadge()
     this.post(MSG.OPEN, {})
@@ -273,7 +306,7 @@ class WidgetHost {
   close(): void {
     this.open = false
     this.frame?.classList.remove('stept-open')
-    this.launcher?.setAttribute('aria-label', 'Open chat')
+    this.launcher?.setAttribute('aria-label', t('launcher.open'))
     if (this.launcher) this.launcher.innerHTML = CHAT_ICON
     this.reattachBadge()
     this.post(MSG.CLOSE, {})
@@ -451,7 +484,7 @@ class WidgetHost {
     this.tourPlayer?.start(
       {
         id: `ai-${Date.now()}`,
-        name: String(payload.name ?? 'How to do this'),
+        name: String(payload.name ?? t('tour.how_to')),
         steps,
         theme: { accent: this.accent },
         version: 1,

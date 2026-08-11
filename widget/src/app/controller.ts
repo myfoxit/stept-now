@@ -30,12 +30,18 @@ import type {
 } from '../types'
 import { isRequireIdentity } from '../types'
 import { bridge } from './bridge'
+import { DEFAULT_LOCALE, ensureCatalog, getLocale, hasCatalog, setLocale, t } from '../i18n'
+import { browserLanguages, resolveLocale } from '../i18n/resolve'
 import { WidgetSocket } from './ws'
 
 export interface BootParams {
   workspaceKey: string
   apiBase: string
   identity?: Identity
+  /** `SteptSettings.locale` — the host page's explicit interface language. */
+  locale?: string
+  /** `SteptSettings.lockLocale` — honour `locale` even against what the visitor writes. */
+  lockLocale?: boolean
 }
 
 export type Screen =
@@ -94,10 +100,13 @@ export interface AppState {
   workingOnPage: string | null
   /** A client action waiting for the visitor's Run / Not now. */
   pendingAction: PendingActionCard | null
+  /** Active interface language. In state so a change re-renders the tree. */
+  locale: string
 }
 
 const INITIAL: AppState = {
   screen: { name: 'loading' },
+  locale: DEFAULT_LOCALE,
   config: {},
   workspace: null,
   contact: null,
@@ -138,6 +147,55 @@ export class Controller {
   constructor(params: BootParams) {
     this.params = params
     this.api = new WidgetApi(params.apiBase)
+    // Pick a language before the first paint. Boot refines this once the
+    // server tells us what this contact actually writes in; doing it here means
+    // the loading and error screens are already in the right language, which is
+    // exactly when a visitor is least able to cope with a foreign one.
+    this.applyLocale()
+  }
+
+  /**
+   * Re-resolve the interface language and re-render if it changed.
+   *
+   * `learned` is the language the server detected from this visitor's own
+   * messages. It outranks the browser header and the host page's setting
+   * because it is the only signal that is evidence about *this person* — see
+   * `i18n/resolve.ts`.
+   */
+  private applyLocale(learned?: string | null): string {
+    const next = resolveLocale({
+      explicit: this.params.locale,
+      lockLocale: this.params.lockLocale,
+      learned: learned ?? this.state?.contact?.locale ?? null,
+      browser: browserLanguages(),
+      workspaceDefault: (this.state?.config?.default_locale as string | undefined) ?? null,
+    })
+    if (next === getLocale() && hasCatalog(next)) return next
+    setLocale(next)
+    // `set` is safe before the first render: listeners is empty until subscribe.
+    this.set({ locale: next })
+    if (!hasCatalog(next)) {
+      // Only English is bundled; fetch the rest and re-render when it lands.
+      // Until then every string falls back to English rather than a raw key.
+      void ensureCatalog(next, this.params.apiBase).then(() => {
+        if (getLocale() === next) this.set({ locale: next })
+      })
+    }
+    return next
+  }
+
+  /**
+   * Adopt a language the server detected for this visitor.
+   *
+   * Called when a message response reports a `detected_locale` — the moment a
+   * German question arrives from an `en-US` browser, the composer placeholder,
+   * the buttons, and the timestamps all switch to German too.
+   */
+  adoptDetectedLocale(locale: string | null | undefined): void {
+    if (!locale) return
+    const contact = this.state.contact
+    if (contact) this.set({ contact: { ...contact, locale } })
+    this.applyLocale(locale)
   }
 
   /** Public widget key — namespaces per-widget localStorage (e.g. feedback). */
@@ -173,7 +231,7 @@ export class Controller {
 
   async boot(): Promise<void> {
     if (!this.params.workspaceKey) {
-      this.set({ screen: { name: 'error', message: 'Missing widget key.' } })
+      this.set({ screen: { name: 'error', message: t('error.missing_key') } })
       return
     }
     try {
@@ -204,6 +262,8 @@ export class Controller {
       helpCenter: boot.help_center_enabled,
       conversations: boot.conversations,
     })
+    // Now that we know the contact and the workspace default, resolve again.
+    this.applyLocale(boot.contact?.locale)
     this.connectRealtime()
     this.bindBridge()
     this.emitReady()
@@ -794,12 +854,12 @@ export class Controller {
 
   private describe(err: unknown): string {
     if (err instanceof ApiError) {
-      if (err.status === 404) return 'This chat widget is unavailable.'
+      if (err.status === 404) return t('error.widget_unavailable')
       // A blocked visitor gets the same neutral wording as an unavailable
       // widget: telling them they're blocked is hostile and confirms the block.
-      if (errorCode(err) === 'contact_blocked') return 'Chat is unavailable right now.'
-      return err.message || 'Something went wrong.'
+      if (errorCode(err) === 'contact_blocked') return t('error.unavailable')
+      return err.message || t('error.generic')
     }
-    return 'Unable to reach the chat service.'
+    return t('error.unreachable')
   }
 }

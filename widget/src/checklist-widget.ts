@@ -18,6 +18,7 @@ import { renderMarkdown } from './app/md'
 import { globMatch } from './loader-core'
 import { absolutizeMedia } from './tour-player'
 import type { Checklist, ChecklistItem, ChecklistProgress } from './types'
+import { t } from './i18n'
 
 // --- pure state helpers (unit-tested) ---------------------------------------
 
@@ -314,7 +315,7 @@ export class ChecklistWidget {
     const checklist = this.checklist
     if (!checklist) return
     const confirmFn = typeof this.win.confirm === 'function' ? this.win.confirm.bind(this.win) : null
-    if (confirmFn && !confirmFn('Hide this checklist?')) return
+    if (confirmFn && !confirmFn(t('checklist.hide_confirm'))) return
     this.state.dismissed = true
     this.persist()
     this.unmount()
@@ -344,7 +345,7 @@ export class ChecklistWidget {
     const panel = node(this.doc, 'div', `stept-cl-panel stept-cl-${side}`)
     panel.style.setProperty('--stept-accent', accent)
     panel.setAttribute('role', 'dialog')
-    panel.setAttribute('aria-label', this.checklist?.name || 'Checklist')
+    panel.setAttribute('aria-label', this.checklist?.name || t('checklist.label'))
     panel.hidden = !this.open
 
     this.doc.body.appendChild(pill)
@@ -361,7 +362,7 @@ export class ChecklistWidget {
 
     this.pill.innerHTML = ''
     const label = node(this.doc, 'span')
-    label.textContent = checklist.launcher?.label || 'Getting started'
+    label.textContent = checklist.launcher?.label || t('checklist.title')
     const count = node(this.doc, 'span', 'stept-cl-pill-count')
     count.textContent = `${done}/${total}`
     this.pill.appendChild(label)
@@ -376,7 +377,7 @@ export class ChecklistWidget {
     head.appendChild(title)
     const close = node(this.doc, 'button', 'stept-cl-close')
     close.textContent = '×'
-    close.setAttribute('aria-label', 'Hide checklist')
+    close.setAttribute('aria-label', t('checklist.hide'))
     close.onclick = () => this.dismiss()
     head.appendChild(close)
     this.panel.appendChild(head)
@@ -476,9 +477,9 @@ export class ChecklistWidget {
 function ctaLabel(item: ChecklistItem): string {
   switch (item.action?.type) {
     case 'start_tour':
-      return 'Start'
+      return t('tour.start')
     case 'open_url':
-      return 'Open'
+      return t('checklist.open')
     case 'open_messenger':
       return 'Chat'
     default:

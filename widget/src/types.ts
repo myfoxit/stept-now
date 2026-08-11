@@ -30,12 +30,26 @@ export interface SteptSettings {
    * so a prompt-injected "go to evil.example" cannot move the session off-site.
    */
   aiAllowedOrigins?: string[]
+  /**
+   * Interface language for the widget (`'de'`, `'pt-BR'`, …). Optional: with no
+   * setting the widget follows the visitor's browser, and then switches to
+   * whatever language they actually write in.
+   */
+  locale?: string
+  /**
+   * Keep `locale` fixed even when the visitor writes in another language.
+   * Off by default — a visitor writing Turkish is better served by a Turkish
+   * interface than by the one the site owner assumed.
+   */
+  lockLocale?: boolean
 }
 
 /** Public widget-inbox theming/config (inbox.config passed through boot). */
 export interface WidgetConfig {
   accent_color?: string
   greeting?: string
+  /** Workspace's default interface language; the weakest locale signal. */
+  default_locale?: string | null
   launcher_position?: 'left' | 'right'
   require_identity?: boolean
   ai_agent_id?: string | null
@@ -46,6 +60,8 @@ export interface BootContact {
   id: string
   name: string
   email: string | null
+  /** Language this contact writes in, learned server-side. Null until known. */
+  locale?: string | null
 }
 
 export interface BootWorkspace {

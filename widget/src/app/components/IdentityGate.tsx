@@ -1,3 +1,5 @@
+import { t } from '../../i18n'
+
 /**
  * Shown when boot returns `require_identity` and the host page did not supply a
  * verified identity. The widget cannot itself mint the identity HMAC (that
@@ -17,13 +19,12 @@ export function IdentityGate({
       <div class="sw-gate-icon" aria-hidden="true">
         🔒
       </div>
-      <h2 class="sw-gate-title">Sign in to chat with {workspaceName || 'us'}</h2>
-      <p class="sw-gate-body">
-        This chat is available to signed-in visitors. Please log in to this site, then reopen the
-        messenger to start a conversation.
-      </p>
+      <h2 class="sw-gate-title">
+        {t('identity.title', { workspace: workspaceName || t('identity.workspace_fallback') })}
+      </h2>
+      <p class="sw-gate-body">{t('identity.body')}</p>
       <button type="button" class="sw-btn sw-btn-primary" onClick={onRetry}>
-        I&rsquo;m signed in — retry
+        {t('identity.retry')}
       </button>
     </div>
   )

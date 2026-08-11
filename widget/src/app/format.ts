@@ -1,23 +1,28 @@
+import { getLocale, t } from '../i18n'
+
 /** Compact "time ago" for conversation rows and message timestamps. */
 export function timeAgo(iso: string, now: number = Date.now()): string {
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ''
   const secs = Math.max(0, Math.round((now - then) / 1000))
-  if (secs < 60) return 'just now'
+  if (secs < 60) return t('time.just_now')
   const mins = Math.round(secs / 60)
-  if (mins < 60) return `${mins}m`
+  if (mins < 60) return t('time.minutes', { count: mins })
   const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h`
+  if (hours < 24) return t('time.hours', { count: hours })
   const days = Math.round(hours / 24)
-  if (days < 7) return `${days}d`
-  return new Date(then).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  if (days < 7) return t('time.days', { count: days })
+  // Past a week we show a real date, which must follow the widget's language
+  // rather than the browser's — those disagree whenever we picked the locale
+  // from what the visitor writes.
+  return new Date(then).toLocaleDateString(getLocale(), { month: 'short', day: 'numeric' })
 }
 
 /** Clock time for a single message (e.g. "3:42 PM"). */
 export function clockTime(iso: string): string {
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return ''
-  return t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const time = new Date(iso)
+  if (Number.isNaN(time.getTime())) return ''
+  return time.toLocaleTimeString(getLocale(), { hour: 'numeric', minute: '2-digit' })
 }
 
 export function initials(name: string): string {

@@ -28,6 +28,7 @@ import type {
   TourSettings,
   TourStep,
 } from './types'
+import { t } from './i18n'
 
 export type Side = 'top' | 'bottom' | 'left' | 'right'
 export type Placement = 'auto' | Side | 'center'
@@ -638,7 +639,7 @@ export class TourPlayer {
 
     if (this.preview) {
       const badge = el2(this.doc, 'span', 'stept-tour-badge')
-      badge.textContent = 'Preview'
+      badge.textContent = t('tour.preview')
       tip.appendChild(badge)
     }
     if (this.settings.dismissable) tip.appendChild(this.closeButton())
@@ -670,7 +671,7 @@ export class TourPlayer {
     const beacon = this.beacon
     if (!beacon) return
     beacon.hidden = false
-    beacon.setAttribute('aria-label', step.title || 'Show tip')
+    beacon.setAttribute('aria-label', step.title || t('tour.show_tip'))
     const open = (): void => {
       this.renderTip(step, i, el, false)
       this.position()
@@ -748,7 +749,7 @@ export class TourPlayer {
     }
     const isLast = i === this.tour.steps.length - 1
     banner.appendChild(
-      this.ctaButton(step.cta ?? null, 'primary', i, isLast ? 'Got it' : 'Next'),
+      this.ctaButton(step.cta ?? null, 'primary', i, isLast ? t('tour.got_it') : t('tour.next')),
     )
     if (this.settings.dismissable) {
       banner.appendChild(this.closeButton(theme.dismiss === 'never_again'))
@@ -873,7 +874,7 @@ export class TourPlayer {
   private closeButton(permanent = false): HTMLElement {
     const close = el2(this.doc, 'button', 'stept-tour-close')
     close.textContent = '×'
-    close.setAttribute('aria-label', permanent ? 'Dismiss and never show again' : 'Dismiss tour')
+    close.setAttribute('aria-label', permanent ? t('tour.dismiss_forever') : t('tour.dismiss'))
     close.onclick = () => this.dismiss(permanent)
     return close
   }
@@ -918,7 +919,7 @@ export class TourPlayer {
     const actions = el2(this.doc, 'div', 'stept-tour-actions')
     if (i > 0) {
       const back = el2(this.doc, 'button', 'stept-tour-btn ghost')
-      back.textContent = 'Back'
+      back.textContent = t('tour.back')
       back.onclick = () => this.back()
       actions.appendChild(back)
     }
@@ -930,14 +931,14 @@ export class TourPlayer {
       hint.textContent = guidedAction
         ? actionHint(step)
         : advance === 'input'
-          ? 'Fill in the field to continue'
+          ? t('tour.fill_field')
           : advance === 'delay'
             ? 'Continuing…'
-            : 'Click the highlighted element to continue'
+            : t('tour.click_target_continue')
       actions.appendChild(hint)
     } else {
       const nextBtn = el2(this.doc, 'button', 'stept-tour-btn primary')
-      nextBtn.textContent = isLast ? 'Done' : 'Next'
+      nextBtn.textContent = isLast ? t('tour.done') : t('tour.next')
       nextBtn.onclick = () => this.next()
       actions.appendChild(nextBtn)
     }
@@ -1209,13 +1210,13 @@ function actionInstruction(step: TourStep): string {
   if (!action) return ''
   if (action.kind === 'fill') return `Type “${action.value ?? ''}” here`
   if (action.kind === 'navigate') return `Go to ${action.url ?? 'the next page'}`
-  return 'Click the highlighted element'
+  return t('tour.click_target')
 }
 
 function actionHint(step: TourStep): string {
   return step.action?.kind === 'fill'
-    ? 'Fill in the field to continue'
-    : 'Click the highlighted element to continue'
+    ? t('tour.fill_field')
+    : t('tour.click_target_continue')
 }
 
 function safeSessionStorage(win: Window): Storage | null {

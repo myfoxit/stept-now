@@ -1,4 +1,5 @@
 import { useRef, useState } from 'preact/hooks'
+import { t } from '../../i18n'
 
 /**
  * Message composer. Enter sends, Shift+Enter inserts a newline. Emits typing
@@ -31,11 +32,11 @@ export function Composer({
       <textarea
         ref={ref}
         class="sw-composer-input"
-        placeholder="Write a message…"
+        placeholder={t('composer.placeholder')}
         rows={1}
         value={text}
         disabled={disabled}
-        aria-label="Message"
+        aria-label={t('composer.label')}
         onInput={(e) => {
           const el = e.currentTarget
           setText(el.value)
@@ -53,7 +54,7 @@ export function Composer({
       <button
         type="button"
         class="sw-send"
-        aria-label="Send message"
+        aria-label={t('composer.send')}
         disabled={disabled || !text.trim()}
         onClick={submit}
       >

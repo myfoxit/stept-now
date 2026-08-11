@@ -1,4 +1,5 @@
 import type { WidgetArticlesResponse } from '../../types'
+import { t } from '../../i18n'
 
 /** Help-center browser: search box + collections tree or search results. */
 export function HelpCenter({
@@ -24,19 +25,19 @@ export function HelpCenter({
         <input
           class="sw-search-input"
           type="search"
-          placeholder="Search for help"
+          placeholder={t('help.search_placeholder')}
           value={query}
-          aria-label="Search help articles"
+          aria-label={t('help.search_label')}
           onInput={(e) => onSearch(e.currentTarget.value)}
         />
       </div>
 
-      {!articles && <div class="sw-loading">Loading…</div>}
+      {!articles && <div class="sw-loading">{t('app.loading')}</div>}
 
       {articles && searching && (
         <div class="sw-articles">
           {articles.results.length === 0 ? (
-            <div class="sw-empty">No results for “{query}”.</div>
+            <div class="sw-empty">{t('help.no_results', { query })}</div>
           ) : (
             articles.results.map((r) => (
               <button key={r.slug} type="button" class="sw-article-row" onClick={() => onOpen(r.slug)}>
@@ -51,7 +52,7 @@ export function HelpCenter({
       {articles && !searching && (
         <div class="sw-collections">
           {articles.collections.length === 0 ? (
-            <div class="sw-empty">No articles yet.</div>
+            <div class="sw-empty">{t('help.empty')}</div>
           ) : (
             articles.collections.map((col) => (
               <div key={col.slug} class="sw-collection">

@@ -13,6 +13,7 @@
 
 import { renderMarkdown } from './app/md'
 import type { Survey, SurveyAnswer, SurveyQuestion } from './types'
+import { t } from './i18n'
 
 // --- pure helpers (unit-tested) ---------------------------------------------
 
@@ -271,7 +272,7 @@ export class SurveyWidget {
 
     const close = node(this.doc, 'button', 'stept-sv-close')
     close.textContent = '×'
-    close.setAttribute('aria-label', 'Dismiss survey')
+    close.setAttribute('aria-label', t('survey.dismiss'))
     close.onclick = () => this.dismiss()
     card.appendChild(close)
 
@@ -319,9 +320,9 @@ export class SurveyWidget {
   private renderScaleLabels(): HTMLElement {
     const scale = node(this.doc, 'div', 'stept-sv-scale')
     const low = node(this.doc, 'span')
-    low.textContent = 'Not likely'
+    low.textContent = t('survey.not_likely')
     const high = node(this.doc, 'span')
-    high.textContent = 'Very likely'
+    high.textContent = t('survey.very_likely')
     scale.appendChild(low)
     scale.appendChild(high)
     return scale
@@ -379,13 +380,13 @@ export class SurveyWidget {
     const isLast = this.index === survey.questions.length - 1
     if (!question.required) {
       const skip = node(this.doc, 'button', 'stept-sv-btn ghost')
-      skip.textContent = 'Skip'
+      skip.textContent = t('survey.skip')
       skip.onclick = () => this.next()
       actions.appendChild(skip)
     }
     const nextBtn = this.doc.createElement('button')
     nextBtn.className = 'stept-sv-btn'
-    nextBtn.textContent = isLast ? 'Submit' : 'Next'
+    nextBtn.textContent = isLast ? t('survey.submit') : t('survey.next')
     nextBtn.disabled = !canAdvance(question, this.values)
     nextBtn.onclick = () => this.next()
     actions.appendChild(nextBtn)
@@ -398,7 +399,7 @@ export class SurveyWidget {
     if (!card) return
     card.innerHTML = ''
     const thanks = node(this.doc, 'div', 'stept-sv-thanks')
-    thanks.innerHTML = renderMarkdown(survey.thanks_message || 'Thanks for the feedback!')
+    thanks.innerHTML = renderMarkdown(survey.thanks_message || t('survey.thanks'))
     card.appendChild(thanks)
   }
 

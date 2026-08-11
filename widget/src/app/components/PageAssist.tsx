@@ -8,6 +8,8 @@
  * clicking and typing on the visitor's behalf, and it is off until they say yes.
  */
 
+import { t, tParts } from '../../i18n'
+
 export function PageAssist({
   pageTitle,
   actionsAllowed,
@@ -29,6 +31,7 @@ export function PageAssist({
       </div>
     )
   }
+  const [before, after] = tParts('page_assist.allow', 'page')
   return (
     <div class="sw-page-assist">
       <label class="sw-page-assist-toggle">
@@ -38,8 +41,9 @@ export function PageAssist({
           onChange={(event) => onAllowChange((event.currentTarget as HTMLInputElement).checked)}
         />
         <span>
-          Let the assistant do things on {pageTitle ? <strong>{pageTitle}</strong> : 'this page'} for
-          me
+          {before}
+          {pageTitle ? <strong>{pageTitle}</strong> : t('page_assist.this_page')}
+          {after}
         </span>
       </label>
     </div>
@@ -50,21 +54,21 @@ export function PageAssist({
 function describe(op: string): string {
   switch (op) {
     case 'action':
-      return 'Running the action…'
+      return t('page_assist.busy.action')
     case 'act':
-      return 'Doing that on the page…'
+      return t('page_assist.busy.act')
     case 'navigate':
-      return 'Taking you to the right page…'
+      return t('page_assist.busy.navigate')
     case 'read':
-      return 'Reading this page…'
+      return t('page_assist.busy.read')
     case 'find':
     case 'snapshot':
-      return 'Looking at this page…'
+      return t('page_assist.busy.look')
     case 'scroll':
-      return 'Scrolling to it…'
+      return t('page_assist.busy.scroll')
     case 'wait':
-      return 'Waiting for the page…'
+      return t('page_assist.busy.wait')
     default:
-      return 'Working on the page…'
+      return t('page_assist.busy.default')
   }
 }

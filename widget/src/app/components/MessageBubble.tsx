@@ -4,6 +4,7 @@ import type { FeedbackRating } from '../../types'
 import type { UiMessage } from '../controller'
 import { clockTime, initials } from '../format'
 import { renderMarkdown } from '../md'
+import { t } from '../../i18n'
 
 /** localStorage key remembering the visitor's rating for one answer. */
 export function feedbackStorageKey(widgetKey: string, messageId: string): string {
@@ -116,7 +117,7 @@ export function MessageBubble({
     <div class={`sw-row ${mine ? 'sw-row-mine' : 'sw-row-them'}`}>
       {!mine && (
         <div class="sw-avatar" aria-hidden="true">
-          {initials(message.author_name || 'Agent')}
+          {initials(message.author_name || t('message.agent'))}
         </div>
       )}
       <div class="sw-bubble-wrap">
@@ -138,11 +139,11 @@ export function MessageBubble({
                     rel="noopener noreferrer"
                     title={c.title || c.url}
                   >
-                    [{c.n}] {c.title || 'Source'}
+                    [{c.n}] {c.title || t('message.source')}
                   </a>
                 ) : (
                   <span key={c.n} class="sw-cite">
-                    [{c.n}] {c.title || 'Source'}
+                    [{c.n}] {c.title || t('message.source')}
                   </span>
                 ),
               )}
@@ -154,7 +155,7 @@ export function MessageBubble({
             <button
               type="button"
               class={`sw-fb-btn ${rating === 'up' ? 'sw-fb-on' : ''}`}
-              aria-label="Helpful"
+              aria-label={t('message.helpful')}
               aria-pressed={rating === 'up'}
               onClick={() => rate('up')}
             >
@@ -163,7 +164,7 @@ export function MessageBubble({
             <button
               type="button"
               class={`sw-fb-btn ${rating === 'down' ? 'sw-fb-on' : ''}`}
-              aria-label="Not helpful"
+              aria-label={t('message.not_helpful')}
               aria-pressed={rating === 'down'}
               onClick={() => rate('down')}
             >
@@ -190,7 +191,7 @@ export function MessageBubble({
               )}
             </span>
           ) : message.pending ? (
-            <span>Sending…</span>
+            <span>{t('message.sending')}</span>
           ) : (
             <span>{clockTime(message.created_at)}</span>
           )}

@@ -8,6 +8,7 @@ import { Csat } from './Csat'
 import { MessageBubble } from './MessageBubble'
 import { PageAssist } from './PageAssist'
 import { TypingDots } from './TypingDots'
+import { t } from '../../i18n'
 
 export function Thread({
   messages,
@@ -80,14 +81,14 @@ export function Thread({
       <div class="sw-messages" ref={scroller} onScroll={onScroll}>
         {hasMore && (
           <button type="button" class="sw-loadmore" onClick={onLoadMore}>
-            Load earlier messages
+            {t('thread.load_earlier')}
           </button>
         )}
-        {loading && messages.length === 0 && <div class="sw-loading">Loading…</div>}
+        {loading && messages.length === 0 && <div class="sw-loading">{t('app.loading')}</div>}
         {!loading && messages.length === 0 && (
           <div class="sw-thread-intro">
             <p>{greeting}</p>
-            <p class="sw-muted">Send a message and we&rsquo;ll get back to you here.</p>
+            <p class="sw-muted">{t('thread.intro_hint')}</p>
           </div>
         )}
         {messages.map((m) => (
