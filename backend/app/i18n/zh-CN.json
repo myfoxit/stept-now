@@ -16,5 +16,12 @@
 
   "widget.greeting": "您好 👋",
   "widget.tagline.ai": "有任何问题都可以问我们——AI 即时回答。",
-  "widget.tagline.human": "我们通常在几分钟内回复。"
+  "widget.tagline.human": "我们通常在几分钟内回复。",
+
+  "tour.transcript.starting": "正在启动导览：“{{name}}”",
+  "tour.transcript.started": "导览已开始：“{{name}}”",
+  "tour.transcript.completed": "导览已完成：“{{name}}”",
+  "tour.transcript.dismissed": "导览已关闭：“{{name}}”",
+  "tour.congrats": "做得好——您已完成“{{name}}”！",
+  "tour.congrats_next": "推荐的下一步：“{{name}}”——点按下方卡片即可开始。"
 }

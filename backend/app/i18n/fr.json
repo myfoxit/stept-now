@@ -17,5 +17,12 @@
 
   "widget.greeting": "Bonjour 👋",
   "widget.tagline.ai": "Posez-nous vos questions — notre IA répond instantanément.",
-  "widget.tagline.human": "Nous répondons généralement en quelques minutes."
+  "widget.tagline.human": "Nous répondons généralement en quelques minutes.",
+
+  "tour.transcript.starting": "Lancement de la visite : « {{name}} »",
+  "tour.transcript.started": "Visite lancée : « {{name}} »",
+  "tour.transcript.completed": "Visite terminée : « {{name}} »",
+  "tour.transcript.dismissed": "Visite fermée : « {{name}} »",
+  "tour.congrats": "Bravo — vous avez terminé « {{name}} » !",
+  "tour.congrats_next": "Une bonne étape suivante : « {{name}} » — touchez la carte ci-dessous pour la lancer."
 }

@@ -237,3 +237,125 @@ async def live_tour(session: AsyncSession, workspace_id: str, tour_id: str) -> T
     if tour is None or tour.workspace_id != workspace_id or tour.status != "live":
         return None
     return tour
+
+
+async def next_tour_after(
+    session: AsyncSession, workspace_id: str, completed: Tour, *, url: str | None = None
+) -> GuideMatch | None:
+    """The one live tour worth suggesting after `completed` — or None.
+
+    "Obvious" is deliberately strict: the candidate must clear the normal
+    relevance floor against the finished tour's own name/description, so a
+    workspace with three unrelated tours suggests nothing rather than whichever
+    sorts first. Only tours qualify (a checklist is not "the next tour").
+    """
+    query = f"{completed.name} {completed.description or ''}".strip()
+    if not query:
+        return None
+    matches = await search_guides(session, workspace_id, query, url=url, limit=4)
+    for match in matches:
+        if match.kind == "tour" and match.id != completed.id:
+            return match
+    return None
+
+
+# ---------------------------------------------------------------------------
+# tour-start intent
+# ---------------------------------------------------------------------------
+
+#: "Being shown" verbs aimed at the speaker — enough on their own: someone who
+#: says "show me…" is asking to be walked through, whatever the object is.
+_SHOW_ME_RES = (
+    # en
+    r"\b(?:show|walk|guide|take)\s+(?:me|us)\b",
+    r"\bwalk\s+(?:me|us)\s+through\b",
+    # de
+    r"\bzeig(?:e|en)?\s+(?:mir|uns|es mir)\b",
+    r"\bführ(?:e|en)?\s+(?:mich|uns)\s+(?:durch|dadurch)\b",
+    # fr
+    r"\bmontre(?:z|r)?[- ](?:moi|nous)\b",
+    r"\bguide(?:z)?[- ](?:moi|nous)\b",
+    # es / pt-BR
+    r"\bmu[eé]str[ae]me(?:lo)?\b",
+    r"\bens[eé]ñame\b",
+    r"\bgu[ií]ame\b",
+    r"\b(?:me\s+)?mostr[ae](?:[- ]me)?\b",
+    # it
+    r"\bmostrami\b",
+    r"\bfammi\s+vedere\b",
+    # nl
+    r"\blaat\s+(?:me|mij|ons)\s+(?:eens\s+)?zien\b",
+    # pl
+    r"\bpoka[żz]\s+(?:mi|nam)\b",
+    # tr
+    r"\bg[öo]ster(?:ir misin| bana)?\b",
+)
+
+#: Play/start/replay verbs — these need a guide-ish OBJECT nearby ("start the
+#: tour"), otherwise "how do I start a subscription?" would false-positive.
+_PLAY_VERB_RE = (
+    r"\b(?:play|start|launch|begin|run|replay|restart|repeat|resume|open)\b"
+    r"|\b(?:spiel|spiele|spielen|starte|starten|wiederhol|wiederhole)\b"
+    r"|\bnochmal\b|\berneut\b"
+    r"|\b(?:lance[zr]?|d[ée]marre[zr]?|rejoue[zr]?)\b"
+    r"|\b(?:inicia|iniciar|reproduce|reproducir|reinicia)\b"
+    r"|\b(?:avvia|riavvia|riproduci)\b"
+    r"|\b(?:speel|start|herhaal)\b"
+    r"|\b(?:uruchom|odtw[óo]rz|powt[óo]rz)\b"
+    r"|\b(?:ba[şs]lat|oynat|tekrar)\b"
+)
+_GUIDE_NOUN_RE = (
+    r"\b(?:tour|tours|guide|walkthrough|walk-through|tutorial|demo|onboarding)\b"
+    r"|\b(?:anleitung|rundgang|führung|einführung)\b"
+    r"|\b(?:visite|guidée|didacticiel|tutoriel)\b"
+    r"|\b(?:recorrido|guía|tutorial)\b"
+    r"|\b(?:tour guidato|guida)\b"
+    r"|\b(?:rondleiding|handleiding)\b"
+    r"|\b(?:przewodnik|samouczek)\b"
+    r"|\b(?:tur|rehber|kılavuz)\b"
+    r"|ツアー|ガイド|チュートリアル|투어|가이드|导览|教程|引导|جولة|دليل"
+)
+#: CJK/Japanese/Korean/Arabic "show me / start" phrasings (no word boundaries).
+_NON_LATIN_IMPERATIVES = (
+    "見せて",
+    "案内して",
+    "開始して",
+    "もう一度",
+    "보여줘",
+    "보여 주세요",
+    "시작해",
+    "다시 보여",
+    "演示",
+    "带我",
+    "播放",
+    "再看一遍",
+    "أرني",
+    "شغل الجولة",
+)
+
+_SHOW_ME_PATTERNS = [re.compile(p, re.IGNORECASE) for p in _SHOW_ME_RES]
+_PLAY_VERB_PATTERN = re.compile(_PLAY_VERB_RE, re.IGNORECASE)
+_GUIDE_NOUN_PATTERN = re.compile(_GUIDE_NOUN_RE, re.IGNORECASE)
+
+
+def is_tour_imperative(text: str | None) -> bool:
+    """Did the visitor explicitly ask to be SHOWN (start/play/replay a tour)?
+
+    This is the gate between "answer in words and attach an offer card" and
+    "start the tour right now" (`tour_autostart_policy: ask`). Deliberately
+    deterministic and conservative: an informational "How do I set up X?" must
+    stay False, while "show me", "play that tour again", "zeig mir das nochmal"
+    must be True. False negatives are cheap (the visitor gets a one-tap offer
+    card); false positives replay today's bug of hijacking the screen.
+    """
+    if not text:
+        return False
+    cleaned = " ".join(text.split())
+    if not cleaned:
+        return False
+    if any(pattern.search(cleaned) for pattern in _SHOW_ME_PATTERNS):
+        return True
+    if any(phrase in cleaned for phrase in _NON_LATIN_IMPERATIVES):
+        return True
+    # Verb + guide noun ("start the tour", "spiel die Tour nochmal ab").
+    return bool(_PLAY_VERB_PATTERN.search(cleaned) and _GUIDE_NOUN_PATTERN.search(cleaned))

@@ -117,9 +117,15 @@ async def get_widget_tour(
 async def record_widget_event(
     tour_id: str, body: WidgetTourEventIn, request: Request, session: Db, widget_key: str
 ):
+    """Playback lifecycle intake: `started` / `step_viewed` / `step_blocked` /
+    `completed` / `dismissed` (+ legacy `step_error`). Tolerant: unknown event
+    types are accepted and ignored, never 422 — an old backend must not break a
+    newer widget. Lifecycle events of agent-initiated tours also resume the
+    conversation's parked run and keep its transcript truthful (service seam).
+    """
     workspace_id, _inbox = await resolve_widget_key(session, widget_key)
     contact = await contact_from_token(request, session, workspace_id)
-    await tours_service.record_event(
+    recorded = await tours_service.record_event(
         session,
         workspace_id,
         tour_id,
@@ -128,4 +134,4 @@ async def record_widget_event(
         contact_id=contact.id if contact is not None else None,
         meta=body.meta,
     )
-    return Msg(message="recorded")
+    return Msg(message="recorded" if recorded is not None else "ignored")

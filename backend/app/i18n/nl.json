@@ -17,5 +17,12 @@
 
   "widget.greeting": "Hallo 👋",
   "widget.tagline.ai": "Vraag ons alles — onze AI antwoordt direct.",
-  "widget.tagline.human": "We reageren meestal binnen een paar minuten."
+  "widget.tagline.human": "We reageren meestal binnen een paar minuten.",
+
+  "tour.transcript.starting": "Tour wordt gestart: “{{name}}”",
+  "tour.transcript.started": "Tour gestart: “{{name}}”",
+  "tour.transcript.completed": "Tour voltooid: “{{name}}”",
+  "tour.transcript.dismissed": "Tour gesloten: “{{name}}”",
+  "tour.congrats": "Goed gedaan — je hebt “{{name}}” voltooid!",
+  "tour.congrats_next": "Een goede volgende stap: “{{name}}” — tik op de kaart hieronder om te starten."
 }

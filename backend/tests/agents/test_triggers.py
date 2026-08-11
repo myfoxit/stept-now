@@ -139,7 +139,14 @@ async def test_human_takeover_stops_further_runs(actx):
     assert await runs_for(conversation_id) == []  # no run while a human owns it
 
 
-async def test_no_duplicate_run_while_one_is_active(actx):
+async def test_message_while_run_parked_queues_a_follow_up_not_a_concurrent_run(actx):
+    """A message that lands while a run is parked must NOT be dropped.
+
+    (The old behavior returned early and the message was never answered — the
+    dogfood "my English question got a reply to the previous message" bug.)
+    It becomes a QUEUED follow-up run that waits for the parked one: exactly
+    one run in flight, zero messages dropped.
+    """
     agent_id = await make_agent(actx)  # close_conversation → require_approval
     inbox_id = await make_wired_inbox(actx, agent_id)
     conversation_id = await new_conversation(actx, inbox_id=inbox_id)
@@ -151,7 +158,10 @@ async def test_no_duplicate_run_while_one_is_active(actx):
     runs = await runs_for(conversation_id)
     assert len(runs) == 1 and runs[0].status == "awaiting_approval"
 
-    # A second message arrives while the run is parked — no new run is spawned.
-    await add_contact_message(actx, conversation_id, "are you there?")
+    # A second message arrives while the run is parked — a follow-up run is
+    # created for it but stays queued (never a second concurrent run).
+    second_message_id = await add_contact_message(actx, conversation_id, "are you there?")
     await drain_tasks()
-    assert len(await runs_for(conversation_id)) == 1
+    runs = sorted(await runs_for(conversation_id), key=lambda r: (r.created_at, r.id))
+    assert [r.status for r in runs] == ["awaiting_approval", "queued"]
+    assert runs[1].trigger_message_id == second_message_id

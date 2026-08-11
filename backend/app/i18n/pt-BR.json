@@ -17,5 +17,12 @@
 
   "widget.greeting": "Olá 👋",
   "widget.tagline.ai": "Pergunte o que quiser — nossa IA responde na hora.",
-  "widget.tagline.human": "Normalmente respondemos em alguns minutos."
+  "widget.tagline.human": "Normalmente respondemos em alguns minutos.",
+
+  "tour.transcript.starting": "Iniciando o tour: “{{name}}”",
+  "tour.transcript.started": "Tour iniciado: “{{name}}”",
+  "tour.transcript.completed": "Tour concluído: “{{name}}”",
+  "tour.transcript.dismissed": "Tour fechado: “{{name}}”",
+  "tour.congrats": "Muito bem — você concluiu “{{name}}”!",
+  "tour.congrats_next": "Um bom próximo passo: “{{name}}” — toque no cartão abaixo para iniciá-lo."
 }
