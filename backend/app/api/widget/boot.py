@@ -22,11 +22,16 @@ from app.core.errors import BlockedContactError, ForbiddenError
 from app.core.i18n import workspace_locale
 from app.core.ratelimit import RateLimit
 from app.core.security import create_widget_token, verify_identity_hash
+from app.models.agent import Agent
 from app.models.article import Article
 from app.models.contact import Contact
 from app.models.inbox import ContactInbox, Inbox
 from app.models.workspace import Workspace
 from app.services import contacts as contacts_service
+
+#: Valid `tour_autostart_policy` values ("ask" is the default: answer in text,
+#: attach an offer card; only an explicit "show me / play it" starts a tour).
+_TOUR_POLICIES = frozenset({"ask", "auto", "never"})
 
 router = APIRouter()
 
@@ -82,6 +87,32 @@ async def _help_center_enabled(session: Db, workspace_id: str) -> bool:
         )
     ).first()
     return row is not None
+
+
+async def _display_config(session: Db, workspace: Workspace, inbox: Inbox) -> dict[str, Any]:
+    """Branding/behavior keys the messenger needs, resolved server-side.
+
+    All four existed server-side and never reached the UI (the bound agent's
+    name — "Northplane Guide" on doktrace — being the sore one). Settings live
+    in the widget inbox config JSON; fallbacks are computed here so the widget
+    never re-implements them.
+    """
+    config = inbox.config or {}
+    brand = str(config.get("brand_display_name") or "").strip() or workspace.name
+    agent_name: str | None = None
+    agent_id = config.get("ai_agent_id")
+    if agent_id:
+        agent = await session.get(Agent, agent_id)
+        if agent is not None and agent.workspace_id == workspace.id:
+            agent_name = agent.name
+    raw_policy = config.get("tour_autostart_policy")
+    policy = raw_policy if isinstance(raw_policy, str) and raw_policy in _TOUR_POLICIES else "ask"
+    return {
+        "brand_display_name": brand,
+        "agent_display_name": agent_name,
+        "ai_disclosure": bool(config.get("ai_disclosure", True)),
+        "tour_autostart_policy": policy,
+    }
 
 
 @router.post(
@@ -142,7 +173,11 @@ async def boot(body: BootRequest, session: Db) -> BootResponse | RequireIdentity
         workspace=BootWorkspaceOut(name=workspace.name, logo_url=workspace.logo_url),
         # The workspace default is the widget's weakest locale signal — used
         # only when we know nothing about this particular visitor.
-        config={**inbox.config, "default_locale": workspace_locale(workspace.settings)},
+        config={
+            **inbox.config,
+            "default_locale": workspace_locale(workspace.settings),
+            **await _display_config(session, workspace, inbox),
+        },
         conversations=await conversation_summaries(
             session, workspace.id, inbox.id, contact.id, limit=10
         ),
