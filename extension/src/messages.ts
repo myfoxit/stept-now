@@ -65,6 +65,7 @@ export type BgToDriver =
 export type ExecOpName =
   | 'compact-dom'
   | 'resolve-index'
+  | 'resolve-semantic'
   | 'describe'
   | 'prepare'
   | 'set-value'
@@ -78,6 +79,7 @@ export type ExecOpName =
   | 'overlay-open'
   | 'scroll-at'
   | 'dom-settle'
+  | 'wait-for'
   | 'url';
 
 export interface BgToExec {

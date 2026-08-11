@@ -21,17 +21,39 @@ const RECONNECT_DELAY_MS = 3_000;
 
 const DEVICE_ID_KEY = 'stept.deviceId';
 
+/** Single-flight guard for `ensureDeviceId`. Two overlapping calls used to
+ * BOTH read an empty store and BOTH mint — registering this one browser under
+ * two device ids, which the gateway then saw as twin browsers and flapped
+ * between (the duplicate-registration bug). One promise per worker lifetime
+ * makes every caller share one read-or-mint. */
+let deviceIdInFlight: Promise<string> | null = null;
+
 /** Stable per-profile device id, minted once into `chrome.storage.local` — the
  * gateway uses it to supersede a stale registration on reconnect. */
-export async function ensureDeviceId(): Promise<string> {
-  const bag = await chrome.storage.local
-    .get(DEVICE_ID_KEY)
-    .catch(() => ({}) as Record<string, unknown>);
-  const existing = bag[DEVICE_ID_KEY];
-  if (typeof existing === 'string' && existing) return existing;
-  const minted = crypto.randomUUID();
-  await chrome.storage.local.set({ [DEVICE_ID_KEY]: minted }).catch(() => {});
-  return minted;
+export function ensureDeviceId(): Promise<string> {
+  deviceIdInFlight ??= (async () => {
+    const bag = await chrome.storage.local
+      .get(DEVICE_ID_KEY)
+      .catch(() => ({}) as Record<string, unknown>);
+    const existing = bag[DEVICE_ID_KEY];
+    if (typeof existing === 'string' && existing) return existing;
+    const minted = crypto.randomUUID();
+    await chrome.storage.local.set({ [DEVICE_ID_KEY]: minted }).catch(() => {});
+    // Re-read after write: if another context (a racing worker start) minted
+    // concurrently, converge on whatever the store settled on so this browser
+    // presents ONE identity to the gateway.
+    const settled = await chrome.storage.local
+      .get(DEVICE_ID_KEY)
+      .catch(() => ({}) as Record<string, unknown>);
+    const stored = settled[DEVICE_ID_KEY];
+    return typeof stored === 'string' && stored ? stored : minted;
+  })();
+  return deviceIdInFlight;
+}
+
+/** Test seam: forget the in-flight/settled device id promise. */
+export function resetDeviceIdCacheForTests(): void {
+  deviceIdInFlight = null;
 }
 
 /** Human label the dashboard/MCP shows for this browser. */

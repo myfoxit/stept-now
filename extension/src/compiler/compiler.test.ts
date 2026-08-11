@@ -303,3 +303,62 @@ describe('elementKey', () => {
     expect(elementKey(null)).toBe('');
   });
 });
+
+describe('per-step page url + click-advance (multi-page playback fuel)', () => {
+  it('stamps a click step with its page url (origin+path, query/hash dropped) and advance_on_click', () => {
+    const { steps } = compile([
+      click('save', { url: 'https://app.example.com/settings/billing?tab=cards#top' }),
+    ]);
+    expect(steps[0]?.url).toBe('https://app.example.com/settings/billing');
+    expect(steps[0]?.advance_on_click).toBe(true);
+  });
+
+  it('stamps typing/select/check/hover steps with their page url', () => {
+    const events: RawEvent[] = [
+      { ...typed('email', 'ada@example.com'), url: 'https://app.example.com/signup' },
+      {
+        kind: 'select',
+        t: tick(),
+        tabId: 1,
+        frameId: 0,
+        context: target('plan'),
+        value: 'pro',
+        label: 'Pro',
+        url: 'https://app.example.com/plans',
+      },
+      {
+        kind: 'check',
+        t: tick(),
+        tabId: 1,
+        frameId: 0,
+        context: target('terms'),
+        checked: true,
+        url: 'https://app.example.com/plans',
+      },
+    ];
+    const { steps } = compile(events);
+    expect(steps.map((s) => s.url)).toEqual([
+      'https://app.example.com/signup',
+      'https://app.example.com/plans',
+      'https://app.example.com/plans',
+    ]);
+    // input/select advance on input, not click; check IS a recorded click
+    expect(steps.map((s) => s.advance_on_click ?? null)).toEqual([null, null, true]);
+  });
+
+  it('a step recorded without a url simply carries none (older recorders)', () => {
+    const { steps } = compile([click('save', { url: undefined })]);
+    expect(steps[0]?.url ?? null).toBeNull();
+    expect(steps[0]?.advance_on_click).toBe(true);
+  });
+
+  it('wait steps carry no page url — their navigation IS the url_pattern', () => {
+    const { steps } = compile([
+      click('save'),
+      nav('https://app.example.com/done'),
+      click('confirm', { url: 'https://app.example.com/done' }),
+    ]);
+    const wait = steps.find((s) => s.type === 'wait');
+    expect(wait?.url ?? null).toBeNull();
+  });
+});

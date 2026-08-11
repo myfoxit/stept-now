@@ -41,3 +41,45 @@ export function waitForDomSettle(opts: { quietMs?: number; maxMs?: number } = {}
     bump(); // start the quiet countdown even if nothing ever mutates
   });
 }
+
+/**
+ * Full "page is ready to be read" settle, bounded by `maxMs` (~3s default):
+ *
+ *   1. document.readyState — wait out the initial parse ('loading') so a
+ *      snapshot taken right after a tab opens doesn't index an empty document;
+ *   2. one rAF tick — a framework that just hydrated has painted at least once;
+ *   3. a mutation-quiet window — SPA renders that land AFTER 'complete'
+ *      (route transitions, async lists) are what readyState can never see.
+ *
+ * This is the shared hydration gate: the remote-drive exec island settles with
+ * it before extracting, and tour surfaces can reuse it so first-paint anchor
+ * resolution stops racing the app's own render.
+ */
+export async function waitForPageSettled(
+  opts: { quietMs?: number; maxMs?: number } = {},
+): Promise<void> {
+  const maxMs = opts.maxMs ?? 3000;
+  const startedAt = Date.now();
+  const remaining = (): number => Math.max(0, maxMs - (Date.now() - startedAt));
+
+  if (document.readyState === 'loading') {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, remaining());
+      document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+  }
+  await new Promise<void>((resolve) =>
+    typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame(() => resolve())
+      : setTimeout(resolve, 16),
+  );
+  const quietMs = Math.min(opts.quietMs ?? 200, Math.max(remaining(), 0) || 1);
+  await waitForDomSettle({ quietMs, maxMs: Math.max(remaining(), 1) });
+}

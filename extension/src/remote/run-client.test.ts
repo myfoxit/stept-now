@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ensureDeviceId, RunClient, type RunClientHandlers } from './run-client';
+import {
+  ensureDeviceId,
+  resetDeviceIdCacheForTests,
+  RunClient,
+  type RunClientHandlers,
+} from './run-client';
 
 /** The gateway socket, scripted by hand: tests open/close/feed it explicitly.
  * `close()` only marks the call — a real socket fires `onclose` async, and the
@@ -255,26 +260,72 @@ describe('RunClient message routing', () => {
 });
 
 describe('ensureDeviceId', () => {
-  it('mints once into chrome.storage.local and reuses it after', async () => {
-    const store: Record<string, unknown> = {};
+  function stubStorage(store: Record<string, unknown>, getDelayMs = 0): void {
     vi.stubGlobal('chrome', {
       storage: {
         local: {
-          get: vi.fn(async (key: string) => ({ [key]: store[key] })),
+          get: vi.fn(async (key: string) => {
+            if (getDelayMs) await new Promise((r) => setTimeout(r, getDelayMs));
+            return { [key]: store[key] };
+          }),
           set: vi.fn(async (items: Record<string, unknown>) => {
             Object.assign(store, items);
           }),
         },
       },
     });
+  }
+
+  it('mints once into chrome.storage.local and reuses it after', async () => {
+    resetDeviceIdCacheForTests();
+    const store: Record<string, unknown> = {};
+    stubStorage(store);
     let minted = 0;
     vi.stubGlobal('crypto', { randomUUID: () => `uuid-${++minted}` });
 
     const first = await ensureDeviceId();
+    resetDeviceIdCacheForTests(); // drop the in-memory cache — the STORE must answer
     const second = await ensureDeviceId();
     expect(first).toBe('uuid-1');
     expect(second).toBe('uuid-1');
     expect(minted).toBe(1);
     expect(store['stept.deviceId']).toBe('uuid-1');
+  });
+
+  it('two overlapping calls share ONE mint — never twin device ids', async () => {
+    // The duplicate-registration bug: both callers read an empty store, both
+    // minted, and this browser registered twice under different ids. The
+    // single-flight guard makes overlapping callers share one read-or-mint.
+    resetDeviceIdCacheForTests();
+    const store: Record<string, unknown> = {};
+    stubStorage(store, 5); // slow read so the calls genuinely overlap
+    let minted = 0;
+    vi.stubGlobal('crypto', { randomUUID: () => `uuid-${++minted}` });
+
+    const [a, b] = await Promise.all([ensureDeviceId(), ensureDeviceId()]);
+    expect(a).toBe(b);
+    expect(minted).toBe(1);
+    expect(store['stept.deviceId']).toBe(a);
+  });
+
+  it('converges on the stored winner when another context minted concurrently', async () => {
+    // Cross-context race (two worker starts): whatever the store settled on
+    // after our write is the identity this browser presents.
+    resetDeviceIdCacheForTests();
+    const store: Record<string, unknown> = {};
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          get: vi.fn(async (key: string) => ({ [key]: store[key] })),
+          set: vi.fn(async () => {
+            // the OTHER context's write lands last
+            store['stept.deviceId'] = 'their-uuid';
+          }),
+        },
+      },
+    });
+    vi.stubGlobal('crypto', { randomUUID: () => 'our-uuid' });
+
+    expect(await ensureDeviceId()).toBe('their-uuid');
   });
 });

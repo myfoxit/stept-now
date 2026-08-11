@@ -72,6 +72,15 @@ export default defineBackground(() => {
    * controller an MCP client may be driving a tab through. */
   let runClient: RunClient | null = null;
   let remoteDrive: RemoteDriveController | null = null;
+  /** Monotonic token for startRunClient: only the LATEST call may install its
+   * client. Without it two overlapping calls each created a client in their
+   * async continuation — the second overwrote `runClient` while the first kept
+   * its socket (and 20s ping) alive forever: the twin registration that made
+   * the gateway flap between two connections of the same browser. */
+  let runClientEpoch = 0;
+  /** Tab of the previous worker's remote-drive session (journaled state) — the
+   * next 'open' reattaches to it instead of spawning yet another tab. */
+  let remoteAdoptTabId: number | null = null;
 
   const api = new DapClient(
     () => session?.apiBase ?? state.auth.apiBase,
@@ -87,6 +96,10 @@ export default defineBackground(() => {
         rectabs: [...recordedTabIds],
         guidesteps: guideSteps,
         drivesteps: driveSteps,
+        // journaled separately from panelstate.remoteDrive (which restore()
+        // nulls) so the reattach hint survives SEVERAL worker teardowns in a
+        // row, not just the first
+        remoteadopt: remoteAdoptTabId,
       })
       .catch(() => {});
     broadcast();
@@ -117,7 +130,7 @@ export default defineBackground(() => {
 
   async function restore(): Promise<void> {
     const stored = await chrome.storage.session
-      .get(['panelstate', 'rectabs', 'guidesteps', 'drivesteps'])
+      .get(['panelstate', 'rectabs', 'guidesteps', 'drivesteps', 'remoteadopt'])
       .catch(() => ({}) as Record<string, unknown>);
     const saved = stored['panelstate'] as PanelState | undefined;
     if (saved) Object.assign(state, saved);
@@ -147,8 +160,14 @@ export default defineBackground(() => {
       .get(REMOTE_CONTROL_KEY)
       .catch(() => ({}) as Record<string, unknown>);
     state.remoteControl = rc[REMOTE_CONTROL_KEY] !== false;
-    // the gateway WS and any remote CDP session died with the previous worker
+    // the gateway WS and any remote CDP session died with the previous worker —
+    // but the driven TAB usually survived. Remember it (falling back to the
+    // hint an EARLIER worker journaled) so the next 'open' reattaches instead
+    // of opening tab after tab across reconnects.
     state.remoteConnected = false;
+    const savedAdopt = stored['remoteadopt'];
+    remoteAdoptTabId =
+      state.remoteDrive?.tabId ?? (typeof savedAdopt === 'number' ? savedAdopt : null);
     state.remoteDrive = null;
     applySession(await loadSession());
     await persist();
@@ -1240,9 +1259,14 @@ export default defineBackground(() => {
   function startRunClient(): void {
     if (!session || state.remoteControl === false) return;
     const forSession = session;
+    const epoch = ++runClientEpoch;
     runClient?.stop();
     runClient = null;
     void ensureDeviceId().then((deviceId) => {
+      // A newer startRunClient superseded this call while the id loaded — its
+      // continuation owns the socket now; installing ours too would leave two
+      // live gateway connections for one browser (the twin-registration bug).
+      if (epoch !== runClientEpoch) return;
       // Signed out / toggled off / re-logged while the id loaded — stand down.
       // Compared by TOKEN, not object identity: validateSession() rebuilds the
       // session object (same token) and must not kill the client under us.
@@ -1253,6 +1277,9 @@ export default defineBackground(() => {
       ) {
         return;
       }
+      // Belt and braces: whatever is installed dies before its replacement
+      // starts, so at most ONE RunClient (one WS, one ping loop) ever lives.
+      runClient?.stop();
       const client = new RunClient(
         forSession.apiBase,
         forSession.extensionToken,
@@ -1279,8 +1306,10 @@ export default defineBackground(() => {
 
   /** Tear the remote transport down: gateway WS + any driven-tab session. */
   async function stopRemote(): Promise<void> {
+    runClientEpoch += 1; // cancel any in-flight startRunClient continuation
     runClient?.stop();
     runClient = null;
+    remoteAdoptTabId = null;
     state.remoteConnected = false;
     const drive = remoteDrive;
     remoteDrive = null;
@@ -1305,7 +1334,12 @@ export default defineBackground(() => {
           'a tour is being driven in this browser right now — try again when it finishes',
         );
       }
-      remoteDrive ??= new RemoteDriveController();
+      if (remoteDrive == null) {
+        // Hand the previous worker's driven tab to the fresh controller so a
+        // backend/worker restart reattaches instead of stacking new tabs.
+        remoteDrive = new RemoteDriveController(undefined, remoteAdoptTabId);
+        remoteAdoptTabId = null;
+      }
     }
     if (!remoteDrive) {
       // benign double-close: the session is already gone, which is what close wants

@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INDEX_ATTR } from '@stept/dom-capture';
-import { handleExecOp } from '../entrypoints/exec.content';
+import { handleExecOp, resetStableIndexForTests } from '../entrypoints/exec.content';
 
 function mount(html: string): void {
   document.body.innerHTML = html;
@@ -34,6 +34,8 @@ function stubElementFromPoint(fn: (x: number, y: number) => Element | null): voi
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  // Stable ids live for a page lifetime; each test is a fresh "page".
+  resetStableIndexForTests();
 });
 
 afterEach(() => {
@@ -286,5 +288,139 @@ describe('page-text / hit-test / url / dom-settle', () => {
     expect(r.url).toBe(location.href);
     expect(r.title).toBe('Stept — Billing');
     await expect(handleExecOp('dom-settle', { ms: 50 })).resolves.toBe(true);
+  });
+});
+
+describe('stable element ids (page-lifetime addressing)', () => {
+  it('an element keeps its [index] across snapshots even when earlier elements vanish', async () => {
+    mount('<button id="a">Alpha</button><button id="b">Beta</button>');
+    withLayout();
+    const first = (await handleExecOp('compact-dom', {})) as { text: string };
+    expect(first.text).toContain('[0]<button');
+    expect(first.text).toContain('[1]<button');
+
+    document.getElementById('a')!.remove(); // page changed: Beta is now FIRST in DOM order
+    const second = (await handleExecOp('compact-dom', {})) as { text: string; count: number };
+    expect(second.count).toBe(1);
+    expect(second.text).toContain('[1]<button'); // …but Beta KEEPS id 1 — no renumbering
+    expect(second.text).not.toContain('[0]<button');
+
+    // and the surviving id still resolves for an act
+    const r = (await handleExecOp('resolve-index', { index: 1 })) as { found: boolean; tag: string };
+    expect(r).toMatchObject({ found: true, tag: 'button' });
+  });
+
+  it('a new element gets a fresh id — retired ids are never recycled', async () => {
+    mount('<button id="a">Alpha</button>');
+    withLayout();
+    await handleExecOp('compact-dom', {}); // Alpha = 0
+    document.getElementById('a')!.remove();
+    document.body.innerHTML = '<button id="b">Beta</button>';
+    withLayout();
+    const r = (await handleExecOp('compact-dom', {})) as { text: string };
+    expect(r.text).toContain('[1]<button'); // Beta = 1, NOT a recycled 0
+  });
+
+  it('resolve-index heals across a framework re-render that replaced the node', async () => {
+    mount('<button id="v1">Save changes</button>');
+    withLayout();
+    await handleExecOp('compact-dom', {}); // Save changes = 0
+
+    // React-style re-render: same control, brand-new DOM node, stamp gone.
+    document.body.innerHTML = '<button id="v2">Save changes</button>';
+    withLayout();
+    const r = (await handleExecOp('resolve-index', { index: 0 })) as { found: boolean; tag: string };
+    expect(r).toMatchObject({ found: true, tag: 'button' });
+    // healing re-adopts the id so the NEXT act hits the registry directly
+    expect(document.getElementById('v2')!.getAttribute(INDEX_ATTR)).toBe('0');
+  });
+
+  it('healing refuses to guess between ambiguous twins', async () => {
+    mount('<button id="v1">Save</button>');
+    withLayout();
+    await handleExecOp('compact-dom', {});
+    document.body.innerHTML = '<button>Save</button><button>Save</button>';
+    withLayout();
+    expect(await handleExecOp('resolve-index', { index: 0 })).toEqual({ found: false });
+  });
+});
+
+describe('resolve-semantic (find-by-accessible-name at act time)', () => {
+  it('finds an element by visible text and returns its point + stable id', async () => {
+    mount('<button>Cancel</button><button>Save draft</button>');
+    withLayout();
+    const r = (await handleExecOp('resolve-semantic', { name: 'Save draft' })) as {
+      found: boolean;
+      tag: string;
+      index: number;
+    };
+    expect(r).toMatchObject({ found: true, tag: 'button' });
+    // the returned index is a stable id an immediate follow-up act can reuse
+    const again = (await handleExecOp('resolve-index', { index: r.index })) as { found: boolean };
+    expect(again.found).toBe(true);
+  });
+
+  it('filters by role when one is given', async () => {
+    mount('<a href="#">Settings</a><button>Settings</button>');
+    withLayout();
+    const r = (await handleExecOp('resolve-semantic', { role: 'button', name: 'Settings' })) as {
+      tag: string;
+    };
+    expect(r.tag).toBe('button');
+  });
+
+  it('throws a friendly error when nothing matches', async () => {
+    mount('<button>Save</button>');
+    withLayout();
+    await expect(handleExecOp('resolve-semantic', { name: 'Purchase' })).rejects.toThrow(
+      /nothing matching "Purchase".*fresh snapshot/,
+    );
+    await expect(handleExecOp('resolve-semantic', {})).rejects.toThrow('needs a name');
+  });
+});
+
+describe('wait-for', () => {
+  it('resolves met:true when the selector appears (and only counts VISIBLE matches)', async () => {
+    mount('<div id="host"></div>');
+    setTimeout(() => {
+      document.getElementById('host')!.innerHTML = '<div class="toast">Saved</div>';
+    }, 40);
+    const r = (await handleExecOp('wait-for', { selector: '.toast', timeoutMs: 2000 })) as {
+      met: boolean;
+    };
+    expect(r.met).toBe(true);
+  });
+
+  it('reports met:false after the timeout instead of pretending', async () => {
+    mount('<div>nothing here</div>');
+    const r = (await handleExecOp('wait-for', { selector: '.never', timeoutMs: 150 })) as {
+      met: boolean;
+      waited_ms: number;
+    };
+    expect(r.met).toBe(false);
+    expect(r.waited_ms).toBeGreaterThanOrEqual(100);
+  });
+
+  it('waits for visible page text', async () => {
+    mount('<main><p>loading…</p></main>');
+    setTimeout(() => {
+      document.querySelector('p')!.textContent = 'Welcome back, Ada';
+    }, 40);
+    const r = (await handleExecOp('wait-for', { text: 'welcome back', timeoutMs: 2000 })) as {
+      met: boolean;
+    };
+    expect(r.met).toBe(true);
+  });
+
+  it('rejects an invalid CSS selector with a clear error', async () => {
+    await expect(handleExecOp('wait-for', { selector: '((', timeoutMs: 300 })).rejects.toThrow(
+      'not a valid CSS selector',
+    );
+  });
+
+  it('with neither selector nor text it settles on a quiet page', async () => {
+    mount('<p>steady</p>');
+    const r = (await handleExecOp('wait-for', { timeoutMs: 500 })) as { met: boolean };
+    expect(r.met).toBe(true);
   });
 });

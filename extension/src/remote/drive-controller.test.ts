@@ -69,6 +69,10 @@ function defaultExec(op: ExecOpName): unknown {
       return true;
     case 'resolve-index':
       return { found: true, x: 40, y: 60, tag: 'button', occluded: false, contentEditable: false, editable: false };
+    case 'resolve-semantic':
+      return { found: true, x: 80, y: 90, index: 9, tag: 'button', contentEditable: false, isPassword: false };
+    case 'wait-for':
+      return { met: true, waited_ms: 250 };
     case 'overlay-open':
       return { open: false };
     case 'scroll-at':
@@ -84,18 +88,29 @@ function defaultExec(op: ExecOpName): unknown {
   }
 }
 
-function makeHarness(exec?: ExecFn, cdp: CdpStub = makeCdp()) {
+function makeHarness(exec?: ExecFn, cdp: CdpStub = makeCdp(), adoptTabId: number | null = null) {
   const execCalls: Array<{ op: ExecOpName; args?: Record<string, unknown> }> = [];
   const sleeps: number[] = [];
   const closedTabs: number[] = [];
+  const created: number[] = [];
+  const attached: number[] = [];
+  let nextTabId = 7;
+  let tabExists: (tabId: number) => boolean = () => true;
   const deps: DriveDeps = {
-    attach: async () => cdp,
+    attach: async (tabId) => {
+      attached.push(tabId);
+      return cdp;
+    },
     exec: async (_tabId, op, args) => {
       execCalls.push({ op, args });
       return exec ? exec(op, args) : defaultExec(op);
     },
-    createTab: async () => ({ id: 7 }),
-    tabExists: async () => true,
+    createTab: async () => {
+      const id = nextTabId++;
+      created.push(id);
+      return { id };
+    },
+    tabExists: async (tabId) => tabExists(tabId),
     closeTab: async (tabId) => {
       closedTabs.push(tabId);
     },
@@ -107,21 +122,43 @@ function makeHarness(exec?: ExecFn, cdp: CdpStub = makeCdp()) {
       sleeps.push(ms);
     },
   };
-  const controller = new RemoteDriveController(deps);
-  return { controller, cdp, execCalls, sleeps, closedTabs };
+  const controller = new RemoteDriveController(deps, adoptTabId);
+  return {
+    controller,
+    cdp,
+    execCalls,
+    sleeps,
+    closedTabs,
+    created,
+    attached,
+    setTabExists: (fn: (tabId: number) => boolean) => {
+      tabExists = fn;
+    },
+  };
 }
 
 describe('RemoteDriveController', () => {
-  it('open creates the tab, attaches, and returns a full snapshot', async () => {
+  it('open creates the tab, attaches, and returns a snapshot WITHOUT a screenshot by default', async () => {
     const { controller } = makeHarness();
     const snap = await controller.handle({ op: 'open', args: { url: 'https://x.test/' } });
     expect(snap.url).toBe('https://x.test/');
     expect(snap.elements).toBe('[0]<button Save>');
     expect(snap.count).toBe(1);
-    expect(snap.screenshot).toBe('JPEG64');
-    expect(snap.screenshotSize).toEqual({ w: 2560, h: 1600 });
+    // Screenshots overflow agent contexts — they are strictly opt-in now.
+    expect(snap.screenshot).toBeUndefined();
+    expect(snap.screenshotSize).toBeUndefined();
     expect(snap.note).toContain('opened a new tab');
     expect(controller.sessionState).toMatchObject({ tabId: 7, url: 'https://x.test/', opCount: 1 });
+  });
+
+  it('open with args.screenshot=true captures and reports the (downscaled) jpeg', async () => {
+    const { controller } = makeHarness();
+    const snap = await controller.handle({
+      op: 'open',
+      args: { url: 'https://x.test/', screenshot: true },
+    });
+    expect(snap.screenshot).toBe('JPEG64');
+    expect(snap.screenshotSize).toEqual({ w: 2560, h: 1600 });
   });
 
   it('any driven op before open fails with the no-driven-tab error', async () => {
@@ -151,16 +188,18 @@ describe('RemoteDriveController', () => {
 
   it('coordinate acts map screenshot pixels to CSS pixels through the calibrated ratio', async () => {
     const { controller, cdp } = makeHarness();
-    await controller.handle({ op: 'open' }); // calibrates 2560x1600 → 1280x800
+    // Coordinates only exist relative to a screenshot the caller saw — the map
+    // calibrates when one is captured (screenshot: true).
+    await controller.handle({ op: 'open', args: { screenshot: true } }); // 2560x1600 → 1280x800
     await controller.handle({ op: 'act', args: { kind: 'click', x: 200, y: 300 } });
     expect(cdp.log).toContain('click 100,150 left x1');
   });
 
-  it('act without an index or coordinates is rejected', async () => {
+  it('act without an index, name or coordinates is rejected', async () => {
     const { controller } = makeHarness();
     await controller.handle({ op: 'open' });
     await expect(controller.handle({ op: 'act', args: { kind: 'click' } })).rejects.toThrow(
-      'act needs an element index (from snapshot) or x/y coordinates',
+      'act needs an element index (from snapshot), a name (accessible label), or x/y coordinates',
     );
   });
 
@@ -300,5 +339,116 @@ describe('RemoteDriveController', () => {
     // double-close: nothing to do, still succeeds
     const again = await controller.handle({ op: 'close' });
     expect(again.note).toBe('drive session closed');
+  });
+});
+
+describe('reattach (recovery must not stack tabs)', () => {
+  it('a second open REUSES the live driven tab instead of creating another', async () => {
+    const { controller, created, cdp } = makeHarness();
+    await controller.handle({ op: 'open', args: { url: 'https://x.test/' } });
+    expect(created).toEqual([7]);
+
+    cdp.log.length = 0;
+    const snap = await controller.handle({ op: 'open', args: { url: 'https://y.test/billing' } });
+    expect(created).toEqual([7]); // no second tab
+    expect(snap.note).toContain('reused the existing driven tab');
+    // a DIFFERENT url than the tab is on → navigate the reused tab there
+    expect(cdp.log).toContain('nav https://y.test/billing');
+  });
+
+  it('re-open on the SAME url does not needlessly reload the tab', async () => {
+    const { controller, cdp } = makeHarness();
+    await controller.handle({ op: 'open', args: { url: 'https://x.test/' } });
+    cdp.log.length = 0;
+    // defaultExec reports the tab is on https://x.test/ already
+    await controller.handle({ op: 'open', args: { url: 'https://x.test/' } });
+    expect(cdp.log.filter((l) => l.startsWith('nav '))).toEqual([]);
+  });
+
+  it('adopts the journaled tab from a previous worker life instead of creating one', async () => {
+    const { controller, created, attached, closedTabs } = makeHarness(undefined, makeCdp(), 42);
+    const snap = await controller.handle({ op: 'open', args: { url: 'https://y.test/' } });
+    expect(created).toEqual([]); // reattached, not created
+    expect(attached).toEqual([42]);
+    expect(snap.note).toContain('reattached to the driven tab from the previous session');
+    // the adopted tab is treated as session-owned: close cleans it up
+    await controller.handle({ op: 'close' });
+    expect(closedTabs).toEqual([42]);
+  });
+
+  it('a dead adopt hint falls back to a fresh tab — and never resurrects later', async () => {
+    const { controller, created, setTabExists } = makeHarness(undefined, makeCdp(), 42);
+    setTabExists((tabId) => tabId !== 42);
+    await controller.handle({ op: 'open' });
+    expect(created).toEqual([7]);
+  });
+});
+
+describe('snapshot resilience + wait-for', () => {
+  it('an empty first extraction settles harder and re-extracts once (hydration race)', async () => {
+    const pages = [
+      { text: '', count: 0 }, // the race: app painted after our quiet window
+      { text: '[0]<button Load data>', count: 1 },
+    ];
+    const { controller, execCalls } = makeHarness((op) =>
+      op === 'compact-dom' ? (pages.shift() ?? { text: '[0]<button Load data>', count: 1 }) : defaultExec(op),
+    );
+    const snap = await controller.handle({ op: 'open' });
+    expect(snap.count).toBe(1);
+    expect(snap.elements).toContain('Load data');
+    expect(execCalls.filter((c) => c.op === 'dom-settle')).toHaveLength(2);
+  });
+
+  it('wait-for forwards the condition and notes success with the waited time', async () => {
+    const { controller, execCalls } = makeHarness();
+    await controller.handle({ op: 'open' });
+    const snap = await controller.handle({
+      op: 'wait-for',
+      args: { selector: '.toast', timeoutMs: 4000 },
+    });
+    expect(execCalls).toContainEqual({
+      op: 'wait-for',
+      args: { selector: '.toast', text: undefined, timeoutMs: 4000 },
+    });
+    expect(snap.note).toBe('waited 250ms for selector ".toast"');
+  });
+
+  it('wait-for reports a timeout honestly', async () => {
+    const { controller } = makeHarness((op) =>
+      op === 'wait-for' ? { met: false, waited_ms: 1500 } : defaultExec(op),
+    );
+    await controller.handle({ op: 'open' });
+    const snap = await controller.handle({ op: 'wait-for', args: { text: 'Welcome' } });
+    expect(snap.note).toContain('timed out after 1500ms waiting for text "Welcome"');
+    expect(snap.note).toContain('shows the page as it is now');
+  });
+});
+
+describe('semantic act targeting (role + name)', () => {
+  it('clicks the point the island resolves for the accessible name', async () => {
+    const { controller, cdp, execCalls } = makeHarness();
+    await controller.handle({ op: 'open' });
+    cdp.log.length = 0;
+    await controller.handle({ op: 'act', args: { kind: 'click', role: 'button', name: 'Save' } });
+    expect(execCalls).toContainEqual({
+      op: 'resolve-semantic',
+      args: { role: 'button', name: 'Save' },
+    });
+    expect(cdp.log).toContain('click 80,90 left x1');
+  });
+
+  it('types into a semantically-targeted field (click to focus, clear, insert)', async () => {
+    const { controller, cdp } = makeHarness();
+    await controller.handle({ op: 'open' });
+    cdp.log.length = 0;
+    await controller.handle({ op: 'act', args: { kind: 'type', name: 'Email', text: 'a@b.co' } });
+    expect(cdp.log).toEqual(['click 80,90 left x1', 'clear', 'insert a@b.co']);
+  });
+
+  it('check by name resolves to the stable index the island reports', async () => {
+    const { controller, execCalls } = makeHarness();
+    await controller.handle({ op: 'open' });
+    await controller.handle({ op: 'act', args: { kind: 'check', name: 'Terms' } });
+    expect(execCalls).toContainEqual({ op: 'set-checked', args: { index: 9, checked: true } });
   });
 });

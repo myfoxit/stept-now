@@ -30,7 +30,9 @@ export default defineContentScript({
 
     const send = (msg: ContentToBg) => {
       try {
-        chrome.runtime.sendMessage(msg);
+        // Catch the promise too: a no-receiver rejection would otherwise land
+        // as an Uncaught error in the customer page's console.
+        chrome.runtime.sendMessage(msg)?.catch?.(() => {});
       } catch {
         /* SW asleep — the panel re-requests state */
       }
