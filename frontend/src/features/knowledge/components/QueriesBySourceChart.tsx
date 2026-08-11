@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/chart'
 
 import type { AnalyticsQueriesBySource } from '../api'
+import { t } from '@/i18n'
 
 // Single measure across categories ⇒ one hue, no legend (axis names the category).
 const chartConfig = {
@@ -19,11 +20,11 @@ export function QueriesBySourceChart({ data }: { data: AnalyticsQueriesBySource[
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">By source</CardTitle>
+        <CardTitle className="text-sm">{t('knowledge.by_source')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No data for this range.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">{t('common.no_data_for_this_range')}</p>
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
             <BarChart data={data} margin={{ top: 20, left: 4, right: 4 }}>

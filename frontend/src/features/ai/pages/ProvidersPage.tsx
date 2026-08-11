@@ -9,6 +9,7 @@ import { AddProviderDialog } from '../components/AddProviderDialog'
 import { ProviderCard } from '../components/ProviderCard'
 import { AiNav, ErrorState, ListSkeleton, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { useProviders } from '../hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const canManage = useHasPerm('ai:manage')
@@ -18,12 +19,12 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="AI providers"
-        description="Connect model providers and enable the models your agents can use"
+        title={t('ai.ai_providers')}
+        description={t('ai.connect_model_providers_and_enable_the')}
         actions={
           canManage ? (
             <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="size-4" /> Add provider
+              <Plus className="size-4" /> {t('ai.add_provider')}
             </Button>
           ) : null
         }
@@ -40,16 +41,15 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <Cpu />
               </EmptyMedia>
-              <EmptyTitle>No providers connected</EmptyTitle>
+              <EmptyTitle>{t('ai.no_providers_connected')}</EmptyTitle>
               <EmptyDescription>
-                Add OpenAI, Anthropic, Google or a local model. A built-in mock provider is always
-                available for testing.
+                {t('ai.add_openai_anthropic_google_or_a')}
               </EmptyDescription>
             </EmptyHeader>
             {canManage ? (
               <EmptyContent>
                 <Button onClick={() => setDialogOpen(true)}>
-                  <Plus className="size-4" /> Add provider
+                  <Plus className="size-4" /> {t('ai.add_provider')}
                 </Button>
               </EmptyContent>
             ) : null}

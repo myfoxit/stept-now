@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import type { TourEvent } from '../api'
 import { useLiveTourEvents, useTourEvents } from '../hooks'
 import { eventLabel } from '../lib'
+import { t } from '@/i18n'
 
 export const EVENTS_PAGE_SIZE = 25
 
@@ -38,7 +39,7 @@ function MetaCell({ event }: { event: TourEvent }) {
           variant="secondary"
           className="gap-1 border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400"
         >
-          <AlertTriangle aria-hidden /> healed
+          <AlertTriangle aria-hidden /> {t('tours.healed')}
         </Badge>
       ) : null}
       {reason ? <span className="text-xs text-destructive">{reason}</span> : null}
@@ -67,7 +68,7 @@ export function TourEventsTable({ tourId }: { tourId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Recent events</CardTitle>
+        <CardTitle className="text-sm">{t('tours.recent_events')}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
         {events.isLoading ? (
@@ -80,23 +81,23 @@ export function TourEventsTable({ tourId }: { tourId: string }) {
           <p className="py-6 text-center text-sm text-muted-foreground">
             Could not load events.{' '}
             <Button variant="link" className="px-1" onClick={() => events.refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           </p>
         ) : shown === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No events yet — they land here as soon as someone sees this tour.
+            {t('tours.no_events_yet_they_land_here')}
           </p>
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Step</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Details</TableHead>
+                  <TableHead>{t('common.when')}</TableHead>
+                  <TableHead>{t('common.event')}</TableHead>
+                  <TableHead>{t('tours.step')}</TableHead>
+                  <TableHead>{t('common.contact')}</TableHead>
+                  <TableHead>{t('tours.details')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -135,7 +136,7 @@ export function TourEventsTable({ tourId }: { tourId: string }) {
                 disabled={offset === 0}
                 onClick={() => setOffset(Math.max(0, offset - EVENTS_PAGE_SIZE))}
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 variant="outline"
@@ -143,7 +144,7 @@ export function TourEventsTable({ tourId }: { tourId: string }) {
                 disabled={offset + shown >= total}
                 onClick={() => setOffset(offset + EVENTS_PAGE_SIZE)}
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
           </>

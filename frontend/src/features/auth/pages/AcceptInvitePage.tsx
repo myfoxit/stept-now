@@ -8,6 +8,7 @@ import { AuthCard } from '@/features/auth/components/AuthCard'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuthStore } from '@/stores/auth'
+import { t } from '@/i18n'
 
 export function Component() {
   const [params] = useSearchParams()
@@ -43,8 +44,8 @@ export function Component() {
 
   if (!token) {
     return (
-      <AuthCard title="Invitation link invalid">
-        <p className="text-sm text-muted-foreground">The invitation link is missing its token.</p>
+      <AuthCard title={t('auth.invitation_link_invalid')}>
+        <p className="text-sm text-muted-foreground">{t('auth.the_invitation_link_is_missing_its')}</p>
       </AuthCard>
     )
   }
@@ -59,14 +60,14 @@ export function Component() {
 
   if (!user) {
     return (
-      <AuthCard title="Join your team on Stept" subtitle="Create an account to accept the invite">
+      <AuthCard title={t('auth.join_your_team_on_stept')} subtitle="Create an account to accept the invite">
         <div className="grid gap-3">
           <Button asChild>
             <Link to={`/signup?invite=${encodeURIComponent(token)}`}>Sign up & join</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link to={`/login?from=/accept-invite?token=${encodeURIComponent(token)}`}>
-              I already have an account
+              {t('auth.i_already_have_an_account')}
             </Link>
           </Button>
         </div>

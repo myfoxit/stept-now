@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '@/stores/auth'
 import { useMembers, useParticipants, useToggleParticipant } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 export function WatchersCard({ conversationId }: { conversationId: string }) {
   const userId = useAuthStore((s) => s.user?.id)
@@ -34,7 +35,7 @@ export function WatchersCard({ conversationId }: { conversationId: string }) {
   return (
     <section className="space-y-2 border-b p-3">
       <div className="flex items-center gap-2">
-        <h3 className="text-xs font-semibold uppercase text-muted-foreground">Watchers</h3>
+        <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t('inbox.watchers')}</h3>
         {userId ? (
           <Button
             variant="ghost"
@@ -46,12 +47,12 @@ export function WatchersCard({ conversationId }: { conversationId: string }) {
             {watching ? (
               <>
                 <EyeOff className="mr-1 size-3.5" />
-                Leave
+                {t('inbox.leave')}
               </>
             ) : (
               <>
                 <Eye className="mr-1 size-3.5" />
-                Watch
+                {t('inbox.watch')}
               </>
             )}
           </Button>
@@ -59,7 +60,7 @@ export function WatchersCard({ conversationId }: { conversationId: string }) {
       </div>
 
       {active.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Nobody is watching this thread.</p>
+        <p className="text-xs text-muted-foreground">{t('inbox.nobody_is_watching_this_thread')}</p>
       ) : (
         <ul className="space-y-1">
           {active.map((participant) => (
@@ -81,9 +82,9 @@ export function WatchersCard({ conversationId }: { conversationId: string }) {
 
       {candidates.length > 0 ? (
         <Select onValueChange={(id) => toggle.mutate({ userId: id, join: true })}>
-          <SelectTrigger className="h-7 w-full text-xs" aria-label="Add watcher">
+          <SelectTrigger className="h-7 w-full text-xs" aria-label={t('inbox.add_watcher')}>
             <UserPlus className="mr-1 size-3.5" />
-            <SelectValue placeholder="Add someone" />
+            <SelectValue placeholder={t('inbox.add_someone')} />
           </SelectTrigger>
           <SelectContent>
             {candidates.map((member) => (

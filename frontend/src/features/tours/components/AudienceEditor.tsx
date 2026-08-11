@@ -7,6 +7,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 import type { FilterOp } from '../api'
 import { emptyFilter, FILTER_FIELDS, FILTER_OPS, opNeedsValue, type FilterDraft } from '../lib'
+import { t } from '@/i18n'
 
 /**
  * Audience targeting: everyone, or contacts matching AND-ed filter rows using
@@ -33,7 +34,7 @@ export function AudienceEditor({
   return (
     <div className="grid gap-3">
       <div className="grid gap-1.5">
-        <Label htmlFor="audience-type">Who sees it</Label>
+        <Label htmlFor="audience-type">{t('common.who_sees_it')}</Label>
         <NativeSelect
           id="audience-type"
           className="w-full"
@@ -41,8 +42,8 @@ export function AudienceEditor({
           disabled={disabled}
           onChange={(e) => onTypeChange(e.target.value as 'all' | 'filters')}
         >
-          <NativeSelectOption value="all">Everyone</NativeSelectOption>
-          <NativeSelectOption value="filters">Contacts matching filters</NativeSelectOption>
+          <NativeSelectOption value="all">{t('common.everyone')}</NativeSelectOption>
+          <NativeSelectOption value="filters">{t('common.contacts_matching_filters')}</NativeSelectOption>
         </NativeSelect>
       </div>
 
@@ -50,7 +51,7 @@ export function AudienceEditor({
         <div className="grid gap-2">
           {filters.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No filters yet — every identified contact matches.
+              {t('common.no_filters_yet_every_identified_contact')}
             </p>
           ) : null}
 
@@ -90,7 +91,7 @@ export function AudienceEditor({
               {row.field === 'attributes' ? (
                 <Input
                   className="font-mono text-xs"
-                  placeholder="plan"
+                  placeholder={t('common.plan')}
                   aria-label={`Filter ${index + 1} attribute key`}
                   value={row.attrKey}
                   disabled={disabled}
@@ -115,7 +116,7 @@ export function AudienceEditor({
                 {opNeedsValue(row.op) ? (
                   <Input
                     aria-label={`Filter ${index + 1} value`}
-                    placeholder="value"
+                    placeholder={t('common.value')}
                     value={row.value}
                     disabled={disabled}
                     onChange={(e) => update(index, { value: e.target.value })}
@@ -133,7 +134,7 @@ export function AudienceEditor({
               disabled={disabled}
               onClick={() => onFiltersChange([...filters, emptyFilter()])}
             >
-              <Plus className="size-4" /> Add filter
+              <Plus className="size-4" /> {t('common.add_filter')}
             </Button>
           </div>
         </div>

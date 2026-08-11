@@ -10,6 +10,7 @@ import { ConversationListPane } from '@/features/inbox/components/ConversationLi
 import { ContextPane } from '@/features/inbox/components/ContextPane'
 import { ThreadPane } from '@/features/inbox/components/ThreadPane'
 import { useConversation, useInboxRealtime } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const { conversationId } = useParams()
@@ -28,7 +29,7 @@ export function Component() {
           <>
             <div className="border-b px-2 py-1.5">
               <Button variant="ghost" size="sm" onClick={() => navigate('/inbox')}>
-                <ChevronLeft className="size-4" /> All conversations
+                <ChevronLeft className="size-4" /> {t('inbox.all_conversations')}
               </Button>
             </div>
             <div className="min-h-0 flex-1">

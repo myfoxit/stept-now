@@ -39,6 +39,7 @@ import {
   useRoles,
   useUpdateMember,
 } from '../hooks'
+import { t } from '@/i18n'
 
 const BUILTIN_ROLES = [
   { value: 'owner', label: 'Owner' },
@@ -93,24 +94,24 @@ export function MembersPanel() {
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Invite a teammate</CardTitle>
+            <CardTitle className="text-sm">{t('settings.invite_a_teammate')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-3">
             <div className="grid flex-1 gap-1.5">
               <label className="text-xs text-muted-foreground" htmlFor="invite-email">
-                Email
+                {t('common.email')}
               </label>
               <Input
                 id="invite-email"
                 type="email"
-                placeholder="teammate@company.com"
+                placeholder={t('settings.teammate_company_com')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground" htmlFor="invite-role">
-                Role
+                {t('settings.role')}
               </label>
               <NativeSelect
                 id="invite-role"
@@ -125,7 +126,7 @@ export function MembersPanel() {
               </NativeSelect>
             </div>
             <Button onClick={sendInvite} disabled={!email.trim() || invite.isPending}>
-              <UserPlus className="size-4" /> Invite
+              <UserPlus className="size-4" /> {t('settings.invite')}
             </Button>
           </CardContent>
         </Card>
@@ -133,7 +134,7 @@ export function MembersPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Members</CardTitle>
+          <CardTitle className="text-sm">{t('settings.members')}</CardTitle>
         </CardHeader>
         <CardContent>
           {members.isLoading ? (
@@ -143,8 +144,8 @@ export function MembersPanel() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>{t('settings.member')}</TableHead>
+                    <TableHead>{t('settings.role')}</TableHead>
                     {canManage ? <TableHead className="w-10" /> : null}
                   </TableRow>
                 </TableHeader>
@@ -209,7 +210,7 @@ export function MembersPanel() {
       {canManage && (invitations.data?.length ?? 0) > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Pending invitations</CardTitle>
+            <CardTitle className="text-sm">{t('settings.pending_invitations')}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2">
             {invitations.data!.map((inv) => (
@@ -229,7 +230,7 @@ export function MembersPanel() {
                   disabled={revoke.isPending}
                   onClick={() => revoke.mutate(inv.id)}
                 >
-                  Revoke
+                  {t('settings.revoke')}
                 </Button>
               </div>
             ))}
@@ -242,18 +243,18 @@ export function MembersPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removing?.user.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              They will lose access to this workspace immediately.
+              {t('settings.they_will_lose_access_to_this')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (removing) removeMember.mutate(removing.id)
                 setRemoving(null)
               }}
             >
-              Remove
+              {t('common.remove')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

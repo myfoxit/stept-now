@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { timeAgo } from '@/lib/format'
 import { ChannelIcon, ContactAvatar, PriorityFlag } from '@/features/inbox/components/atoms'
 import type { ConversationListItem, Tag } from '@/features/inbox/api'
+import { t } from '@/i18n'
 
 export function ConversationRow({
   item,
@@ -33,8 +34,7 @@ export function ConversationRow({
       )}
     >
       {selectable ? (
-        // Outside the row button: a checkbox nested in a <button> is invalid
-        // markup and swallows the click.
+        // Outside the row button: a checkbox nested in a <button> {t('inbox.is_invalid_markup_and_swallows_the')}
         <label className="flex cursor-pointer items-start px-2 pt-4">
           <input
             type="checkbox"
@@ -86,7 +86,7 @@ export function ConversationRow({
 
           <div className="mt-1 flex items-center gap-2">
             {item.unread ? (
-              <span className="size-2 rounded-full bg-brand" aria-label="unread" />
+              <span className="size-2 rounded-full bg-brand" aria-label={t('inbox.unread')} />
             ) : null}
             <PriorityFlag priority={item.priority} />
             {item.waiting_since ? (

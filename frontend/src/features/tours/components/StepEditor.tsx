@@ -45,6 +45,7 @@ import {
 } from '../lib'
 import { SelectorChips } from './SelectorChips'
 import { StepShot } from './StepShot'
+import { t } from '@/i18n'
 
 /** Image/video URL with an upload button writing to the public media namespace. */
 function MediaField({
@@ -72,17 +73,17 @@ function MediaField({
 
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={`media-url-${index}`}>Media</Label>
+      <Label htmlFor={`media-url-${index}`}>{t('tours.media')}</Label>
       <div className="flex items-center gap-2">
         <NativeSelect
           className="w-28 shrink-0"
-          aria-label="Media type"
+          aria-label={t('tours.media_type')}
           value={draft.mediaType}
           disabled={disabled}
           onChange={(e) => onChange({ mediaType: e.target.value as 'image' | 'video' })}
         >
-          <NativeSelectOption value="image">Image</NativeSelectOption>
-          <NativeSelectOption value="video">Video</NativeSelectOption>
+          <NativeSelectOption value="image">{t('tours.image')}</NativeSelectOption>
+          <NativeSelectOption value="video">{t('tours.video')}</NativeSelectOption>
         </NativeSelect>
         <Input
           id={`media-url-${index}`}
@@ -116,7 +117,7 @@ function MediaField({
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Uploads are stored publicly so they render on your customers’ site.
+        {t('tours.uploads_are_stored_publicly_so_they')}
       </p>
     </div>
   )
@@ -150,7 +151,7 @@ function CtaFields({
         <Input
           aria-label={`${legend} text`}
           id={`${slug}-label-${index}`}
-          placeholder="Button text"
+          placeholder={t('tours.button_text')}
           value={label}
           disabled={disabled}
           onChange={(e) => onLabel(e.target.value)}
@@ -222,7 +223,7 @@ function StepCard({
         </span>
         <NativeSelect
           id={`step-type-${index}`}
-          aria-label="Type"
+          aria-label={t('common.type')}
           className="w-36"
           value={draft.type}
           disabled={disabled}
@@ -243,7 +244,7 @@ function StepCard({
         ) : null}
         {draft.sandboxKey ? (
           <Badge variant="outline" className="gap-1" data-testid="sandbox-ready">
-            Sandbox ready
+            {t('tours.sandbox_ready')}
           </Badge>
         ) : null}
         <div className="flex-1" />
@@ -289,32 +290,32 @@ function StepCard({
             <figure className="grid gap-1">
               <StepShot draft={draft} workspaceId={workspaceId} index={index} />
               <figcaption className="text-[11px] text-muted-foreground">
-                Captured while recording — shown here only, never to end users.
+                {t('tours.captured_while_recording_shown_here_only')}
               </figcaption>
             </figure>
           ) : null}
           <div className="grid content-start gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor={`title-${index}`}>Title</Label>
+              <Label htmlFor={`title-${index}`}>{t('common.title')}</Label>
               <Input
                 id={`title-${index}`}
-                placeholder="Welcome!"
+                placeholder={t('tours.welcome')}
                 value={draft.title}
                 disabled={disabled}
                 onChange={(e) => onChange({ title: e.target.value })}
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor={`body-${index}`}>Description</Label>
+              <Label htmlFor={`body-${index}`}>{t('common.description')}</Label>
               <Textarea
                 id={`body-${index}`}
                 rows={captured ? 5 : 3}
-                placeholder="Explain what this feature does…"
+                placeholder={t('tours.explain_what_this_feature_does')}
                 value={draft.body}
                 disabled={disabled}
                 onChange={(e) => onChange({ body: e.target.value })}
               />
-              <p className="text-[11px] text-muted-foreground">Markdown is supported.</p>
+              <p className="text-[11px] text-muted-foreground">{t('tours.markdown_is_supported')}</p>
             </div>
           </div>
         </div>
@@ -343,7 +344,7 @@ function StepCard({
           >
             <ChevronRight className={cn('size-3.5 transition-transform', advancedOpen && 'rotate-90')} />
             <Settings2 className="size-3.5" />
-            Advanced
+            {t('tours.advanced')}
             <span className="font-normal opacity-70">
               — targeting, buttons{showAdvance ? ', timing' : ''}
             </span>
@@ -353,7 +354,7 @@ function StepCard({
         <CollapsibleContent className="grid gap-3 pt-3">
           {showContent ? (
             <div className="grid gap-1.5">
-              <Label htmlFor={`placement-${index}`}>Placement</Label>
+              <Label htmlFor={`placement-${index}`}>{t('tours.placement')}</Label>
               <NativeSelect
                 id={`placement-${index}`}
                 className="w-full"
@@ -373,7 +374,7 @@ function StepCard({
           {showSelector ? (
             <>
               <div className="grid gap-1.5">
-                <Label htmlFor={`selector-${index}`}>CSS selector</Label>
+                <Label htmlFor={`selector-${index}`}>{t('tours.css_selector')}</Label>
                 <Input
                   id={`selector-${index}`}
                   className="font-mono text-xs"
@@ -384,7 +385,7 @@ function StepCard({
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor={`fallbacks-${index}`}>Fallback selectors</Label>
+                <Label htmlFor={`fallbacks-${index}`}>{t('tours.fallback_selectors')}</Label>
                 <SelectorChips
                   inputId={`fallbacks-${index}`}
                   label={`Add fallback selector for step ${index + 1}`}
@@ -394,16 +395,16 @@ function StepCard({
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor={`hint-${index}`}>Text hint</Label>
+                <Label htmlFor={`hint-${index}`}>{t('tours.text_hint')}</Label>
                 <Input
                   id={`hint-${index}`}
-                  placeholder="Save changes"
+                  placeholder={t('tours.save_changes')}
                   value={draft.textHint}
                   disabled={disabled}
                   onChange={(e) => onChange({ textHint: e.target.value })}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Visible text the player scans for when every selector misses.
+                  {t('tours.visible_text_the_player_scans_for')}
                 </p>
               </div>
             </>
@@ -438,7 +439,7 @@ function StepCard({
           {draft.type === 'action' ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <Label htmlFor={`action-kind-${index}`}>Action</Label>
+                <Label htmlFor={`action-kind-${index}`}>{t('common.action')}</Label>
                 <NativeSelect
                   id={`action-kind-${index}`}
                   className="w-full"
@@ -455,7 +456,7 @@ function StepCard({
               </div>
               {draft.actionKind === 'fill' ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`action-value-${index}`}>Value to type</Label>
+                  <Label htmlFor={`action-value-${index}`}>{t('tours.value_to_type')}</Label>
                   <Input
                     id={`action-value-${index}`}
                     value={draft.actionValue}
@@ -466,7 +467,7 @@ function StepCard({
               ) : null}
               {draft.actionKind === 'navigate' ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`action-url-${index}`}>Destination URL</Label>
+                  <Label htmlFor={`action-url-${index}`}>{t('tours.destination_url')}</Label>
                   <Input
                     id={`action-url-${index}`}
                     className="font-mono text-xs"
@@ -483,7 +484,7 @@ function StepCard({
           {draft.type === 'wait' ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <Label htmlFor={`wait-for-${index}`}>Wait for</Label>
+                <Label htmlFor={`wait-for-${index}`}>{t('tours.wait_for')}</Label>
                 <NativeSelect
                   id={`wait-for-${index}`}
                   className="w-full"
@@ -500,7 +501,7 @@ function StepCard({
               </div>
               {draft.waitFor === 'element' ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`wait-selector-${index}`}>Selector to wait for</Label>
+                  <Label htmlFor={`wait-selector-${index}`}>{t('tours.selector_to_wait_for')}</Label>
                   <Input
                     id={`wait-selector-${index}`}
                     className="font-mono text-xs"
@@ -512,7 +513,7 @@ function StepCard({
                 </div>
               ) : (
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`wait-url-${index}`}>URL pattern</Label>
+                  <Label htmlFor={`wait-url-${index}`}>{t('common.url_pattern')}</Label>
                   <Input
                     id={`wait-url-${index}`}
                     className="font-mono text-xs"
@@ -541,7 +542,7 @@ function StepCard({
           {showAdvance ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <Label htmlFor={`advance-${index}`}>Advance</Label>
+                <Label htmlFor={`advance-${index}`}>{t('tours.advance')}</Label>
                 <NativeSelect
                   id={`advance-${index}`}
                   className="w-full"
@@ -614,7 +615,7 @@ export function StepEditor({
     <div className="grid gap-3">
       {steps.length === 0 ? (
         <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No steps yet. Add one below, or record them from your app with the Chrome extension.
+          {t('tours.no_steps_yet_add_one_below')}
         </p>
       ) : null}
 
@@ -635,7 +636,7 @@ export function StepEditor({
       ))}
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Add</span>
+        <span className="text-xs text-muted-foreground">{t('common.add')}</span>
         {QUICK_ADD.map(({ type, label, Icon }) => (
           <Button
             key={type}
@@ -656,7 +657,7 @@ export function StepEditor({
           disabled={disabled}
           onClick={() => onChange([...steps, emptyStep()])}
         >
-          <Plus className="size-4" /> Add step
+          <Plus className="size-4" /> {t('tours.add_step')}
         </Button>
       </div>
     </div>

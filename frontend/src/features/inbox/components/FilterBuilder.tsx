@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { FilterCondition, FilterField, FilterQuery } from '@/features/inbox/api'
+import { t } from '@/i18n'
 
 const OP_LABELS: Record<string, string> = {
   eq: 'is',
@@ -117,7 +118,7 @@ export function FilterBuilder({
     <div className="grid gap-3">
       <div className="flex items-center gap-2">
         <Label htmlFor="filter-match" className="text-xs text-muted-foreground">
-          Match
+          {t('inbox.match')}
         </Label>
         <Select
           value={query.match}
@@ -127,15 +128,15 @@ export function FilterBuilder({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">all conditions</SelectItem>
-            <SelectItem value="any">any condition</SelectItem>
+            <SelectItem value="all">{t('inbox.all_conditions')}</SelectItem>
+            <SelectItem value="any">{t('inbox.any_condition')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {query.conditions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No conditions yet — this view matches every conversation.
+          {t('inbox.no_conditions_yet_this_view_matches')}
         </p>
       ) : null}
 
@@ -157,7 +158,7 @@ export function FilterBuilder({
                 })
               }}
             >
-              <SelectTrigger className="h-8 w-44" aria-label="Field">
+              <SelectTrigger className="h-8 w-44" aria-label={t('common.field')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -170,7 +171,7 @@ export function FilterBuilder({
             </Select>
 
             <Select value={condition.op} onValueChange={(op) => update(index, { op, value: '' })}>
-              <SelectTrigger className="h-8 w-40" aria-label="Operator">
+              <SelectTrigger className="h-8 w-40" aria-label={t('common.operator')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -187,8 +188,8 @@ export function FilterBuilder({
                 value={valueToInput(condition.value)}
                 onValueChange={(value) => update(index, { value })}
               >
-                <SelectTrigger className="h-8 w-44" aria-label="Value">
-                  <SelectValue placeholder="Choose…" />
+                <SelectTrigger className="h-8 w-44" aria-label={t('common.value_2')}>
+                  <SelectValue placeholder={t('inbox.choose')} />
                 </SelectTrigger>
                 <SelectContent>
                   {options.map((option) => (
@@ -203,7 +204,7 @@ export function FilterBuilder({
             {showValue && (options.length === 0 || MULTI.has(condition.op)) ? (
               <Input
                 className="h-8 w-44"
-                aria-label="Value"
+                aria-label={t('common.value_2')}
                 type={inputTypeFor(field, condition.op)}
                 placeholder={MULTI.has(condition.op) ? 'comma separated' : 'value'}
                 value={valueToInput(condition.value)}
@@ -217,7 +218,7 @@ export function FilterBuilder({
               variant="ghost"
               size="icon"
               className="size-8"
-              aria-label="Remove condition"
+              aria-label={t('common.remove_condition')}
               onClick={() => removeCondition(index)}
             >
               <X className="size-4" />
@@ -229,7 +230,7 @@ export function FilterBuilder({
       <div>
         <Button variant="outline" size="sm" onClick={addCondition} disabled={fields.length === 0}>
           <Plus className="mr-1 size-4" />
-          Add condition
+          {t('common.add_condition')}
         </Button>
       </div>
     </div>

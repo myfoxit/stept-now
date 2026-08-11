@@ -12,6 +12,7 @@ import { formatBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { DOCUMENT_ACCEPT } from '../api'
+import { t } from '@/i18n'
 
 /** Per-file lifecycle while a batch upload runs. */
 export type UploadState = 'queued' | 'uploading' | 'indexed' | 'failed'
@@ -70,7 +71,7 @@ export function FileDrop({
         )}
       >
         <FileText className="size-6 text-muted-foreground" />
-        <span className="font-medium">Drop files or click to browse</span>
+        <span className="font-medium">{t('knowledge.drop_files_or_click_to_browse')}</span>
         <span className="text-xs text-muted-foreground">
           PDF, DOCX, HTML, Markdown, CSV or TXT{max ? ` · up to ${max} at a time` : ''}
         </span>
@@ -80,7 +81,7 @@ export function FileDrop({
           accept={DOCUMENT_ACCEPT}
           disabled={disabled}
           className="sr-only"
-          aria-label="Upload files"
+          aria-label={t('knowledge.upload_files')}
           onChange={(e) => {
             add(Array.from(e.target.files ?? []))
             e.target.value = ''

@@ -18,6 +18,7 @@ import {
   type Citation,
 } from '@/features/inbox/api'
 import { useCanned, useCopilot, useSendMessage } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 function fillPlaceholders(content: string, contactName: string, agentName: string): string {
   return content
@@ -109,7 +110,7 @@ export function Composer({
         ])
       }
     } catch {
-      toast.error('Upload failed')
+      toast.error(t('inbox.upload_failed'))
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -177,8 +178,8 @@ export function Composer({
       <div className="flex items-center justify-between px-3 pt-2">
         <Tabs value={visibility} onValueChange={(v) => setVisibility(v as 'public' | 'note')}>
           <TabsList>
-            <TabsTrigger value="public">Reply</TabsTrigger>
-            <TabsTrigger value="note">Note</TabsTrigger>
+            <TabsTrigger value="public">{t('common.reply')}</TabsTrigger>
+            <TabsTrigger value="note">{t('inbox.note')}</TabsTrigger>
           </TabsList>
         </Tabs>
         <Button
@@ -187,7 +188,7 @@ export function Composer({
           size="sm"
           onClick={suggest}
           disabled={copilot.isPending}
-          aria-label="Suggest reply"
+          aria-label={t('inbox.suggest_reply')}
         >
           {copilot.isPending ? (
             <Loader2 className="size-4 animate-spin" />
@@ -237,7 +238,7 @@ export function Composer({
             className="absolute bottom-full left-3 z-20 mb-1 w-72 overflow-hidden rounded-md border bg-popover shadow-md"
             data-testid="canned-picker"
           >
-            <p className="border-b px-2 py-1 text-[11px] text-muted-foreground">Canned responses</p>
+            <p className="border-b px-2 py-1 text-[11px] text-muted-foreground">{t('inbox.canned_responses')}</p>
             <ul className="max-h-56 overflow-y-auto py-1">
               {filtered.map((c, i) => (
                 <li key={c.id}>
@@ -294,7 +295,7 @@ export function Composer({
               size="icon-sm"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              aria-label="Attach file"
+              aria-label={t('inbox.attach_file')}
             >
               {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
             </Button>

@@ -1,10 +1,14 @@
 import { create } from 'zustand'
 
+import { applyUserLocale } from '@/i18n/bootstrap'
+
 export interface User {
   id: string
   email: string
   name: string
   avatar_url?: string | null
+  /** Chosen dashboard language; null means "follow the browser". */
+  locale?: string | null
 }
 
 export interface WorkspaceSummary {
@@ -32,6 +36,8 @@ interface AuthState {
   bootstrapped: boolean
   setAccessToken: (token: string | null) => void
   setSession: (user: User, memberships: MembershipSummary[]) => void
+  /** Patch the signed-in user in place (e.g. after changing a preference). */
+  setUser: (user: User) => void
   setWorkspace: (workspaceId: string) => void
   setBootstrapped: () => void
   clear: () => void
@@ -69,7 +75,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (workspaceId) storeWorkspace(workspaceId)
     }
     set({ user, memberships, workspaceId, bootstrapped: true })
+    // The account's own choice outranks whatever the browser or the cached
+    // guess picked at startup — someone who set Japanese means it, even when
+    // signing in from a colleague's laptop. Fire-and-forget: the catalog fetch
+    // must not gate the session being usable.
+    void applyUserLocale(user.locale)
   },
+  setUser: (user) => set({ user }),
   setWorkspace: (workspaceId) => {
     storeWorkspace(workspaceId)
     set({ workspaceId })

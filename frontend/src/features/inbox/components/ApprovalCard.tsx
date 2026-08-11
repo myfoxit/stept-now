@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useDecideApproval } from '@/features/inbox/hooks'
 import type { Approval } from '@/features/inbox/api'
+import { t } from '@/i18n'
 
 export function ApprovalCard({ approval, canApprove }: { approval: Approval; canApprove: boolean }) {
   const [note, setNote] = useState('')
@@ -16,7 +17,7 @@ export function ApprovalCard({ approval, canApprove }: { approval: Approval; can
     <div className="rounded-lg border border-amber-400/50 bg-amber-50 p-3 dark:bg-amber-950/30">
       <div className="flex items-center gap-2 text-sm font-medium text-amber-900 dark:text-amber-200">
         <ShieldAlert className="size-4" />
-        Approval needed
+        {t('inbox.approval_needed')}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{approval.agent_name ?? 'AI agent'}</span> wants
@@ -32,8 +33,8 @@ export function ApprovalCard({ approval, canApprove }: { approval: Approval; can
           <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Note (optional)"
-            aria-label="Approval note"
+            placeholder={t('inbox.note_optional')}
+            aria-label={t('inbox.approval_note')}
             className="mt-2 h-8"
           />
           <div className="mt-2 flex gap-2">
@@ -43,7 +44,7 @@ export function ApprovalCard({ approval, canApprove }: { approval: Approval; can
               disabled={decide.isPending}
               onClick={() => decide.mutate({ id: approval.id, approved: true, note: note || undefined })}
             >
-              Approve
+              {t('inbox.approve')}
             </Button>
             <Button
               size="sm"
@@ -52,7 +53,7 @@ export function ApprovalCard({ approval, canApprove }: { approval: Approval; can
               disabled={decide.isPending}
               onClick={() => decide.mutate({ id: approval.id, approved: false, note: note || undefined })}
             >
-              Reject
+              {t('inbox.reject')}
             </Button>
           </div>
         </>

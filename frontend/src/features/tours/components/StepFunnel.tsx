@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 import type { TourStepStat } from '../api'
+import { t } from '@/i18n'
 
 /**
  * Per-step funnel. Bar length is the step's share of the widest step; the
@@ -17,12 +18,12 @@ export function StepFunnel({ steps }: { steps: TourStepStat[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Step funnel</CardTitle>
+        <CardTitle className="text-sm">{t('tours.step_funnel')}</CardTitle>
       </CardHeader>
       <CardContent>
         {steps.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            This tour has no steps yet.
+            {t('tours.this_tour_has_no_steps_yet')}
           </p>
         ) : (
           <ul className="grid gap-3">

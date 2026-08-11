@@ -34,6 +34,7 @@ import { TourKindBadge, TourModeBadge } from '../components/TourBadges'
 import { TourStatusBadge } from '../components/TourStatusBadge'
 import { useCreateTour, useDuplicateTour, useTours, useTourStats } from '../hooks'
 import { formatRate, TOUR_KINDS } from '../lib'
+import { t } from '@/i18n'
 
 const KIND_TABS: { value: 'all' | TourKind; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -45,21 +46,21 @@ const KIND_TABS: { value: 'all' | TourKind; label: string }[] = [
 function TourStatsRow({ tour }: { tour: Tour }) {
   const stats = useTourStats(tour.id, tour.status !== 'draft')
   if (tour.status === 'draft') {
-    return <p className="text-xs text-muted-foreground">Not published yet</p>
+    return <p className="text-xs text-muted-foreground">{t('common.not_published_yet')}</p>
   }
   if (stats.isLoading) return <Skeleton className="h-6 w-32" />
-  if (!stats.data) return <p className="text-xs text-muted-foreground">No data</p>
+  if (!stats.data) return <p className="text-xs text-muted-foreground">{t('common.no_data')}</p>
   return (
     <div className="flex items-center gap-4">
       <div>
         <div className="text-sm font-semibold tabular-nums">{stats.data.starts}</div>
-        <div className="text-[11px] text-muted-foreground">starts</div>
+        <div className="text-[11px] text-muted-foreground">{t('tours.starts')}</div>
       </div>
       <div>
         <div className="text-sm font-semibold tabular-nums">
           {formatRate(stats.data.completion_rate)}
         </div>
-        <div className="text-[11px] text-muted-foreground">completed</div>
+        <div className="text-[11px] text-muted-foreground">{t('common.completed')}</div>
       </div>
       <Sparkline values={stats.data.steps.map((s) => s.viewed)} className="ml-auto" />
     </div>
@@ -95,7 +96,7 @@ function TourCard({ tour, canManage }: { tour: Tour; canManage: boolean }) {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={`/tours/${tour.id}/analytics`}>
-              <BarChart3 className="size-4" /> Analytics
+              <BarChart3 className="size-4" /> {t('tours.analytics')}
             </Link>
           </Button>
           {canManage ? (
@@ -106,7 +107,7 @@ function TourCard({ tour, canManage }: { tour: Tour; canManage: boolean }) {
               disabled={duplicate.isPending}
               onClick={() => duplicate.mutate(tour)}
             >
-              <Copy className="size-4" /> Duplicate
+              <Copy className="size-4" /> {t('tours.duplicate')}
             </Button>
           ) : null}
         </div>
@@ -150,18 +151,18 @@ export function Component() {
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex items-center justify-between gap-4 border-b px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold">Product tours</h1>
+          <h1 className="text-lg font-semibold">{t('tours.product_tours')}</h1>
           <p className="text-sm text-muted-foreground">
-            Guide users through your product with tours, banners and announcements.
+            {t('tours.guide_users_through_your_product_with')}
           </p>
         </div>
         {canManage ? (
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(true)}>
-              <Plus className="size-4" /> New tour
+              <Plus className="size-4" /> {t('tours.new_tour')}
             </Button>
             <Button onClick={() => setRecorderOpen(true)}>
-              <Radio className="size-4" /> Record a tour
+              <Radio className="size-4" /> {t('tours.record_a_tour')}
             </Button>
           </div>
         ) : null}
@@ -189,7 +190,7 @@ export function Component() {
                 <Card className="p-6 text-center text-sm text-muted-foreground">
                   Could not load tours.{' '}
                   <Button variant="link" className="px-1" onClick={() => tours.refetch()}>
-                    Retry
+                    {t('common.retry')}
                   </Button>
                 </Card>
               ) : visible.length === 0 ? (
@@ -204,18 +205,17 @@ export function Component() {
                         : `No ${KIND_TABS.find((t) => t.value === kind)?.label.toLowerCase()} yet`}
                     </EmptyTitle>
                     <EmptyDescription>
-                      The fastest way to build one is to click through your product once and let
-                      the recorder capture the steps for you.
+                      {t('tours.the_fastest_way_to_build_one')}
                     </EmptyDescription>
                   </EmptyHeader>
                   {canManage ? (
                     <EmptyContent>
                       <div className="flex flex-wrap items-center justify-center gap-2">
                         <Button onClick={() => setRecorderOpen(true)}>
-                          <Radio className="size-4" /> Record a tour
+                          <Radio className="size-4" /> {t('tours.record_a_tour')}
                         </Button>
                         <Button variant="outline" onClick={() => setDialogOpen(true)}>
-                          <Plus className="size-4" /> Build one by hand
+                          <Plus className="size-4" /> {t('tours.build_one_by_hand')}
                         </Button>
                       </div>
                     </EmptyContent>
@@ -236,18 +236,18 @@ export function Component() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New tour</DialogTitle>
+            <DialogTitle>{t('tours.new_tour')}</DialogTitle>
             <DialogDescription>
-              Pick what you want to ship — every kind runs on the same engine.
+              {t('tours.pick_what_you_want_to_ship')}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-2">
-              <Label htmlFor="tour-name">Name</Label>
+              <Label htmlFor="tour-name">{t('common.name')}</Label>
               <Input
                 id="tour-name"
                 value={name}
-                placeholder="Onboarding walkthrough"
+                placeholder={t('tours.onboarding_walkthrough')}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void submit()
@@ -255,7 +255,7 @@ export function Component() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="tour-kind">Kind</Label>
+              <Label htmlFor="tour-kind">{t('tours.kind')}</Label>
               <NativeSelect
                 id="tour-kind"
                 className="w-full"
@@ -275,7 +275,7 @@ export function Component() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={submit} disabled={!name.trim() || create.isPending}>
               {create.isPending ? 'Creating…' : 'Create tour'}

@@ -34,6 +34,7 @@ import { fullDateTime } from '@/lib/format'
 
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '../hooks'
 import { MCP_CLIENTS, McpSnippets, SnippetBlock, mcpOrigin } from './McpSnippets'
+import { t } from '@/i18n'
 
 const SCOPES = [
   { value: 'read', label: 'Read', hint: 'Read-only access' },
@@ -82,7 +83,7 @@ export function McpPanel() {
 
       {/* Endpoint */}
       <div className="grid gap-1.5">
-        <Label>MCP endpoint</Label>
+        <Label>{t('settings.mcp_endpoint')}</Label>
         <SnippetBlock value={endpoint} copyLabel="Copy MCP endpoint" />
       </div>
 
@@ -90,7 +91,7 @@ export function McpPanel() {
       <Card>
         <CardContent className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-medium">Install in your client</h3>
+            <h3 className="text-sm font-medium">{t('common.install_in_your_client')}</h3>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
@@ -111,14 +112,14 @@ export function McpPanel() {
                 }}
               >
                 <PopoverTrigger asChild>
-                  <Button size="sm" variant="outline" aria-label="Customize key before creating">
+                  <Button size="sm" variant="outline" aria-label={t('settings.customize_key_before_creating')}>
                     <Settings2 className="size-4" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-72">
                   <div className="grid gap-3">
                     <div className="grid gap-1.5">
-                      <Label htmlFor="mcp-key-name">Key name</Label>
+                      <Label htmlFor="mcp-key-name">{t('settings.key_name')}</Label>
                       <Input
                         id="mcp-key-name"
                         value={customName}
@@ -127,7 +128,7 @@ export function McpPanel() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label>Scopes</Label>
+                      <Label>{t('settings.scopes')}</Label>
                       {SCOPES.map((scope) => (
                         <label
                           key={scope.value}
@@ -168,10 +169,10 @@ export function McpPanel() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
               <p className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
                 <TriangleAlert className="size-4 shrink-0" />
-                This key is shown once — copy it now. The snippets above already contain it.
+                {t('common.this_key_is_shown_once_copy')}
               </p>
               <Button size="sm" variant="outline" onClick={() => setRawKey(null)}>
-                Done
+                {t('common.done')}
               </Button>
             </div>
           ) : null}
@@ -187,9 +188,9 @@ export function McpPanel() {
             <EmptyMedia variant="icon">
               <Bot />
             </EmptyMedia>
-            <EmptyTitle>No keys yet</EmptyTitle>
+            <EmptyTitle>{t('settings.no_keys_yet')}</EmptyTitle>
             <EmptyDescription>
-              Create a key above to connect your first MCP client.
+              {t('settings.create_a_key_above_to_connect')}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -199,10 +200,10 @@ export function McpPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Prefix</TableHead>
-                  <TableHead>Scopes</TableHead>
-                  <TableHead>Last used</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('settings.prefix')}</TableHead>
+                  <TableHead>{t('settings.scopes')}</TableHead>
+                  <TableHead>{t('settings.last_used')}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -215,7 +216,7 @@ export function McpPanel() {
                         {key.name}
                         {key.agent_id ? (
                           <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                            agent-bound
+                            {t('common.agent_bound')}
                           </Badge>
                         ) : null}
                       </span>
@@ -235,7 +236,7 @@ export function McpPanel() {
                     </TableCell>
                     <TableCell>
                       {key.revoked_at ? (
-                        <Badge variant="outline">Revoked</Badge>
+                        <Badge variant="outline">{t('settings.revoked')}</Badge>
                       ) : (
                         <Button
                           variant="ghost"
@@ -243,7 +244,7 @@ export function McpPanel() {
                           disabled={revoke.isPending}
                           onClick={() => revoke.mutate(key.id)}
                         >
-                          Revoke
+                          {t('settings.revoke')}
                         </Button>
                       )}
                     </TableCell>

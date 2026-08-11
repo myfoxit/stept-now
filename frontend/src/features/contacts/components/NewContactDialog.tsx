@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label'
 import { parseApiError } from '@/lib/errors'
 import { useCreateContact } from '@/features/contacts/hooks'
 import type { Contact } from '@/features/contacts/api'
+import { t } from '@/i18n'
 
 const FIELDS = [
   { key: 'name', label: 'Name', placeholder: 'Ada Lovelace' },
@@ -61,7 +62,7 @@ export function NewContactDialog({
       },
       {
         onSuccess: (contact) => {
-          toast.success('Contact created')
+          toast.success(t('contacts.contact_created'))
           reset()
           onOpenChange(false)
           onCreated?.(contact)
@@ -88,8 +89,8 @@ export function NewContactDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New contact</DialogTitle>
-          <DialogDescription>Add someone manually. Give at least a name or an email.</DialogDescription>
+          <DialogTitle>{t('common.new_contact')}</DialogTitle>
+          <DialogDescription>{t('contacts.add_someone_manually_give_at_least')}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3">
@@ -115,10 +116,10 @@ export function NewContactDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={submit} disabled={!canSubmit || create.isPending}>
-            Create contact
+            {t('contacts.create_contact')}
           </Button>
         </DialogFooter>
       </DialogContent>

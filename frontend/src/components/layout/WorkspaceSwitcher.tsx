@@ -12,6 +12,7 @@ import {
 import { SidebarMenuButton } from '@/components/ui/sidebar'
 import { reconnectRealtime } from '@/api/ws'
 import { useAuthStore } from '@/stores/auth'
+import { t } from '@/i18n'
 
 export function WorkspaceSwitcher() {
   const navigate = useNavigate()
@@ -32,11 +33,11 @@ export function WorkspaceSwitcher() {
           {/* The product mark, not a workspace initial — the sidebar is Stept's
               own chrome, and the workspace name sits right beside it. */}
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-            <StepMark className="size-5" title="Stept" />
+            <StepMark className="size-5" title={t('common.stept')} />
           </div>
           <div className="grid flex-1 text-left leading-tight">
             <span className="truncate font-semibold">{current?.name ?? 'Stept'}</span>
-            <span className="truncate text-xs text-muted-foreground">Workspace</span>
+            <span className="truncate text-xs text-muted-foreground">{t('common.workspace')}</span>
           </div>
           <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
         </SidebarMenuButton>
@@ -53,7 +54,7 @@ export function WorkspaceSwitcher() {
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate('/onboarding')}>
-          <Plus className="size-4" /> New workspace
+          <Plus className="size-4" /> {t('common.new_workspace')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

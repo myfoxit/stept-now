@@ -10,6 +10,7 @@ import { fullDateTime, timeAgo } from '@/lib/format'
 import { RunStatusBadge } from '../components/status'
 import { AiNav, ErrorState, ListSkeleton, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { useRuns } from '../hooks'
+import { t } from '@/i18n'
 
 const STATUSES = [
   'queued',
@@ -30,16 +31,16 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="Agent runs"
-        description="Every agent execution with its full reasoning trace"
+        title={t('ai.agent_runs')}
+        description={t('ai.every_agent_execution_with_its_full')}
         actions={
           <NativeSelect
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            aria-label="Filter by status"
+            aria-label={t('common.filter_by_status')}
             size="sm"
           >
-            <NativeSelectOption value="">All statuses</NativeSelectOption>
+            <NativeSelectOption value="">{t('common.all_statuses')}</NativeSelectOption>
             {STATUSES.map((s) => (
               <NativeSelectOption key={s} value={s}>
                 {s.replace(/_/g, ' ')}
@@ -60,9 +61,9 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <Activity />
               </EmptyMedia>
-              <EmptyTitle>No runs yet</EmptyTitle>
+              <EmptyTitle>{t('ai.no_runs_yet')}</EmptyTitle>
               <EmptyDescription>
-                When an agent handles a conversation, its run shows up here with a step-by-step trace.
+                {t('ai.when_an_agent_handles_a_conversation')}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -71,10 +72,10 @@ export function Component() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead>Started</TableHead>
+                  <TableHead>{t('common.agent')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="text-right">{t('common.tokens')}</TableHead>
+                  <TableHead>{t('ai.started')}</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>

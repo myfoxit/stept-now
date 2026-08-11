@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import type { Webhook } from '../api'
 import { WEBHOOK_EVENTS } from '../constants'
 import { useCreateWebhook, useUpdateWebhook } from '../hooks'
+import { t } from '@/i18n'
 
 export function WebhookEditorDialog({
   open,
@@ -75,13 +76,13 @@ export function WebhookEditorDialog({
         <DialogHeader>
           <DialogTitle>{webhook ? 'Edit webhook' : 'New webhook'}</DialogTitle>
           <DialogDescription>
-            Stept POSTs a signed JSON payload to your endpoint for each subscribed event.
+            {t('automation.stept_posts_a_signed_json_payload')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="wh-url">Endpoint URL</Label>
+            <Label htmlFor="wh-url">{t('common.endpoint_url')}</Label>
             <Input
               id="wh-url"
               placeholder="https://example.com/hooks/stept"
@@ -94,17 +95,17 @@ export function WebhookEditorDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="wh-desc">Description</Label>
+            <Label htmlFor="wh-desc">{t('common.description')}</Label>
             <Input
               id="wh-desc"
-              placeholder="Optional label"
+              placeholder={t('automation.optional_label')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
           <div className="grid gap-2">
-            <Label>Events</Label>
+            <Label>{t('automation.events')}</Label>
             <div className="grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto rounded-md border p-3 sm:grid-cols-2">
               {WEBHOOK_EVENTS.map((name) => (
                 <label
@@ -126,14 +127,14 @@ export function WebhookEditorDialog({
           </div>
 
           <div className="flex items-center justify-between rounded-md border p-3">
-            <Label htmlFor="wh-enabled">Enabled</Label>
+            <Label htmlFor="wh-enabled">{t('common.enabled')}</Label>
             <Switch id="wh-enabled" checked={enabled} onCheckedChange={setEnabled} />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!canSave || saving}>
             {saving ? 'Saving…' : webhook ? 'Save changes' : 'Create webhook'}

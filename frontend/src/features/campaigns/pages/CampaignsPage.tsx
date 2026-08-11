@@ -38,18 +38,19 @@ import {
   useUpdateCampaign,
 } from '../hooks'
 import { describeTrigger } from '../lib'
+import { t } from '@/i18n'
 
 function CampaignTypeBadge({ type }: { type: string }) {
   if (type === 'ongoing') {
     return (
       <Badge variant="outline">
-        <Megaphone className="size-3" /> In-app
+        <Megaphone className="size-3" /> {t('campaigns.in_app')}
       </Badge>
     )
   }
   return (
     <Badge variant="outline">
-      <CalendarClock className="size-3" /> Scheduled
+      <CalendarClock className="size-3" /> {t('campaigns.scheduled')}
     </Badge>
   )
 }
@@ -169,14 +170,14 @@ export function Component() {
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex items-center justify-between gap-4 border-b px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold">Campaigns</h1>
+          <h1 className="text-lg font-semibold">{t('campaigns.campaigns')}</h1>
           <p className="text-sm text-muted-foreground">
-            Proactive messages to your visitors and customers.
+            {t('campaigns.proactive_messages_to_your_visitors_and')}
           </p>
         </div>
         {canManage ? (
           <Button onClick={openNew}>
-            <Plus className="size-4" /> New campaign
+            <Plus className="size-4" /> {t('campaigns.new_campaign')}
           </Button>
         ) : null}
       </header>
@@ -197,7 +198,7 @@ export function Component() {
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Could not load campaigns.{' '}
               <Button variant="link" className="px-1" onClick={() => campaigns.refetch()}>
-                Retry
+                {t('common.retry')}
               </Button>
             </Card>
           ) : !campaigns.data || campaigns.data.length === 0 ? (
@@ -206,15 +207,15 @@ export function Component() {
                 <EmptyMedia variant="icon">
                   <Megaphone />
                 </EmptyMedia>
-                <EmptyTitle>No campaigns yet</EmptyTitle>
+                <EmptyTitle>{t('campaigns.no_campaigns_yet')}</EmptyTitle>
                 <EmptyDescription>
-                  Announce features in the widget, or schedule a send to an audience.
+                  {t('campaigns.announce_features_in_the_widget_or')}
                 </EmptyDescription>
               </EmptyHeader>
               {canManage ? (
                 <EmptyContent>
                   <Button onClick={openNew}>
-                    <Plus className="size-4" /> Create your first campaign
+                    <Plus className="size-4" /> {t('campaigns.create_your_first_campaign')}
                   </Button>
                 </EmptyContent>
               ) : null}
@@ -244,18 +245,18 @@ export function Component() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete &ldquo;{deleting?.title}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
-              The campaign stops sending immediately. This action cannot be undone.
+              {t('campaigns.the_campaign_stops_sending_immediately_this')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

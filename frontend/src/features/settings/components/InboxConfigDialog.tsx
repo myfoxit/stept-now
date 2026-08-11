@@ -33,6 +33,7 @@ import { useAgents } from '@/features/ai/hooks'
 import type { Inbox, InboxUpdate } from '../api'
 import { useUpdateInbox } from '../hooks'
 import { EmailInboxWizard } from './EmailInboxWizard'
+import { t } from '@/i18n'
 
 /** Radix Select forbids an empty-string item value, so "none" needs a sentinel. */
 const NO_AGENT = '__none__'
@@ -184,7 +185,7 @@ async function copy(text: string, label: string) {
     await navigator.clipboard.writeText(text)
     toast.success(`${label} copied`)
   } catch {
-    toast.error('Could not copy')
+    toast.error(t('common.could_not_copy'))
   }
 }
 
@@ -268,7 +269,7 @@ export function InboxConfigDialog({
         <DialogHeader>
           <DialogTitle>Configure “{inbox.name}”</DialogTitle>
           <DialogDescription>
-            Connection settings for this <span className="capitalize">{inbox.channel_type}</span>{' '}
+            {t('settings.connection_settings_for_this')} <span className="capitalize">{inbox.channel_type}</span>{' '}
             channel. Secrets are stored encrypted and never shown again.
           </DialogDescription>
         </DialogHeader>
@@ -285,10 +286,10 @@ export function InboxConfigDialog({
                   }
                 >
                   <SelectTrigger id={`cfg-${field.key}`} className="w-full">
-                    <SelectValue placeholder="No AI agent" />
+                    <SelectValue placeholder={t('settings.no_ai_agent')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_AGENT}>No AI agent</SelectItem>
+                    <SelectItem value={NO_AGENT}>{t('settings.no_ai_agent')}</SelectItem>
                     {liveAgents.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.avatar_emoji ? `${a.avatar_emoji} ` : ''}
@@ -300,7 +301,7 @@ export function InboxConfigDialog({
                 {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
                 {liveAgents.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No live agents yet — set an agent to “Live” under AI Agents first.
+                    {t('settings.no_live_agents_yet_set_an')}
                   </p>
                 ) : null}
               </div>
@@ -398,7 +399,7 @@ export function InboxConfigDialog({
                 )
               })}
               <p className="text-xs text-muted-foreground">
-                Point the provider at this path on your Stept host.
+                {t('settings.point_the_provider_at_this_path')}
               </p>
             </div>
           ) : null}
@@ -406,7 +407,7 @@ export function InboxConfigDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!canSave || updateInbox.isPending}>
             {updateInbox.isPending ? 'Saving…' : 'Save configuration'}

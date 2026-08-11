@@ -23,6 +23,7 @@ import { ArticleEditor } from '../components/ArticleEditor'
 import { CollectionDialog } from '../components/CollectionDialog'
 import { KnowledgeNav, PageHeader, PageShell } from '../components/shell'
 import { useArticles, useCollections } from '../hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const workspaceId = currentWorkspaceId()
@@ -44,7 +45,7 @@ export function Component() {
     onSuccess: (article) => {
       queryClient.invalidateQueries({ queryKey: ['knowledge', workspaceId, 'articles'] })
       setSelectedArticle(article.id)
-      toast.success('Draft created')
+      toast.success(t('knowledge.draft_created'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not create article'),
   })
@@ -55,7 +56,7 @@ export function Component() {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.collections(workspaceId) })
       queryClient.invalidateQueries({ queryKey: ['knowledge', workspaceId, 'articles'] })
       if (collectionId === id) setCollectionId(null)
-      toast.success('Collection deleted')
+      toast.success(t('knowledge.collection_deleted'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Delete failed'),
   })
@@ -64,7 +65,7 @@ export function Component() {
 
   return (
     <PageShell>
-      <PageHeader title="Help center" description="Author and publish customer-facing articles" />
+      <PageHeader title={t('knowledge.help_center')} description={t('knowledge.author_and_publish_customer_facing_articles')} />
       <KnowledgeNav />
       <div className="flex min-h-0 flex-1">
         {/* Collections rail */}
@@ -77,7 +78,7 @@ export function Component() {
                 collectionId === null && 'bg-accent font-medium'
               )}
             >
-              <BookOpen className="size-4" /> All articles
+              <BookOpen className="size-4" /> {t('knowledge.all_articles')}
             </button>
             {collections.isLoading ? (
               <div className="flex justify-center py-4">
@@ -118,13 +119,13 @@ export function Component() {
                         <DropdownMenuItem
                           onClick={() => setCollectionDialog({ open: true, edit: collection })}
                         >
-                          <Pencil className="size-4" /> Edit
+                          <Pencil className="size-4" /> {t('common.edit')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           variant="destructive"
                           onClick={() => deleteCollection.mutate(collection.id)}
                         >
-                          <Trash2 className="size-4" /> Delete
+                          <Trash2 className="size-4" /> {t('common.delete')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -141,7 +142,7 @@ export function Component() {
                 className="w-full justify-start"
                 onClick={() => setCollectionDialog({ open: true, edit: null })}
               >
-                <Plus className="size-4" /> New collection
+                <Plus className="size-4" /> {t('knowledge.new_collection')}
               </Button>
             </div>
           ) : null}
@@ -153,13 +154,13 @@ export function Component() {
             <NativeSelect
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              aria-label="Filter by status"
+              aria-label={t('common.filter_by_status')}
               size="sm"
               className="flex-1"
             >
-              <NativeSelectOption value="all">All statuses</NativeSelectOption>
-              <NativeSelectOption value="draft">Draft</NativeSelectOption>
-              <NativeSelectOption value="published">Published</NativeSelectOption>
+              <NativeSelectOption value="all">{t('common.all_statuses')}</NativeSelectOption>
+              <NativeSelectOption value="draft">{t('common.draft')}</NativeSelectOption>
+              <NativeSelectOption value="published">{t('knowledge.published')}</NativeSelectOption>
             </NativeSelect>
             {canWrite ? (
               <Button
@@ -167,7 +168,7 @@ export function Component() {
                 onClick={() => createArticle.mutate()}
                 disabled={createArticle.isPending}
               >
-                <Plus className="size-4" /> New
+                <Plus className="size-4" /> {t('common.new')}
               </Button>
             ) : null}
           </div>
@@ -177,7 +178,7 @@ export function Component() {
                 <Spinner className="size-4" />
               </div>
             ) : items.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">No articles here yet.</p>
+              <p className="p-4 text-sm text-muted-foreground">{t('knowledge.no_articles_here_yet')}</p>
             ) : (
               <ul>
                 {items.map((article) => (
@@ -219,9 +220,9 @@ export function Component() {
                 <EmptyMedia variant="icon">
                   <FileText />
                 </EmptyMedia>
-                <EmptyTitle>Select an article</EmptyTitle>
+                <EmptyTitle>{t('knowledge.select_an_article')}</EmptyTitle>
                 <EmptyDescription>
-                  Choose an article from the list, or create a new draft to start writing.
+                  {t('knowledge.choose_an_article_from_the_list')}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

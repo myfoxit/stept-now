@@ -15,13 +15,14 @@ import { Label } from '@/components/ui/label'
 import type { IntegrationCredential, IntegrationProvider } from '../../api'
 import { useDeleteCredentials, usePutCredentials } from '../../hooks'
 import { fieldLabel } from './lib'
+import { t } from '@/i18n'
 
 async function copyText(text: string, label: string) {
   try {
     await navigator.clipboard.writeText(text)
     toast.success(`${label} copied`)
   } catch {
-    toast.error('Could not copy')
+    toast.error(t('common.could_not_copy'))
   }
 }
 
@@ -79,13 +80,12 @@ export function CredentialForm({
     <div className="grid gap-3 rounded-md border bg-muted/30 p-3">
       {credential.from_env ? (
         <p className="text-xs text-muted-foreground">
-          Currently using the instance-level app configured by your server admin. Saving here
-          switches this workspace to your own app.
+          {t('settings.currently_using_the_instance_level_app')}
         </p>
       ) : null}
 
       <div className="grid gap-1.5">
-        <Label htmlFor={`cred-${provider.id}-client-id`}>Client ID</Label>
+        <Label htmlFor={`cred-${provider.id}-client-id`}>{t('settings.client_id')}</Label>
         <Input
           id={`cred-${provider.id}-client-id`}
           value={clientId}
@@ -95,7 +95,7 @@ export function CredentialForm({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor={`cred-${provider.id}-client-secret`}>Client secret</Label>
+        <Label htmlFor={`cred-${provider.id}-client-secret`}>{t('settings.client_secret')}</Label>
         <Input
           id={`cred-${provider.id}-client-secret`}
           type="password"
@@ -105,7 +105,7 @@ export function CredentialForm({
           onChange={(e) => setClientSecret(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Stored encrypted and never shown again.
+          {t('settings.stored_encrypted_and_never_shown_again')}
         </p>
       </div>
 
@@ -124,7 +124,7 @@ export function CredentialForm({
       ))}
 
       <div className="grid gap-1.5">
-        <Label htmlFor={`cred-${provider.id}-redirect`}>Redirect URI</Label>
+        <Label htmlFor={`cred-${provider.id}-redirect`}>{t('settings.redirect_uri')}</Label>
         <div className="flex items-center gap-2">
           <Input
             id={`cred-${provider.id}-redirect`}
@@ -136,7 +136,7 @@ export function CredentialForm({
             variant="ghost"
             size="icon"
             className="shrink-0"
-            aria-label="Copy redirect URI"
+            aria-label={t('settings.copy_redirect_uri')}
             onClick={() => copyText(credential.redirect_uri, 'Redirect URI')}
           >
             <Copy className="size-4" />
@@ -155,7 +155,7 @@ export function CredentialForm({
             disabled={remove.isPending}
             onClick={() => remove.mutate(provider.id)}
           >
-            Remove
+            {t('common.remove')}
           </Button>
         ) : null}
         <Button size="sm" onClick={save} disabled={!canSave || put.isPending}>

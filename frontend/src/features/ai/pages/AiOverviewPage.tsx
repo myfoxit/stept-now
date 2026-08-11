@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { AiNav, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { AgentStatusBadge } from '../components/status'
 import { useAgents, useApprovals, useProviders, useRuns } from '../hooks'
+import { t } from '@/i18n'
 
 function StatCard({
   to,
@@ -58,38 +59,38 @@ export function Component() {
 
   return (
     <PageShell>
-      <PageHeader title="AI agents" description="Your AI support automation at a glance" />
+      <PageHeader title={t('ai.ai_agents')} description={t('ai.your_ai_support_automation_at_a')} />
       <AiNav />
       <ScrollBody className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             to="/ai/agents"
             icon={Bot}
-            label="Agents"
+            label={t('ai.agents')}
             value={agents.data?.length ?? 0}
             hint={`${liveAgents} live`}
           />
           <StatCard
             to="/ai/providers"
             icon={Cpu}
-            label="Providers"
+            label={t('ai.providers')}
             value={providers.data?.length ?? 0}
           />
           <StatCard
             to="/ai/approvals"
             icon={ShieldQuestion}
-            label="Pending approvals"
+            label={t('common.pending_approvals')}
             value={pending}
             highlight={pending > 0}
           />
-          <StatCard to="/ai/runs" icon={Activity} label="Recent runs" value={runs.data?.total ?? 0} />
+          <StatCard to="/ai/runs" icon={Activity} label={t('ai.recent_runs')} value={runs.data?.total ?? 0} />
         </div>
 
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium">Your agents</h2>
+            <h2 className="text-sm font-medium">{t('ai.your_agents')}</h2>
             <Link to="/ai/agents" className="text-sm text-brand hover:underline">
-              View all
+              {t('ai.view_all')}
             </Link>
           </div>
           {(agents.data ?? []).length === 0 ? (
@@ -97,7 +98,7 @@ export function Component() {
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 No agents yet.{' '}
                 <Link to="/ai/agents" className="text-brand hover:underline">
-                  Create one
+                  {t('ai.create_one')}
                 </Link>{' '}
                 to get started.
               </CardContent>

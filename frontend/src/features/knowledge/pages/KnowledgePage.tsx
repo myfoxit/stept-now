@@ -42,6 +42,7 @@ import {
 } from '../components/status'
 import { useSources } from '../hooks'
 import { refreshMinutes, sourceTypeLabel } from '../lib'
+import { t } from '@/i18n'
 
 export function Component() {
   const navigate = useNavigate()
@@ -56,7 +57,7 @@ export function Component() {
     mutationFn: (id: string) => knowledgeApi.syncSource(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.sources(workspaceId) })
-      toast.success('Sync started')
+      toast.success(t('knowledge.sync_started'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Sync failed'),
   })
@@ -65,7 +66,7 @@ export function Component() {
     mutationFn: (id: string) => knowledgeApi.deleteSource(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.sources(workspaceId) })
-      toast.success('Source deleted')
+      toast.success(t('knowledge.source_deleted'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Delete failed'),
   })
@@ -73,12 +74,12 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="Knowledge"
-        description="Content your AI agents retrieve and cite"
+        title={t('knowledge.knowledge')}
+        description={t('knowledge.content_your_ai_agents_retrieve_and')}
         actions={
           canWrite ? (
             <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="size-4" /> Add source
+              <Plus className="size-4" /> {t('knowledge.add_source')}
             </Button>
           ) : null
         }
@@ -95,16 +96,15 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <BookOpen />
               </EmptyMedia>
-              <EmptyTitle>No knowledge sources yet</EmptyTitle>
+              <EmptyTitle>{t('knowledge.no_knowledge_sources_yet')}</EmptyTitle>
               <EmptyDescription>
-                Upload files, crawl sites, or connect GitHub and Notion so your AI agents have
-                something to cite.
+                {t('knowledge.upload_files_crawl_sites_or_connect')}
               </EmptyDescription>
             </EmptyHeader>
             {canWrite ? (
               <EmptyContent>
                 <Button onClick={() => setDialogOpen(true)}>
-                  <Plus className="size-4" /> Add your first source
+                  <Plus className="size-4" /> {t('knowledge.add_your_first_source')}
                 </Button>
               </EmptyContent>
             ) : null}
@@ -136,7 +136,7 @@ export function Component() {
                             size="icon"
                             variant="ghost"
                             className="size-8"
-                            aria-label="Re-sync source"
+                            aria-label={t('knowledge.re_sync_source')}
                             disabled={syncMutation.isPending}
                             onClick={() => syncMutation.mutate(source.id)}
                           >
@@ -150,20 +150,20 @@ export function Component() {
                                 size="icon"
                                 variant="ghost"
                                 className="size-8"
-                                aria-label="Source actions"
+                                aria-label={t('knowledge.source_actions')}
                               >
                                 <MoreVertical className="size-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setEditSource(source)}>
-                                <Pencil className="size-4" /> Edit
+                                <Pencil className="size-4" /> {t('common.edit')}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 variant="destructive"
                                 onClick={() => deleteMutation.mutate(source.id)}
                               >
-                                <Trash2 className="size-4" /> Delete
+                                <Trash2 className="size-4" /> {t('common.delete')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

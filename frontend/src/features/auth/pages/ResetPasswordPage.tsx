@@ -8,6 +8,7 @@ import { AuthCard } from '@/features/auth/components/AuthCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { t } from '@/i18n'
 
 export function Component() {
   const [params] = useSearchParams()
@@ -21,7 +22,7 @@ export function Component() {
     setSubmitting(true)
     try {
       await authApi.confirmPasswordReset(token, password)
-      toast.success('Password updated — log in with your new password')
+      toast.success(t('auth.password_updated_log_in_with_your'))
       navigate('/login', { replace: true })
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : 'Reset failed')
@@ -31,10 +32,10 @@ export function Component() {
   }
 
   return (
-    <AuthCard title="Choose a new password">
+    <AuthCard title={t('auth.choose_a_new_password')}>
       <form className="grid gap-4" onSubmit={submit}>
         <div className="grid gap-2">
-          <Label htmlFor="password">New password</Label>
+          <Label htmlFor="password">{t('common.new_password')}</Label>
           <Input
             id="password"
             type="password"

@@ -21,6 +21,7 @@ import { contactsApi, type Contact } from '@/features/contacts/api'
 import { NewContactDialog } from '@/features/contacts/components/NewContactDialog'
 import { useInboxes } from '@/features/inbox/hooks'
 import { useCreateConversation } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 export function NewConversationDialog({
   open,
@@ -88,7 +89,7 @@ export function NewConversationDialog({
       />
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New conversation</DialogTitle>
+          <DialogTitle>{t('inbox.new_conversation')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           {contact ? (
@@ -98,7 +99,7 @@ export function NewConversationDialog({
                 {contact.email ? <span className="text-muted-foreground"> · {contact.email}</span> : null}
               </span>
               <Button variant="ghost" size="sm" onClick={() => setContact(null)}>
-                Change
+                {t('inbox.change')}
               </Button>
             </div>
           ) : (
@@ -106,8 +107,8 @@ export function NewConversationDialog({
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search contacts by name or email"
-                aria-label="Search contacts"
+                placeholder={t('inbox.search_contacts_by_name_or_email')}
+                aria-label={t('common.search_contacts')}
                 autoFocus
               />
               {results?.items.length ? (
@@ -142,7 +143,7 @@ export function NewConversationDialog({
                           : 'No contacts yet.'}
                       </span>
                       <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New contact
+                        <Plus className="size-4" /> {t('common.new_contact')}
                       </Button>
                     </div>
                   )}
@@ -153,7 +154,7 @@ export function NewConversationDialog({
 
           <Select value={inboxId} onValueChange={setInboxId}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select an inbox" />
+              <SelectValue placeholder={t('inbox.select_an_inbox')} />
             </SelectTrigger>
             <SelectContent>
               {inboxes.map((i) => (
@@ -167,23 +168,23 @@ export function NewConversationDialog({
           <Input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            placeholder="Subject (optional)"
-            aria-label="Subject"
+            placeholder={t('inbox.subject_optional')}
+            aria-label={t('inbox.subject')}
           />
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Write the first message…"
-            aria-label="Message"
+            placeholder={t('inbox.write_the_first_message')}
+            aria-label={t('common.message')}
             className={cn('min-h-24')}
           />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={start} disabled={!contact || !inboxId || !content.trim() || create.isPending}>
-            Start conversation
+            {t('inbox.start_conversation')}
           </Button>
         </DialogFooter>
       </DialogContent>

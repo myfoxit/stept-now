@@ -15,6 +15,7 @@ import {
   type TourUpdate,
 } from './api'
 import { duplicatePayload, prependEvent } from './lib'
+import { t } from '@/i18n'
 
 const AREA = 'tours'
 
@@ -100,7 +101,7 @@ export function useCreateTour() {
   return useMutation({
     mutationFn: (body: TourCreate) => toursApi.create(body),
     onSuccess: () => {
-      toast.success('Tour created')
+      toast.success(t('tours.tour_created'))
       invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create tour')),
@@ -125,7 +126,7 @@ export function useUpdateTour() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: TourUpdate }) => toursApi.update(id, body),
     onSuccess: (tour) => {
-      toast.success('Tour saved')
+      toast.success(t('tours.tour_saved'))
       invalidate(tour.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save tour')),
@@ -137,7 +138,7 @@ export function useDeleteTour() {
   return useMutation({
     mutationFn: (id: string) => toursApi.remove(id),
     onSuccess: () => {
-      toast.success('Tour deleted')
+      toast.success(t('tours.tour_deleted'))
       invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete tour')),
@@ -149,7 +150,7 @@ export function usePublishTour() {
   return useMutation({
     mutationFn: (id: string) => toursApi.publish(id),
     onSuccess: (tour) => {
-      toast.success('Tour published')
+      toast.success(t('tours.tour_published'))
       invalidate(tour.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not publish tour')),
@@ -161,7 +162,7 @@ export function usePauseTour() {
   return useMutation({
     mutationFn: (id: string) => toursApi.pause(id),
     onSuccess: (tour) => {
-      toast.success('Tour paused')
+      toast.success(t('tours.tour_paused'))
       invalidate(tour.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not pause tour')),

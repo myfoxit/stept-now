@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Markdown } from '@/features/knowledge/components/markdown'
 
 import { ACTION_KINDS, stepTypeLabel, type StepDraft } from '../lib'
+import { t } from '@/i18n'
 
 function Media({ draft }: { draft: StepDraft }) {
   if (!draft.mediaUrl.trim()) return null
@@ -56,7 +57,7 @@ function Bubble({
       {draft.body ? (
         <Markdown content={draft.body} className="mt-1 text-xs text-muted-foreground" />
       ) : (
-        <p className="mt-1 text-xs text-muted-foreground">No body yet.</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('tours.no_body_yet')}</p>
       )}
       <div className="mt-3 flex items-center gap-2">
         {showProgress ? (
@@ -101,7 +102,7 @@ export function StepPreview({
   if (!draft) {
     return (
       <p className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-        Select a step to preview it.
+        {t('tours.select_a_step_to_preview_it')}
       </p>
     )
   }
@@ -111,7 +112,7 @@ export function StepPreview({
     return (
       <div className="rounded-md border border-dashed p-4 text-xs" data-testid="step-preview">
         <Badge variant="secondary" className="mb-2 gap-1">
-          <MousePointerClick aria-hidden /> Driven step
+          <MousePointerClick aria-hidden /> {t('tours.driven_step')}
         </Badge>
         <p className="text-muted-foreground">
           In “do it for me” mode Stept performs this itself: <strong>{kind}</strong>
@@ -136,7 +137,7 @@ export function StepPreview({
     return (
       <div className="rounded-md border border-dashed p-4 text-xs" data-testid="step-preview">
         <Badge variant="secondary" className="mb-2 gap-1">
-          <Clock aria-hidden /> Hidden step
+          <Clock aria-hidden /> {t('tours.hidden_step')}
         </Badge>
         <p className="text-muted-foreground">
           Nothing is shown. The player waits up to {draft.waitTimeoutMs}ms for{' '}

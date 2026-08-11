@@ -7,6 +7,7 @@ import { timeAgo } from '@/lib/format'
 import { useHasPerm } from '@/stores/auth'
 
 import { useApplySla, useConversationSla, useSlaPolicyOptions } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 const NONE = '__none__'
 
@@ -41,7 +42,7 @@ export function SlaCard({ conversationId }: { conversationId: string }) {
 
   if (sla.isLoading) return <Skeleton className="h-16 w-full" data-testid="sla-loading" />
   if (sla.isError) {
-    return <p className="text-xs text-muted-foreground">Could not load SLA.</p>
+    return <p className="text-xs text-muted-foreground">{t('inbox.could_not_load_sla')}</p>
   }
 
   const policy = sla.data?.policy ?? null
@@ -56,7 +57,7 @@ export function SlaCard({ conversationId }: { conversationId: string }) {
           {status ? <SlaStatusBadge status={status} /> : null}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">No SLA applied.</p>
+        <p className="text-xs text-muted-foreground">{t('inbox.no_sla_applied')}</p>
       )}
 
       {events.length > 0 ? (
@@ -75,7 +76,7 @@ export function SlaCard({ conversationId }: { conversationId: string }) {
 
       {canManage ? (
         <NativeSelect
-          aria-label="Apply SLA"
+          aria-label={t('inbox.apply_sla')}
           className="w-full"
           value={policy?.id ?? NONE}
           disabled={apply.isPending}

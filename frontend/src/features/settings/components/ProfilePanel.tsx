@@ -8,6 +8,8 @@ import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/stores/auth'
 
 import { useChangePassword, useUpdateProfile } from '../hooks'
+import { LanguagePanel } from './LanguagePanel'
+import { t } from '@/i18n'
 
 export function ProfilePanel() {
   const user = useAuthStore((s) => s.user)
@@ -38,17 +40,18 @@ export function ProfilePanel() {
 
   return (
     <div className="grid max-w-xl gap-6">
+      <LanguagePanel />
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Your profile</CardTitle>
+          <CardTitle className="text-sm">{t('settings.your_profile')}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="profile-email">Email</Label>
+            <Label htmlFor="profile-email">{t('common.email')}</Label>
             <Input id="profile-email" value={user?.email ?? ''} disabled />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="profile-name">Name</Label>
+            <Label htmlFor="profile-name">{t('common.name')}</Label>
             <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
@@ -64,11 +67,11 @@ export function ProfilePanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Change password</CardTitle>
+          <CardTitle className="text-sm">{t('settings.change_password')}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="pw-current">Current password</Label>
+            <Label htmlFor="pw-current">{t('settings.current_password')}</Label>
             <Input
               id="pw-current"
               type="password"
@@ -78,7 +81,7 @@ export function ProfilePanel() {
           </div>
           <Separator />
           <div className="grid gap-1.5">
-            <Label htmlFor="pw-new">New password</Label>
+            <Label htmlFor="pw-new">{t('common.new_password')}</Label>
             <Input
               id="pw-new"
               type="password"
@@ -87,7 +90,7 @@ export function ProfilePanel() {
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="pw-confirm">Confirm new password</Label>
+            <Label htmlFor="pw-confirm">{t('settings.confirm_new_password')}</Label>
             <Input
               id="pw-confirm"
               type="password"

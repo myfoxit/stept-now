@@ -46,31 +46,32 @@ import {
   usePublishChecklist,
 } from '../hooks'
 import { describeTrigger, formatRate } from '../lib'
+import { t } from '@/i18n'
 
 function ChecklistStatsRow({ checklist }: { checklist: Checklist }) {
   const stats = useChecklistStats(checklist.id, checklist.status !== 'draft')
 
   if (checklist.status === 'draft') {
-    return <p className="text-xs text-muted-foreground">Not published yet</p>
+    return <p className="text-xs text-muted-foreground">{t('common.not_published_yet')}</p>
   }
   if (stats.isLoading) return <Skeleton className="h-8 w-32" />
-  if (!stats.data) return <p className="text-xs text-muted-foreground">No data</p>
+  if (!stats.data) return <p className="text-xs text-muted-foreground">{t('common.no_data')}</p>
 
   return (
     <div className="flex items-center gap-5">
       <div>
         <div className="text-sm font-semibold tabular-nums">{stats.data.starts}</div>
-        <div className="text-[11px] text-muted-foreground">started</div>
+        <div className="text-[11px] text-muted-foreground">{t('checklists.started')}</div>
       </div>
       <div>
         <div className="text-sm font-semibold tabular-nums">{stats.data.completions}</div>
-        <div className="text-[11px] text-muted-foreground">completed</div>
+        <div className="text-[11px] text-muted-foreground">{t('common.completed')}</div>
       </div>
       <div>
         <div className="text-sm font-semibold tabular-nums">
           {formatRate(stats.data.completion_rate)}
         </div>
-        <div className="text-[11px] text-muted-foreground">completion rate</div>
+        <div className="text-[11px] text-muted-foreground">{t('common.completion_rate_2')}</div>
       </div>
     </div>
   )
@@ -175,14 +176,14 @@ export function Component() {
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex items-center justify-between gap-4 border-b px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold">Checklists</h1>
+          <h1 className="text-lg font-semibold">{t('checklists.checklists')}</h1>
           <p className="text-sm text-muted-foreground">
-            Onboarding to-do lists that guide new users to their first win.
+            {t('checklists.onboarding_to_do_lists_that_guide')}
           </p>
         </div>
         {canManage ? (
           <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="size-4" /> New checklist
+            <Plus className="size-4" /> {t('checklists.new_checklist')}
           </Button>
         ) : null}
       </header>
@@ -203,7 +204,7 @@ export function Component() {
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Could not load checklists.{' '}
               <Button variant="link" className="px-1" onClick={() => checklists.refetch()}>
-                Retry
+                {t('common.retry')}
               </Button>
             </Card>
           ) : !checklists.data || checklists.data.length === 0 ? (
@@ -212,15 +213,15 @@ export function Component() {
                 <EmptyMedia variant="icon">
                   <ListChecks />
                 </EmptyMedia>
-                <EmptyTitle>No checklists yet</EmptyTitle>
+                <EmptyTitle>{t('checklists.no_checklists_yet')}</EmptyTitle>
                 <EmptyDescription>
-                  Build a getting-started list — link items to tours, docs or the messenger.
+                  {t('checklists.build_a_getting_started_list_link')}
                 </EmptyDescription>
               </EmptyHeader>
               {canManage ? (
                 <EmptyContent>
                   <Button onClick={() => setDialogOpen(true)}>
-                    <Plus className="size-4" /> Create your first checklist
+                    <Plus className="size-4" /> {t('checklists.create_your_first_checklist')}
                   </Button>
                 </EmptyContent>
               ) : null}
@@ -244,16 +245,16 @@ export function Component() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New checklist</DialogTitle>
+            <DialogTitle>{t('checklists.new_checklist')}</DialogTitle>
             <DialogDescription>
               Name it now — you&rsquo;ll add items and targeting in the editor.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-1.5">
-            <Label htmlFor="checklist-name">Name</Label>
+            <Label htmlFor="checklist-name">{t('common.name')}</Label>
             <Input
               id="checklist-name"
-              placeholder="Getting started"
+              placeholder={t('common.getting_started')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -263,7 +264,7 @@ export function Component() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={submit} disabled={!name.trim() || create.isPending}>
               {create.isPending ? 'Creating…' : 'Create'}
@@ -277,19 +278,18 @@ export function Component() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete &ldquo;{deleting?.name}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
-              The checklist disappears from the widget and its progress is deleted. This cannot be
-              undone.
+              {t('checklists.the_checklist_disappears_from_the_widget')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

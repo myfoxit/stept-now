@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useHasPerm } from '@/stores/auth'
 import { fileUrl, messageCitations, type Message } from '@/features/inbox/api'
 import { useMessageFeedback, useSubmitMessageFeedback } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 interface Attachment {
   key: string
@@ -110,7 +111,7 @@ function FeedbackButtons({ message }: { message: Message }) {
         variant="ghost"
         size="icon"
         className="size-6"
-        aria-label="Good response"
+        aria-label={t('inbox.good_response')}
         aria-pressed={selected === 'up'}
         onClick={() => rate('up')}
       >
@@ -125,7 +126,7 @@ function FeedbackButtons({ message }: { message: Message }) {
         variant="ghost"
         size="icon"
         className="size-6"
-        aria-label="Bad response"
+        aria-label={t('inbox.bad_response')}
         aria-pressed={selected === 'down'}
         onClick={() => rate('down')}
       >
@@ -186,10 +187,10 @@ export function MessageBubble({ message }: { message: Message }) {
             <Bot className="size-2.5" /> AI
           </span>
         ) : null}
-        {isSystem ? <span className="text-[10px] uppercase tracking-wide">System</span> : null}
+        {isSystem ? <span className="text-[10px] uppercase tracking-wide">{t('inbox.system')}</span> : null}
         {isNote ? (
           <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-            <Lock className="size-2.5" /> Internal note
+            <Lock className="size-2.5" /> {t('inbox.internal_note')}
           </span>
         ) : null}
         <span>· {messageTime(message.created_at)}</span>
@@ -210,7 +211,7 @@ export function MessageBubble({ message }: { message: Message }) {
         <span className="px-1 text-[11px] text-muted-foreground">
           {message.delivery_status === 'pending' ? (
             <span className="inline-flex items-center gap-1">
-              <Loader2 className="size-3 animate-spin" /> Sending…
+              <Loader2 className="size-3 animate-spin" /> {t('inbox.sending')}
             </span>
           ) : message.delivery_status === 'failed' ? (
             <span className="inline-flex items-center gap-1 text-destructive">

@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { t } from '@/i18n'
 
 export function Component() {
   return (
@@ -8,7 +9,7 @@ export function Component() {
       <p className="text-6xl font-bold text-muted-foreground/40">404</p>
       <h1 className="text-xl font-semibold">This page doesn't exist</h1>
       <Button asChild>
-        <Link to="/">Back to the inbox</Link>
+        <Link to="/">{t('common.back_to_the_inbox')}</Link>
       </Button>
     </div>
   )

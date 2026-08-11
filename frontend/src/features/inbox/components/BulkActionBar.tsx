@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import type { BulkAction, Member, Tag, Team } from '@/features/inbox/api'
 import { useBulkAction } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 const STATUSES = ['open', 'pending', 'resolved'] as const
 const PRIORITIES = ['urgent', 'high', 'medium', 'low', 'none'] as const
@@ -45,13 +46,13 @@ export function BulkActionBar({
     <div
       className="flex flex-wrap items-center gap-2 border-b bg-accent/50 px-2 py-1.5"
       role="toolbar"
-      aria-label="Bulk actions"
+      aria-label={t('inbox.bulk_actions')}
     >
       <span className="text-xs font-medium">{selected.length} selected</span>
 
       <Select onValueChange={(status) => run('set_status', { status })}>
-        <SelectTrigger className="h-7 w-28 text-xs" aria-label="Set status">
-          <SelectValue placeholder="Status" />
+        <SelectTrigger className="h-7 w-28 text-xs" aria-label={t('inbox.set_status')}>
+          <SelectValue placeholder={t('common.status')} />
         </SelectTrigger>
         <SelectContent>
           {STATUSES.map((status) => (
@@ -63,8 +64,8 @@ export function BulkActionBar({
       </Select>
 
       <Select onValueChange={(priority) => run('set_priority', { priority })}>
-        <SelectTrigger className="h-7 w-28 text-xs" aria-label="Set priority">
-          <SelectValue placeholder="Priority" />
+        <SelectTrigger className="h-7 w-28 text-xs" aria-label={t('inbox.set_priority')}>
+          <SelectValue placeholder={t('common.priority')} />
         </SelectTrigger>
         <SelectContent>
           {PRIORITIES.map((priority) => (
@@ -80,12 +81,12 @@ export function BulkActionBar({
           run('assign_user', { assignee_user_id: value === '__none__' ? null : value })
         }
       >
-        <SelectTrigger className="h-7 w-32 text-xs" aria-label="Assign to">
-          <SelectValue placeholder="Assign" />
+        <SelectTrigger className="h-7 w-32 text-xs" aria-label={t('inbox.assign_to')}>
+          <SelectValue placeholder={t('inbox.assign')} />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="self">Me</SelectItem>
-          <SelectItem value="__none__">Unassign</SelectItem>
+          <SelectItem value="__none__">{t('inbox.unassign')}</SelectItem>
           {members.map((member) => (
             <SelectItem key={member.user.id} value={member.user.id}>
               {member.user.name}
@@ -100,11 +101,11 @@ export function BulkActionBar({
             run('assign_team', { team_id: value === '__none__' ? null : value })
           }
         >
-          <SelectTrigger className="h-7 w-28 text-xs" aria-label="Assign team">
-            <SelectValue placeholder="Team" />
+          <SelectTrigger className="h-7 w-28 text-xs" aria-label={t('inbox.assign_team')}>
+            <SelectValue placeholder={t('inbox.team')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__none__">No team</SelectItem>
+            <SelectItem value="__none__">{t('inbox.no_team')}</SelectItem>
             {teams.map((team) => (
               <SelectItem key={team.id} value={team.id}>
                 {team.name}
@@ -116,8 +117,8 @@ export function BulkActionBar({
 
       {tags.length > 0 ? (
         <Select onValueChange={(tagId) => run('add_tag', { tag_id: tagId })}>
-          <SelectTrigger className="h-7 w-28 text-xs" aria-label="Add tag">
-            <SelectValue placeholder="Add tag" />
+          <SelectTrigger className="h-7 w-28 text-xs" aria-label={t('inbox.add_tag')}>
+            <SelectValue placeholder={t('inbox.add_tag')} />
           </SelectTrigger>
           <SelectContent>
             {tags.map((tag) => (
@@ -133,7 +134,7 @@ export function BulkActionBar({
         variant="ghost"
         size="icon"
         className="ml-auto size-7"
-        aria-label="Clear selection"
+        aria-label={t('inbox.clear_selection')}
         onClick={onDone}
       >
         <X className="size-4" />

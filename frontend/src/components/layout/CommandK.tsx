@@ -20,6 +20,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { t } from '@/i18n'
 
 const NAV = [
   { title: 'Inbox', url: '/inbox', icon: Inbox },
@@ -54,9 +55,9 @@ export function CommandK() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search or jump to…" />
+      <CommandInput placeholder={t('common.search_or_jump_to')} />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>{t('common.no_results_found')}</CommandEmpty>
         <CommandGroup heading="Go to">
           {NAV.map((item) => (
             <CommandItem

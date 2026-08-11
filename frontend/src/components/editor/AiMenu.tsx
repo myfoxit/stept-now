@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
+import { t } from '@/i18n'
 
 /** Commands that transform the selected text. */
 const REWRITE_COMMANDS = [
@@ -70,7 +71,7 @@ export function AiMenu({
       })
       const content = result.content.trim()
       if (!content) {
-        toast.error('The assistant returned nothing — try again')
+        toast.error(t('common.the_assistant_returned_nothing_try_again'))
         return
       }
       if (hasSelection) onReplaceSelection(content)
@@ -100,7 +101,7 @@ export function AiMenu({
           size="sm"
           className="h-8 gap-1.5 px-2"
           disabled={disabled}
-          aria-label="Ask AI"
+          aria-label={t('common.ask_ai')}
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
           <span className="text-xs">AI</span>
@@ -130,13 +131,13 @@ export function AiMenu({
             <Separator />
             <div className="grid gap-1.5">
               <Label htmlFor="ai-translate-language" className="text-xs">
-                Translate into
+                {t('common.translate_into')}
               </Label>
               <div className="flex gap-1.5">
                 <Input
                   id="ai-translate-language"
                   value={language}
-                  placeholder="German"
+                  placeholder={t('common.german')}
                   onChange={(event) => setLanguage(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' && language.trim()) {
@@ -159,16 +160,16 @@ export function AiMenu({
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              Draft from your knowledge base, or select text first to rewrite it.
+              {t('common.draft_from_your_knowledge_base_or')}
             </p>
             <div className="grid gap-1.5">
               <Label htmlFor="ai-draft-prompt" className="text-xs">
-                What should it write?
+                {t('common.what_should_it_write')}
               </Label>
               <Input
                 id="ai-draft-prompt"
                 value={prompt}
-                placeholder="A short guide to issuing refunds"
+                placeholder={t('common.a_short_guide_to_issuing_refunds')}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && prompt.trim()) {
@@ -185,7 +186,7 @@ export function AiMenu({
                 disabled={busy !== null || !prompt.trim()}
                 onClick={() => void run('draft', { prompt: prompt.trim() })}
               >
-                Draft
+                {t('common.draft')}
               </Button>
               <Button
                 type="button"
@@ -194,7 +195,7 @@ export function AiMenu({
                 disabled={busy !== null || !prompt.trim()}
                 onClick={() => void run('outline', { prompt: prompt.trim() })}
               >
-                Outline
+                {t('common.outline')}
               </Button>
             </div>
           </>

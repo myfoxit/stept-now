@@ -35,14 +35,15 @@ import {
 } from '../../hooks'
 import { CredentialForm } from './CredentialForm'
 import { activeConnections, providerIcon, providerState } from './lib'
+import { t } from '@/i18n'
 
 function StateChip({ provider }: { provider: IntegrationProvider }) {
   const state = providerState(provider)
   if (state === 'connected') {
     return <Badge variant="secondary">Connected ({activeConnections(provider).length})</Badge>
   }
-  if (state === 'needs_setup') return <Badge variant="outline">Needs setup</Badge>
-  return <Badge variant="outline">Not connected</Badge>
+  if (state === 'needs_setup') return <Badge variant="outline">{t('settings.needs_setup')}</Badge>
+  return <Badge variant="outline">{t('settings.not_connected')}</Badge>
 }
 
 function ConnectionStatusBadge({ connection }: { connection: IntegrationConnection }) {
@@ -52,12 +53,12 @@ function ConnectionStatusBadge({ connection }: { connection: IntegrationConnecti
         variant="outline"
         className="gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
       >
-        <TriangleAlert className="size-3" /> Reauthorize
+        <TriangleAlert className="size-3" /> {t('settings.reauthorize')}
       </Badge>
     )
   }
-  if (connection.status === 'error') return <Badge variant="destructive">Error</Badge>
-  return <Badge variant="secondary">Connected</Badge>
+  if (connection.status === 'error') return <Badge variant="destructive">{t('common.error')}</Badge>
+  return <Badge variant="secondary">{t('settings.connected')}</Badge>
 }
 
 export function IntegrationCard({ provider }: { provider: IntegrationProvider }) {
@@ -107,7 +108,7 @@ export function IntegrationCard({ provider }: { provider: IntegrationProvider })
               Zendesk uses an API token instead of OAuth — add your help center as a knowledge
               source under{' '}
               <Link to="/knowledge" className="underline underline-offset-2 hover:text-foreground">
-                Knowledge → Add source → Zendesk
+                {t('settings.knowledge_add_source_zendesk')}
               </Link>
               .
             </p>
@@ -134,7 +135,7 @@ export function IntegrationCard({ provider }: { provider: IntegrationProvider })
                       aria-label={`Reconnect ${connection.account_label ?? provider.name}`}
                       onClick={() => reconnect.mutate({ connectionId: connection.id })}
                     >
-                      <RefreshCw className="size-3.5" /> Reconnect
+                      <RefreshCw className="size-3.5" /> {t('settings.reconnect')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -142,7 +143,7 @@ export function IntegrationCard({ provider }: { provider: IntegrationProvider })
                       aria-label={`Disconnect ${connection.account_label ?? provider.name}`}
                       onClick={() => setDisconnecting(connection)}
                     >
-                      <Unplug className="size-3.5" /> Disconnect
+                      <Unplug className="size-3.5" /> {t('settings.disconnect')}
                     </Button>
                   </div>
                 </li>
@@ -154,7 +155,7 @@ export function IntegrationCard({ provider }: { provider: IntegrationProvider })
             <Collapsible defaultOpen={providerState(provider) === 'needs_setup'}>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-                  <ChevronDown className="size-3.5" /> Use your own app
+                  <ChevronDown className="size-3.5" /> {t('settings.use_your_own_app')}
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2">
@@ -180,14 +181,14 @@ export function IntegrationCard({ provider }: { provider: IntegrationProvider })
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (disconnecting) disconnect.mutate(disconnecting.id)
                 setDisconnecting(null)
               }}
             >
-              Disconnect
+              {t('settings.disconnect')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

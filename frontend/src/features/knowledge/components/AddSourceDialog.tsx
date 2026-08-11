@@ -61,6 +61,7 @@ import {
 } from '../api'
 import { refreshMinutes as configuredRefresh } from '../lib'
 import { FileDrop } from './FileDrop'
+import { t } from '@/i18n'
 
 const TYPE_TABS: { value: SourceType; label: string; icon: LucideIcon }[] = [
   { value: 'files', label: 'Files', icon: Upload },
@@ -491,19 +492,19 @@ export function AddSourceDialog({
 
           <div className="mt-4 grid gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="source-name">Source name</Label>
+              <Label htmlFor="source-name">{t('knowledge.source_name')}</Label>
               <Input
                 id="source-name"
                 value={form.name}
                 onChange={(e) => set('name', e.target.value)}
-                placeholder="e.g. Product documentation"
+                placeholder={t('knowledge.e_g_product_documentation')}
               />
             </div>
 
             <TabsContent value="files" className="mt-0">
               {editing ? (
                 <p className="text-sm text-muted-foreground">
-                  Add or remove documents from the source page.
+                  {t('knowledge.add_or_remove_documents_from_the')}
                 </p>
               ) : (
                 <FileDrop
@@ -526,7 +527,7 @@ export function AddSourceDialog({
                   className="font-mono text-xs"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Each page is fetched, parsed and indexed after you save.
+                  {t('knowledge.each_page_is_fetched_parsed_and')}
                 </p>
               </div>
               <RefreshField value={form.refreshMinutes} onChange={(v) => set('refreshMinutes', v)} />
@@ -535,30 +536,30 @@ export function AddSourceDialog({
             <TabsContent value="text" className="mt-0 grid gap-3">
               {editing ? (
                 <p className="text-sm text-muted-foreground">
-                  Add or remove documents from the source page.
+                  {t('knowledge.add_or_remove_documents_from_the')}
                 </p>
               ) : (
                 <>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="source-title">Document title</Label>
+                    <Label htmlFor="source-title">{t('knowledge.document_title')}</Label>
                     <Input
                       id="source-title"
                       value={form.title}
                       onChange={(e) => set('title', e.target.value)}
-                      placeholder="Refund policy"
+                      placeholder={t('knowledge.refund_policy')}
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>Content</Label>
+                    <Label>{t('knowledge.content')}</Label>
                     <RichTextEditor
                       value={form.content}
                       onChange={(markdown) => set('content', markdown)}
                       variant="full"
                       ariaLabel="Document content"
-                      placeholder="Paste or write the content you want indexed…"
+                      placeholder={t('knowledge.paste_or_write_the_content_you')}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Stored as markdown so search and the help center stay in sync.
+                      {t('knowledge.stored_as_markdown_so_search_and')}
                     </p>
                   </div>
                 </>
@@ -567,7 +568,7 @@ export function AddSourceDialog({
 
             <TabsContent value="sitemap" className="mt-0 grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="sitemap-url">Sitemap URL</Label>
+                <Label htmlFor="sitemap-url">{t('knowledge.sitemap_url')}</Label>
                 <Input
                   id="sitemap-url"
                   value={form.sitemapUrl}
@@ -575,12 +576,12 @@ export function AddSourceDialog({
                   placeholder="https://example.com/sitemap.xml"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Every page listed in the sitemap is fetched and indexed.
+                  {t('knowledge.every_page_listed_in_the_sitemap')}
                 </p>
               </div>
               <NumberField
                 id="sitemap-max-pages"
-                label="Max pages (optional)"
+                label={t('knowledge.max_pages_optional')}
                 value={form.maxPages}
                 onChange={(v) => set('maxPages', v)}
               />
@@ -589,7 +590,7 @@ export function AddSourceDialog({
 
             <TabsContent value="crawl" className="mt-0 grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="crawl-base-url">Base URL</Label>
+                <Label htmlFor="crawl-base-url">{t('common.base_url')}</Label>
                 <Input
                   id="crawl-base-url"
                   value={form.baseUrl}
@@ -597,42 +598,42 @@ export function AddSourceDialog({
                   placeholder="https://docs.example.com"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Follows same-site links from this page and indexes what it finds.
+                  {t('knowledge.follows_same_site_links_from_this')}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <NumberField
                   id="crawl-max-pages"
-                  label="Max pages (optional)"
+                  label={t('knowledge.max_pages_optional')}
                   value={form.maxPages}
                   onChange={(v) => set('maxPages', v)}
                 />
                 <NumberField
                   id="crawl-max-depth"
-                  label="Max depth (optional)"
+                  label={t('knowledge.max_depth_optional')}
                   value={form.maxDepth}
                   onChange={(v) => set('maxDepth', v)}
                 />
               </div>
               <PatternField
                 id="crawl-include"
-                label="Include patterns"
+                label={t('knowledge.include_patterns')}
                 hint="Glob against the URL path, e.g. /docs/*. Empty means everything."
                 values={form.includePatterns}
                 onChange={(v) => set('includePatterns', v)}
               />
               <PatternField
                 id="crawl-exclude"
-                label="Exclude patterns"
+                label={t('knowledge.exclude_patterns')}
                 hint="Exclusions win over includes, e.g. /blog/*."
                 values={form.excludePatterns}
                 onChange={(v) => set('excludePatterns', v)}
               />
               <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
                 <div className="grid gap-0.5">
-                  <Label htmlFor="crawl-robots">Respect robots.txt</Label>
+                  <Label htmlFor="crawl-robots">{t('knowledge.respect_robots_txt')}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Skip paths disallowed for user-agent <code>*</code>.
+                    {t('knowledge.skip_paths_disallowed_for_user_agent')} <code>*</code>.
                   </p>
                 </div>
                 <Switch
@@ -662,21 +663,21 @@ export function AddSourceDialog({
             <TabsContent value="github" className="mt-0 grid gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="github-owner">Repository owner</Label>
+                  <Label htmlFor="github-owner">{t('knowledge.repository_owner')}</Label>
                   <Input
                     id="github-owner"
                     value={form.repoOwner}
                     onChange={(e) => set('repoOwner', e.target.value)}
-                    placeholder="acme"
+                    placeholder={t('knowledge.acme')}
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="github-repo">Repository</Label>
+                  <Label htmlFor="github-repo">{t('knowledge.repository')}</Label>
                   <Input
                     id="github-repo"
                     value={form.repo}
                     onChange={(e) => set('repo', e.target.value)}
-                    placeholder="docs"
+                    placeholder={t('knowledge.docs')}
                   />
                 </div>
               </div>
@@ -686,33 +687,33 @@ export function AddSourceDialog({
                   id="github-branch"
                   value={form.branch}
                   onChange={(e) => set('branch', e.target.value)}
-                  placeholder="main"
+                  placeholder={t('knowledge.main')}
                 />
               </div>
               <fieldset className="grid gap-2">
-                <legend className="text-sm font-medium">Include</legend>
+                <legend className="text-sm font-medium">{t('knowledge.include')}</legend>
                 <CheckField
                   id="github-include-files"
-                  label="Markdown & doc files"
+                  label={t('knowledge.markdown_doc_files')}
                   checked={form.includeFiles}
                   onChange={(v) => set('includeFiles', v)}
                 />
                 <CheckField
                   id="github-include-issues"
-                  label="Issues"
+                  label={t('knowledge.issues')}
                   checked={form.includeIssues}
                   onChange={(v) => set('includeIssues', v)}
                 />
                 <CheckField
                   id="github-include-prs"
-                  label="Pull requests"
+                  label={t('knowledge.pull_requests')}
                   checked={form.includePrs}
                   onChange={(v) => set('includePrs', v)}
                 />
               </fieldset>
               <SecretField
                 id="github-token"
-                label="Access token (optional)"
+                label={t('knowledge.access_token_optional')}
                 value={form.token}
                 onChange={(v) => set('token', v)}
                 hasStored={editing && Boolean(source?.has_secrets)}
@@ -733,7 +734,7 @@ export function AddSourceDialog({
                 <ConnectionSelect
                   id="notion-connection"
                   providerId="notion"
-                  label="Notion account"
+                  label={t('knowledge.notion_account')}
                   value={form.connectionId}
                   onChange={(v) => set('connectionId', v)}
                   hint="Pages shared with the connected Notion integration are imported."
@@ -741,7 +742,7 @@ export function AddSourceDialog({
               ) : (
                 <SecretField
                   id="notion-token"
-                  label="Integration token"
+                  label={t('knowledge.integration_token')}
                   value={form.token}
                   onChange={(v) => set('token', v)}
                   hasStored={editing && Boolean(source?.has_secrets)}
@@ -759,7 +760,7 @@ export function AddSourceDialog({
               </div>
               <NumberField
                 id="notion-max-pages"
-                label="Max pages (optional)"
+                label={t('knowledge.max_pages_optional')}
                 value={form.maxPages}
                 onChange={(v) => set('maxPages', v)}
               />
@@ -778,14 +779,14 @@ export function AddSourceDialog({
                 <ConnectionSelect
                   id="confluence-connection"
                   providerId="confluence"
-                  label="Atlassian account"
+                  label={t('knowledge.atlassian_account')}
                   value={form.connectionId}
                   onChange={(v) => set('connectionId', v)}
                 />
               ) : (
                 <>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="confluence-base-url">Site URL</Label>
+                    <Label htmlFor="confluence-base-url">{t('knowledge.site_url')}</Label>
                     <Input
                       id="confluence-base-url"
                       value={form.baseUrl}
@@ -794,18 +795,18 @@ export function AddSourceDialog({
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="confluence-email">Account email</Label>
+                    <Label htmlFor="confluence-email">{t('knowledge.account_email')}</Label>
                     <Input
                       id="confluence-email"
                       type="email"
                       value={form.accountEmail}
                       onChange={(e) => set('accountEmail', e.target.value)}
-                      placeholder="you@yourcompany.com"
+                      placeholder={t('knowledge.you_yourcompany_com')}
                     />
                   </div>
                   <SecretField
                     id="confluence-token"
-                    label="API token"
+                    label={t('knowledge.api_token')}
                     value={form.token}
                     onChange={(v) => set('token', v)}
                     hasStored={editing && Boolean(source?.has_secrets)}
@@ -819,12 +820,12 @@ export function AddSourceDialog({
                   id="confluence-spaces"
                   value={form.spaceKeys}
                   onChange={(e) => set('spaceKeys', e.target.value)}
-                  placeholder="DOCS, HELP — empty imports all global spaces"
+                  placeholder={t('knowledge.docs_help_empty_imports_all_global')}
                 />
               </div>
               <NumberField
                 id="confluence-max-pages"
-                label="Max pages (optional, cap 500)"
+                label={t('knowledge.max_pages_optional_cap_500')}
                 value={form.maxPages}
                 onChange={(v) => set('maxPages', v)}
               />
@@ -835,7 +836,7 @@ export function AddSourceDialog({
               <ConnectionSelect
                 id="gdrive-connection"
                 providerId="google"
-                label="Google account"
+                label={t('knowledge.google_account')}
                 value={form.connectionId}
                 onChange={(v) => set('connectionId', v)}
                 hint="Drive access is read-only; only the folders below are imported."
@@ -851,13 +852,13 @@ export function AddSourceDialog({
                   className="font-mono text-xs"
                 />
                 <p className="text-xs text-muted-foreground">
-                  From the folder URL: drive.google.com/drive/folders/<b>&lt;id&gt;</b>. Subfolders
+                  {t('knowledge.from_the_folder_url_drive_google')}<b>&lt;id&gt;</b>. Subfolders
                   are included.
                 </p>
               </div>
               <NumberField
                 id="gdrive-max-files"
-                label="Max files (optional, cap 500)"
+                label={t('knowledge.max_files_optional_cap_500')}
                 value={form.maxFiles}
                 onChange={(v) => set('maxFiles', v)}
               />
@@ -866,44 +867,43 @@ export function AddSourceDialog({
 
             <TabsContent value="zendesk" className="mt-0 grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="zendesk-subdomain">Subdomain</Label>
+                <Label htmlFor="zendesk-subdomain">{t('knowledge.subdomain')}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="zendesk-subdomain"
                     value={form.subdomain}
                     onChange={(e) => set('subdomain', e.target.value)}
-                    placeholder="yourcompany"
+                    placeholder={t('knowledge.yourcompany')}
                   />
                   <span className="shrink-0 text-sm text-muted-foreground">.zendesk.com</span>
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="zendesk-locale">Locale</Label>
+                <Label htmlFor="zendesk-locale">{t('knowledge.locale')}</Label>
                 <Input
                   id="zendesk-locale"
                   value={form.locale}
                   onChange={(e) => set('locale', e.target.value)}
-                  placeholder="en-us"
+                  placeholder={t('knowledge.en_us')}
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="zendesk-email">Account email</Label>
+                <Label htmlFor="zendesk-email">{t('knowledge.account_email')}</Label>
                 <Input
                   id="zendesk-email"
                   type="email"
                   autoComplete="off"
                   value={form.accountEmail}
                   onChange={(e) => set('accountEmail', e.target.value)}
-                  placeholder="you@yourcompany.com"
+                  placeholder={t('knowledge.you_yourcompany_com')}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Stored encrypted with the API token — Zendesk authenticates as
-                  email/token.
+                  {t('knowledge.stored_encrypted_with_the_api_token')}
                 </p>
               </div>
               <SecretField
                 id="zendesk-token"
-                label="API token"
+                label={t('knowledge.api_token')}
                 value={form.token}
                 onChange={(v) => set('token', v)}
                 hasStored={editing && Boolean(source?.has_secrets)}
@@ -937,7 +937,7 @@ export function AddSourceDialog({
             onClick={() => onOpenChange(false)}
             disabled={mutation.isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={() => mutation.mutate()}
@@ -969,7 +969,7 @@ function AuthModeField({
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={id}>Authentication</Label>
+      <Label htmlFor={id}>{t('knowledge.authentication')}</Label>
       <NativeSelect
         id={id}
         className="w-full"
@@ -993,7 +993,7 @@ function RefreshField({ value, onChange }: { value: string; onChange: (value: st
         min={5}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Leave empty to sync manually"
+        placeholder={t('knowledge.leave_empty_to_sync_manually')}
       />
     </div>
   )
@@ -1046,7 +1046,7 @@ function SecretField({
       />
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {hasStored ? (
-        <p className="text-xs text-muted-foreground">Leave blank to keep the stored token.</p>
+        <p className="text-xs text-muted-foreground">{t('knowledge.leave_blank_to_keep_the_stored')}</p>
       ) : null}
     </div>
   )

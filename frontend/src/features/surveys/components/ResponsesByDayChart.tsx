@@ -10,6 +10,7 @@ import {
 
 import type { SurveyDayPoint } from '../api'
 import { shortDay } from '../lib'
+import { t } from '@/i18n'
 
 // One series ⇒ one hue (categorical slot 1, stepped per mode) and no legend —
 // the card title names the measure. Same palette as the reports dashboard.
@@ -21,11 +22,11 @@ export function ResponsesByDayChart({ data }: { data: SurveyDayPoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Responses over time</CardTitle>
+        <CardTitle className="text-sm">{t('surveys.responses_over_time')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No responses yet.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">{t('surveys.no_responses_yet')}</p>
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-56 w-full">
             <AreaChart data={data} margin={{ left: 4, right: 12, top: 8 }}>

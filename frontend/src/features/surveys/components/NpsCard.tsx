@@ -12,6 +12,7 @@ import {
 
 import type { SurveyNpsResult } from '../api'
 import { npsSegments } from '../lib'
+import { t } from '@/i18n'
 
 /**
  * Promoters / passives / detractors read as polarity, so the three fills are
@@ -38,7 +39,7 @@ export function NpsCard({ nps }: { nps: SurveyNpsResult }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Net Promoter Score</CardTitle>
+        <CardTitle className="text-sm">{t('surveys.net_promoter_score')}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="flex items-baseline gap-3">
@@ -49,7 +50,7 @@ export function NpsCard({ nps }: { nps: SurveyNpsResult }) {
         </div>
 
         {total === 0 ? (
-          <p className="text-sm text-muted-foreground">No scored responses yet.</p>
+          <p className="text-sm text-muted-foreground">{t('surveys.no_scored_responses_yet')}</p>
         ) : (
           <>
             <ChartContainer config={chartConfig} className="aspect-auto h-20 w-full">

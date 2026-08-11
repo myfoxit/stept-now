@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 
 import { KnowledgeNav, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { useSearch, useSources } from '../hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const [query, setQuery] = useState('')
@@ -59,8 +60,8 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="Search playground"
-        description="Query your knowledge base exactly like your AI agents do"
+        title={t('knowledge.search_playground')}
+        description={t('knowledge.query_your_knowledge_base_exactly_like')}
       />
       <KnowledgeNav />
       <ScrollBody className="space-y-5">
@@ -71,15 +72,15 @@ export function Component() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g. How do I install the chat widget?"
-                aria-label="Search query"
+                placeholder={t('knowledge.e_g_how_do_i_install')}
+                aria-label={t('knowledge.search_query')}
                 className="pl-9"
               />
             </div>
             <NativeSelect
               value={String(k)}
               onChange={(e) => setK(Number(e.target.value))}
-              aria-label="Number of results"
+              aria-label={t('knowledge.number_of_results')}
               className="sm:w-32"
             >
               {[4, 8, 12, 20].map((n) => (
@@ -98,11 +99,11 @@ export function Component() {
             <div className="flex items-center gap-2">
               <Switch id="rerank-toggle" checked={rerank} onCheckedChange={onRerankChange} />
               <Label htmlFor="rerank-toggle" className="text-sm font-medium">
-                Rerank with AI
+                {t('knowledge.rerank_with_ai')}
               </Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              One extra LLM pass reorders results — falls back to fused order on failure.
+              {t('knowledge.one_extra_llm_pass_reorders_results')}
             </p>
           </div>
 
@@ -147,8 +148,8 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <Search />
               </EmptyMedia>
-              <EmptyTitle>No matches</EmptyTitle>
-              <EmptyDescription>Try a different query or broaden the scope.</EmptyDescription>
+              <EmptyTitle>{t('knowledge.no_matches')}</EmptyTitle>
+              <EmptyDescription>{t('knowledge.try_a_different_query_or_broaden')}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : null}
@@ -159,10 +160,9 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <Sparkles />
               </EmptyMedia>
-              <EmptyTitle>Test your retrieval quality</EmptyTitle>
+              <EmptyTitle>{t('knowledge.test_your_retrieval_quality')}</EmptyTitle>
               <EmptyDescription>
-                Enter a question above to see the ranked chunks and relevance scores your agents
-                retrieve.
+                {t('knowledge.enter_a_question_above_to_see')}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -185,7 +185,7 @@ export function Component() {
                     rel="noreferrer"
                     className="flex shrink-0 items-center gap-1 text-xs text-brand hover:underline"
                   >
-                    Open <ExternalLink className="size-3" />
+                    {t('common.open')} <ExternalLink className="size-3" />
                   </a>
                 ) : null}
               </div>

@@ -13,6 +13,7 @@ import {
   type Contact,
   type ContactUpdate,
 } from '@/features/contacts/api'
+import { t } from '@/i18n'
 
 const AREA = 'contacts'
 
@@ -149,7 +150,7 @@ export function useMergeContacts() {
       contactAdminApi.merge(winnerId, loserId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [AREA, workspaceId] })
-      toast.success('Contacts merged')
+      toast.success(t('contacts.contacts_merged'))
     },
     onError: (error) => toast.error(message(error, 'Could not merge the contacts')),
   })
@@ -197,7 +198,7 @@ export function useStartImport() {
       contactAdminApi.start(id, mapping),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [AREA, workspaceId] })
-      toast.success('Import started')
+      toast.success(t('contacts.import_started'))
     },
     onError: (error) => toast.error(message(error, 'Could not start the import')),
   })

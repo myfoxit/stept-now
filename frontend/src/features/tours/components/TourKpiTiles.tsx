@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 
 import type { TourStats } from '../api'
 import { compactNumber, formatRate } from '../lib'
+import { t } from '@/i18n'
 
 function StatTile({
   label,
@@ -38,22 +39,22 @@ export function TourKpiTiles({ stats }: { stats: TourStats }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatTile
-        label="Starts"
+        label={t('common.starts')}
         value={compactNumber(stats.starts)}
         hint={`${compactNumber(stats.dismissals)} dismissed`}
       />
       <StatTile
-        label="Unique starts"
+        label={t('tours.unique_starts')}
         value={compactNumber(stats.unique_starts ?? 0)}
         hint="Distinct contacts"
       />
       <StatTile
-        label="Completion rate"
+        label={t('common.completion_rate')}
         value={formatRate(stats.completion_rate)}
         hint={`${compactNumber(stats.completions)} completed`}
       />
       <StatTile
-        label="Step errors"
+        label={t('tours.step_errors')}
         value={compactNumber(stats.step_errors ?? 0)}
         tone={(stats.step_errors ?? 0) > 0 ? 'warning' : 'default'}
         hint="Steps the player could not find"

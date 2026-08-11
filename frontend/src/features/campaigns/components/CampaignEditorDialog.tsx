@@ -32,6 +32,7 @@ import {
   useUpdateCampaign,
 } from '../hooks'
 import { campaignTypeForChannel, parseAudience, parseTriggerRules } from '../lib'
+import { t } from '@/i18n'
 
 const AUDIENCE_TYPES = ['all', 'segment', 'tag'] as const
 
@@ -224,14 +225,14 @@ export function CampaignEditorDialog({
           aria-label={editing ? 'Edit campaign' : 'New campaign'}
         >
           <div className="grid gap-2">
-            <Label htmlFor="campaign-inbox">Inbox</Label>
+            <Label htmlFor="campaign-inbox">{t('common.inbox')}</Label>
             <NativeSelect
               id="campaign-inbox"
               className="w-full"
               disabled={editing !== null}
               {...form.register('inbox_id')}
             >
-              <NativeSelectOption value="">Select an inbox…</NativeSelectOption>
+              <NativeSelectOption value="">{t('campaigns.select_an_inbox')}</NativeSelectOption>
               {(inboxes.data ?? []).map((inbox) => (
                 <NativeSelectOption key={inbox.id} value={inbox.id}>
                   {inbox.name} · {inbox.channel_type}
@@ -241,7 +242,7 @@ export function CampaignEditorDialog({
             <FieldError message={errors.inbox_id?.message} />
             {type === 'ongoing' ? (
               <Badge variant="secondary" className="w-fit">
-                <Megaphone className="size-3" /> In-app — shows in the widget
+                <Megaphone className="size-3" /> {t('campaigns.in_app_shows_in_the_widget')}
               </Badge>
             ) : type === 'one_off' ? (
               <Badge variant="secondary" className="w-fit">
@@ -252,17 +253,17 @@ export function CampaignEditorDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="campaign-title">Title</Label>
+            <Label htmlFor="campaign-title">{t('common.title')}</Label>
             <Input
               id="campaign-title"
-              placeholder="e.g. Announce the new pricing"
+              placeholder={t('campaigns.e_g_announce_the_new_pricing')}
               {...form.register('title')}
             />
             <FieldError message={errors.title?.message} />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="campaign-message">Message</Label>
+            <Label htmlFor="campaign-message">{t('common.message')}</Label>
             <Textarea
               id="campaign-message"
               rows={4}
@@ -279,7 +280,7 @@ export function CampaignEditorDialog({
             <>
               <Separator />
               <div className="grid gap-2">
-                <Label htmlFor="campaign-url">Show on pages matching</Label>
+                <Label htmlFor="campaign-url">{t('campaigns.show_on_pages_matching')}</Label>
                 <Input
                   id="campaign-url"
                   placeholder="https://app.example.com/pricing*"
@@ -305,7 +306,7 @@ export function CampaignEditorDialog({
             <>
               <Separator />
               <div className="grid gap-2">
-                <Label htmlFor="campaign-scheduled">Send at</Label>
+                <Label htmlFor="campaign-scheduled">{t('campaigns.send_at')}</Label>
                 <Input
                   id="campaign-scheduled"
                   type="datetime-local"
@@ -316,7 +317,7 @@ export function CampaignEditorDialog({
               </div>
 
               <div className="grid gap-2">
-                <Label>Audience</Label>
+                <Label>{t('common.audience')}</Label>
                 <RadioGroup
                   className="flex flex-wrap gap-4"
                   value={audienceType}
@@ -327,30 +328,30 @@ export function CampaignEditorDialog({
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value="all" id="audience-all" />
                     <Label htmlFor="audience-all" className="font-normal">
-                      Everyone
+                      {t('common.everyone')}
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value="segment" id="audience-segment" />
                     <Label htmlFor="audience-segment" className="font-normal">
-                      Segment
+                      {t('common.segment')}
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value="tag" id="audience-tag" />
                     <Label htmlFor="audience-tag" className="font-normal">
-                      Tag
+                      {t('common.tag')}
                     </Label>
                   </div>
                 </RadioGroup>
                 {audienceType === 'segment' ? (
                   <>
                     <NativeSelect
-                      aria-label="Choose segment"
+                      aria-label={t('campaigns.choose_segment')}
                       className="w-full"
                       {...form.register('segment_id')}
                     >
-                      <NativeSelectOption value="">Select a segment…</NativeSelectOption>
+                      <NativeSelectOption value="">{t('campaigns.select_a_segment')}</NativeSelectOption>
                       {(segments.data ?? []).map((segment) => (
                         <NativeSelectOption key={segment.id} value={segment.id}>
                           {segment.name}
@@ -363,11 +364,11 @@ export function CampaignEditorDialog({
                 {audienceType === 'tag' ? (
                   <>
                     <NativeSelect
-                      aria-label="Choose tag"
+                      aria-label={t('campaigns.choose_tag')}
                       className="w-full"
                       {...form.register('tag_id')}
                     >
-                      <NativeSelectOption value="">Select a tag…</NativeSelectOption>
+                      <NativeSelectOption value="">{t('campaigns.select_a_tag')}</NativeSelectOption>
                       {(tags.data ?? []).map((tag) => (
                         <NativeSelectOption key={tag.id} value={tag.id}>
                           {tag.name}
@@ -380,13 +381,13 @@ export function CampaignEditorDialog({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="campaign-sender">Send as</Label>
+                <Label htmlFor="campaign-sender">{t('campaigns.send_as')}</Label>
                 <NativeSelect
                   id="campaign-sender"
                   className="w-full"
                   {...form.register('sender_user_id')}
                 >
-                  <NativeSelectOption value="">Workspace default</NativeSelectOption>
+                  <NativeSelectOption value="">{t('common.workspace_default')}</NativeSelectOption>
                   {(members.data ?? []).map((member) => (
                     <NativeSelectOption key={member.id} value={member.user.id}>
                       {member.user.name}
@@ -399,7 +400,7 @@ export function CampaignEditorDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={saving}>
               {saving ? 'Saving…' : editing ? 'Save changes' : 'Create campaign'}

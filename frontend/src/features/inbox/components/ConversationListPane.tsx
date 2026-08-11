@@ -33,6 +33,7 @@ import {
 } from '@/features/inbox/hooks'
 import { useTags } from '@/features/contacts/hooks'
 import { useDrilldownStore } from '@/stores/drilldown'
+import { t } from '@/i18n'
 
 interface TabDef {
   key: string
@@ -137,14 +138,14 @@ export function ConversationListPane({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b px-3 py-2">
-        <h2 className="text-sm font-semibold">Inbox</h2>
+        <h2 className="text-sm font-semibold">{t('common.inbox')}</h2>
         {canWrite ? (
           <Button
             variant="ghost"
             size="icon-sm"
             className="ml-auto"
             onClick={() => setNewOpen(true)}
-            aria-label="New conversation"
+            aria-label={t('inbox.new_conversation')}
           >
             <PenSquare className="size-4" />
           </Button>
@@ -159,7 +160,7 @@ export function ConversationListPane({
             variant="ghost"
             size="icon"
             className="ml-auto size-6"
-            aria-label="Clear drill-down"
+            aria-label={t('inbox.clear_drill_down')}
             onClick={() => setDrilldown(null)}
           >
             <X className="size-3.5" />
@@ -222,14 +223,14 @@ export function ConversationListPane({
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search conversations"
-            aria-label="Search conversations"
+            placeholder={t('inbox.search_conversations')}
+            aria-label={t('inbox.search_conversations')}
             className="h-8 pl-8"
           />
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" aria-label="Filters" className="relative">
+            <Button variant="outline" size="sm" aria-label={t('inbox.filters')} className="relative">
               <Filter className="size-4" />
               {activeFilterCount ? (
                 <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-brand text-[10px] text-brand-foreground">
@@ -240,16 +241,16 @@ export function ConversationListPane({
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Inbox</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('common.inbox')}</label>
               <Select
                 value={inboxId ?? ALL}
                 onValueChange={(v) => setInboxId(v === ALL ? undefined : v)}
               >
                 <SelectTrigger className="w-full" size="sm">
-                  <SelectValue placeholder="All inboxes" />
+                  <SelectValue placeholder={t('inbox.all_inboxes')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All inboxes</SelectItem>
+                  <SelectItem value={ALL}>{t('inbox.all_inboxes')}</SelectItem>
                   {inboxes.map((i) => (
                     <SelectItem key={i.id} value={i.id}>
                       {i.name}
@@ -259,16 +260,16 @@ export function ConversationListPane({
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Priority</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('common.priority')}</label>
               <Select
                 value={priority ?? ALL}
                 onValueChange={(v) => setPriority(v === ALL ? undefined : v)}
               >
                 <SelectTrigger className="w-full" size="sm">
-                  <SelectValue placeholder="Any priority" />
+                  <SelectValue placeholder={t('inbox.any_priority')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>Any priority</SelectItem>
+                  <SelectItem value={ALL}>{t('inbox.any_priority')}</SelectItem>
                   {['urgent', 'high', 'medium', 'low', 'none'].map((p) => (
                     <SelectItem key={p} value={p} className="capitalize">
                       {p}
@@ -278,16 +279,16 @@ export function ConversationListPane({
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Tag</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('common.tag')}</label>
               <Select
                 value={tagId ?? ALL}
                 onValueChange={(v) => setTagId(v === ALL ? undefined : v)}
               >
                 <SelectTrigger className="w-full" size="sm">
-                  <SelectValue placeholder="Any tag" />
+                  <SelectValue placeholder={t('inbox.any_tag')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>Any tag</SelectItem>
+                  <SelectItem value={ALL}>{t('inbox.any_tag')}</SelectItem>
                   {tags.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
                       {t.name}
@@ -316,9 +317,9 @@ export function ConversationListPane({
         ) : isError ? (
           <div className="flex flex-col items-center gap-3 p-8 text-center">
             <AlertCircle className="size-8 text-destructive" />
-            <p className="text-sm text-muted-foreground">Failed to load conversations.</p>
+            <p className="text-sm text-muted-foreground">{t('inbox.failed_to_load_conversations')}</p>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           </div>
         ) : items.length === 0 ? (
@@ -327,7 +328,7 @@ export function ConversationListPane({
               <EmptyMedia variant="icon">
                 <Search className="size-5" />
               </EmptyMedia>
-              <EmptyTitle>No conversations</EmptyTitle>
+              <EmptyTitle>{t('inbox.no_conversations')}</EmptyTitle>
               <EmptyDescription>
                 {q || activeFilterCount
                   ? 'Try adjusting your filters.'

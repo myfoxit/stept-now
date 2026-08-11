@@ -23,6 +23,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useHasPerm } from '@/stores/auth'
 import { useInboxes, useSaveWorkingHours, useWorkingHours } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -71,7 +72,7 @@ export function WorkingHoursPanel() {
   if (inboxes.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Create an inbox first — working hours are configured per channel.
+        {t('settings.create_an_inbox_first_working_hours')}
       </p>
     )
   }
@@ -79,7 +80,7 @@ export function WorkingHoursPanel() {
   return (
     <div className="space-y-4">
       <div className="grid max-w-xs gap-1.5">
-        <Label htmlFor="wh-inbox">Inbox</Label>
+        <Label htmlFor="wh-inbox">{t('common.inbox')}</Label>
         <Select value={inboxId ?? ''} onValueChange={setInboxId}>
           <SelectTrigger id="wh-inbox">
             <SelectValue />
@@ -155,7 +156,7 @@ function InboxHours({ inboxId, canManage }: { inboxId: string; canManage: boolea
     <Card>
       <CardHeader className="flex-row items-center gap-2 space-y-0">
         <Clock className="size-4 text-muted-foreground" />
-        <CardTitle className="text-base">Working hours</CardTitle>
+        <CardTitle className="text-base">{t('settings.working_hours')}</CardTitle>
         {data ? (
           <span
             className={
@@ -178,16 +179,15 @@ function InboxHours({ inboxId, canManage }: { inboxId: string; canManage: boolea
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span>
-            <span className="font-medium">Enforce working hours</span>
+            <span className="font-medium">{t('settings.enforce_working_hours')}</span>
             <span className="block text-xs text-muted-foreground">
-              Drives out-of-office replies and business-hours SLA targets. While off, the inbox
-              counts as always open.
+              {t('settings.drives_out_of_office_replies_and')}
             </span>
           </span>
         </label>
 
         <div className="grid max-w-xs gap-1.5">
-          <Label htmlFor="wh-tz">Timezone</Label>
+          <Label htmlFor="wh-tz">{t('settings.timezone')}</Label>
           <Input
             id="wh-tz"
             list="wh-zones"
@@ -217,7 +217,7 @@ function InboxHours({ inboxId, canManage }: { inboxId: string; canManage: boolea
                     onChange={(e) => update(index, { closed: !e.target.checked })}
                     aria-label={`${label} open`}
                   />
-                  Open
+                  {t('common.open')}
                 </label>
                 <Input
                   type="time"
@@ -227,7 +227,7 @@ function InboxHours({ inboxId, canManage }: { inboxId: string; canManage: boolea
                   onChange={(e) => update(index, { open: e.target.value })}
                   aria-label={`${label} opening time`}
                 />
-                <span className="text-xs text-muted-foreground">to</span>
+                <span className="text-xs text-muted-foreground">{t('settings.to')}</span>
                 <Input
                   type="time"
                   className="h-8 w-28"
@@ -242,10 +242,10 @@ function InboxHours({ inboxId, canManage }: { inboxId: string; canManage: boolea
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="wh-ooo">Out-of-office message</Label>
+          <Label htmlFor="wh-ooo">{t('settings.out_of_office_message')}</Label>
           <Input
             id="wh-ooo"
-            placeholder="We're back at 9am — leave a message and we'll reply then."
+            placeholder={t('settings.we_re_back_at_9am_leave')}
             value={message}
             disabled={!canManage}
             onChange={(e) => setMessage(e.target.value)}
@@ -254,13 +254,13 @@ function InboxHours({ inboxId, canManage }: { inboxId: string; canManage: boolea
 
         {invalid ? (
           <p className="text-xs text-destructive">
-            Each open day needs a closing time after its opening time.
+            {t('settings.each_open_day_needs_a_closing')}
           </p>
         ) : null}
 
         {canManage ? (
           <Button onClick={submit} disabled={invalid || save.isPending}>
-            Save working hours
+            {t('settings.save_working_hours')}
           </Button>
         ) : null}
       </CardContent>

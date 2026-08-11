@@ -17,6 +17,7 @@ import { currentWorkspaceId } from '@/stores/auth'
 import { aiApi, aiKeys, type Provider, type ProviderTestResult } from '../api'
 import { useCatalog, useProviderModels } from '../hooks'
 import { providerKindLabel } from './status'
+import { t } from '@/i18n'
 
 export function ProviderCard({ provider }: { provider: Provider }) {
   const workspaceId = currentWorkspaceId()
@@ -43,7 +44,7 @@ export function ProviderCard({ provider }: { provider: Provider }) {
     mutationFn: () => aiApi.deleteProvider(provider.id),
     onSuccess: () => {
       invalidate()
-      toast.success('Provider removed')
+      toast.success(t('ai.provider_removed'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Delete failed'),
   })
@@ -55,7 +56,7 @@ export function ProviderCard({ provider }: { provider: Provider }) {
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{provider.name}</span>
             <Badge variant="outline">{providerKindLabel(provider.kind)}</Badge>
-            {!provider.enabled ? <Badge variant="secondary">Disabled</Badge> : null}
+            {!provider.enabled ? <Badge variant="secondary">{t('common.disabled')}</Badge> : null}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {provider.has_key ? `Key ${provider.api_key_hint ?? '••••'}` : 'No API key'}
@@ -80,7 +81,7 @@ export function ProviderCard({ provider }: { provider: Provider }) {
             size="icon"
             variant="ghost"
             className="size-8 text-destructive"
-            aria-label="Remove provider"
+            aria-label={t('ai.remove_provider')}
             onClick={() => deleteMutation.mutate()}
           >
             <Trash2 className="size-4" />
@@ -129,7 +130,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
     onSuccess: () => {
       onChanged()
       setCustom('')
-      toast.success('Model enabled')
+      toast.success(t('ai.model_enabled'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not enable model'),
   })
@@ -138,7 +139,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
     mutationFn: (id: string) => aiApi.deleteModel(id),
     onSuccess: () => {
       onChanged()
-      toast.success('Model removed')
+      toast.success(t('ai.model_removed'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not remove model'),
   })
@@ -147,7 +148,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
     mutationFn: (id: string) => aiApi.setDefaultModel(id),
     onSuccess: () => {
       onChanged()
-      toast.success('Default model set')
+      toast.success(t('ai.default_model_set'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not set default'),
   })
@@ -158,7 +159,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">Models</p>
+      <p className="text-xs font-medium text-muted-foreground">{t('ai.models')}</p>
 
       {catalogModels.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
@@ -192,7 +193,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
         <Input
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
-          placeholder="Add a custom model key…"
+          placeholder={t('ai.add_a_custom_model_key')}
           aria-label={`Custom model for ${provider.name}`}
           className="h-8"
         />
@@ -202,7 +203,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
           disabled={!custom.trim() || enableMutation.isPending}
           onClick={() => enableMutation.mutate({ model_key: custom.trim() })}
         >
-          Add
+          {t('common.add')}
         </Button>
       </div>
 
@@ -221,7 +222,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
               </Badge>
               {model.is_default ? (
                 <Badge className="gap-1 text-[10px]">
-                  <Star className="size-3" /> Default
+                  <Star className="size-3" /> {t('ai.default')}
                 </Badge>
               ) : (
                 <Button
@@ -230,7 +231,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
                   className="ml-auto h-6 px-2 text-xs"
                   onClick={() => defaultMutation.mutate(model.id)}
                 >
-                  Set default
+                  {t('ai.set_default')}
                 </Button>
               )}
               <Button
@@ -246,7 +247,7 @@ function ProviderModels({ provider, onChanged }: { provider: Provider; onChanged
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-muted-foreground">No models enabled yet.</p>
+        <p className="text-xs text-muted-foreground">{t('ai.no_models_enabled_yet')}</p>
       )}
     </div>
   )

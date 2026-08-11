@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/table'
 import { reportsExtraApi } from '@/features/reports/api'
 import { useSlaReport } from '@/features/reports/hooks'
+import { t } from '@/i18n'
 
 async function downloadCsv(url: string, filename: string) {
   const response = await fetch(url, { headers: authHeaders() })
@@ -41,7 +42,7 @@ export function SlaAttainmentTable({ days }: { days: number }) {
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-2 space-y-0">
-        <CardTitle className="text-base">SLA attainment</CardTitle>
+        <CardTitle className="text-base">{t('reports.sla_attainment')}</CardTitle>
         <Button
           variant="outline"
           size="sm"
@@ -57,18 +58,18 @@ export function SlaAttainmentTable({ days }: { days: number }) {
           <Skeleton className="h-32 w-full" />
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No SLA policies were applied in this window.
+            {t('reports.no_sla_policies_were_applied_in')}
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Policy</TableHead>
-                <TableHead className="text-right">Applied</TableHead>
-                <TableHead className="text-right">Hit</TableHead>
-                <TableHead className="text-right">Missed</TableHead>
-                <TableHead className="text-right">Attainment</TableHead>
-                <TableHead className="text-right">FRT / NRT / RT misses</TableHead>
+                <TableHead>{t('reports.policy')}</TableHead>
+                <TableHead className="text-right">{t('reports.applied')}</TableHead>
+                <TableHead className="text-right">{t('reports.hit')}</TableHead>
+                <TableHead className="text-right">{t('reports.missed')}</TableHead>
+                <TableHead className="text-right">{t('reports.attainment')}</TableHead>
+                <TableHead className="text-right">{t('reports.frt_nrt_rt_misses')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

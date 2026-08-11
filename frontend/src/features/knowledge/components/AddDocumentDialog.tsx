@@ -29,6 +29,7 @@ import { currentWorkspaceId } from '@/stores/auth'
 
 import { knowledgeApi, knowledgeKeys, MAX_BATCH_FILES, type Document, type Source } from '../api'
 import { FileDrop, type FileStatus } from './FileDrop'
+import { t } from '@/i18n'
 
 export function AddDocumentDialog({
   source,
@@ -145,17 +146,17 @@ export function AddDocumentDialog({
         ) : (
           <div className="grid gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="doc-title">Title</Label>
+              <Label htmlFor="doc-title">{t('common.title')}</Label>
               <Input id="doc-title" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
-              <Label>Content</Label>
+              <Label>{t('knowledge.content')}</Label>
               <RichTextEditor
                 value={content}
                 onChange={setContent}
                 variant="full"
                 ariaLabel="Document content"
-                placeholder="Write the content you want indexed…"
+                placeholder={t('knowledge.write_the_content_you_want_indexed')}
               />
             </div>
           </div>
@@ -166,7 +167,7 @@ export function AddDocumentDialog({
             onClick={() => onOpenChange(false)}
             disabled={mutation.isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => mutation.mutate()} disabled={!canSubmit || mutation.isPending}>
             {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}

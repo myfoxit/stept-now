@@ -83,7 +83,8 @@ export const slasApi = {
 }
 
 export const profileApi = {
-  update: (body: { name?: string; avatar_url?: string }) => api.patch<User>('/api/v1/me', body),
+  update: (body: { name?: string; avatar_url?: string; locale?: string }) =>
+    api.patch<User>('/api/v1/me', body),
   changePassword: (body: { current_password: string; new_password: string }) =>
     api.post<{ message: string }>('/api/v1/me/change-password', body),
 }

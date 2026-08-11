@@ -16,6 +16,7 @@ import {
   moveItem,
   type ChecklistItemDraft,
 } from '../lib'
+import { t } from '@/i18n'
 
 function TourPicker({
   id,
@@ -42,7 +43,7 @@ function TourPicker({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       >
-        <NativeSelectOption value="">Select a tour…</NativeSelectOption>
+        <NativeSelectOption value="">{t('checklists.select_a_tour')}</NativeSelectOption>
         {tours.map((tour) => (
           <NativeSelectOption key={tour.id} value={tour.id}>
             {tour.name}
@@ -79,7 +80,7 @@ export function ItemEditor({
     <div className="grid gap-3">
       {items.length === 0 ? (
         <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No items yet. Add the first thing a new user should do.
+          {t('checklists.no_items_yet_add_the_first')}
         </p>
       ) : null}
 
@@ -122,10 +123,10 @@ export function ItemEditor({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor={`item-title-${index}`}>Title</Label>
+            <Label htmlFor={`item-title-${index}`}>{t('common.title')}</Label>
             <Input
               id={`item-title-${index}`}
-              placeholder="Take the product tour"
+              placeholder={t('checklists.take_the_product_tour')}
               value={item.title}
               disabled={disabled}
               onChange={(e) => update(index, { title: e.target.value })}
@@ -137,7 +138,7 @@ export function ItemEditor({
             <Textarea
               id={`item-body-${index}`}
               rows={2}
-              placeholder="A two-minute walkthrough of the basics."
+              placeholder={t('checklists.a_two_minute_walkthrough_of_the')}
               value={item.body}
               disabled={disabled}
               onChange={(e) => update(index, { body: e.target.value })}
@@ -147,7 +148,7 @@ export function ItemEditor({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor={`item-action-${index}`}>Button action</Label>
+                <Label htmlFor={`item-action-${index}`}>{t('checklists.button_action')}</Label>
                 <NativeSelect
                   id={`item-action-${index}`}
                   className="w-full"
@@ -167,7 +168,7 @@ export function ItemEditor({
               {item.actionType === 'start_tour' ? (
                 <TourPicker
                   id={`item-action-tour-${index}`}
-                  label="Tour to start"
+                  label={t('checklists.tour_to_start')}
                   value={item.actionTourId}
                   tours={tours}
                   disabled={disabled}
@@ -176,7 +177,7 @@ export function ItemEditor({
               ) : null}
               {item.actionType === 'open_url' ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`item-action-url-${index}`}>URL to open</Label>
+                  <Label htmlFor={`item-action-url-${index}`}>{t('checklists.url_to_open')}</Label>
                   <Input
                     id={`item-action-url-${index}`}
                     className="font-mono text-xs"
@@ -191,7 +192,7 @@ export function ItemEditor({
 
             <div className="grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor={`item-completion-${index}`}>Completes when</Label>
+                <Label htmlFor={`item-completion-${index}`}>{t('checklists.completes_when')}</Label>
                 <NativeSelect
                   id={`item-completion-${index}`}
                   className="w-full"
@@ -211,7 +212,7 @@ export function ItemEditor({
               {item.completionType === 'tour_completed' ? (
                 <TourPicker
                   id={`item-completion-tour-${index}`}
-                  label="Tour that completes it"
+                  label={t('checklists.tour_that_completes_it')}
                   value={item.completionTourId}
                   tours={tours}
                   disabled={disabled}
@@ -220,7 +221,7 @@ export function ItemEditor({
               ) : null}
               {item.completionType === 'url_visited' ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`item-completion-url-${index}`}>URL pattern</Label>
+                  <Label htmlFor={`item-completion-url-${index}`}>{t('common.url_pattern')}</Label>
                   <Input
                     id={`item-completion-url-${index}`}
                     className="font-mono text-xs"
@@ -244,7 +245,7 @@ export function ItemEditor({
           disabled={disabled || atLimit}
           onClick={() => onChange([...items, emptyItem()])}
         >
-          <Plus className="size-4" /> Add item
+          <Plus className="size-4" /> {t('checklists.add_item')}
         </Button>
         <span className="text-xs text-muted-foreground">
           {items.length} of {MAX_ITEMS} items

@@ -47,6 +47,7 @@ import {
   type ChecklistItemDraft,
   type FilterDraft,
 } from '../lib'
+import { t } from '@/i18n'
 
 function StatsStrip({ checklistId, published }: { checklistId: string; published: boolean }) {
   const stats = useChecklistStats(checklistId, published)
@@ -54,7 +55,7 @@ function StatsStrip({ checklistId, published }: { checklistId: string; published
   if (!published) {
     return (
       <Card className="p-4 text-xs text-muted-foreground">
-        Publish this checklist to start collecting completion stats.
+        {t('checklists.publish_this_checklist_to_start_collecting')}
       </Card>
     )
   }
@@ -64,7 +65,7 @@ function StatsStrip({ checklistId, published }: { checklistId: string; published
       <Card className="p-4 text-center text-xs text-muted-foreground">
         Could not load stats.{' '}
         <Button variant="link" className="px-1 text-xs" onClick={() => stats.refetch()}>
-          Retry
+          {t('common.retry')}
         </Button>
       </Card>
     )
@@ -75,17 +76,17 @@ function StatsStrip({ checklistId, published }: { checklistId: string; published
       <div className="flex flex-wrap items-center gap-6">
         <div>
           <div className="text-2xl font-semibold tabular-nums">{stats.data.starts}</div>
-          <div className="text-xs text-muted-foreground">started</div>
+          <div className="text-xs text-muted-foreground">{t('checklists.started')}</div>
         </div>
         <div>
           <div className="text-2xl font-semibold tabular-nums">{stats.data.completions}</div>
-          <div className="text-xs text-muted-foreground">completed</div>
+          <div className="text-xs text-muted-foreground">{t('common.completed')}</div>
         </div>
         <div>
           <div className="text-2xl font-semibold tabular-nums">
             {formatRate(stats.data.completion_rate)}
           </div>
-          <div className="text-xs text-muted-foreground">completion rate</div>
+          <div className="text-xs text-muted-foreground">{t('common.completion_rate_2')}</div>
         </div>
       </div>
       {stats.data.items.length > 0 ? (
@@ -193,7 +194,7 @@ export function Component() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load this checklist.{' '}
           <Button variant="link" asChild className="px-1">
-            <Link to="/checklists">Back to checklists</Link>
+            <Link to="/checklists">{t('checklists.back_to_checklists')}</Link>
           </Button>
         </Card>
       </div>
@@ -203,7 +204,7 @@ export function Component() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to checklists">
+        <Button variant="ghost" size="icon" asChild aria-label={t('checklists.back_to_checklists')}>
           <Link to="/checklists">
             <ArrowLeft className="size-4" />
           </Link>
@@ -225,7 +226,7 @@ export function Component() {
                 disabled={pause.isPending}
                 onClick={() => pause.mutate(checklist.id)}
               >
-                <PauseCircle className="size-4" /> Pause
+                <PauseCircle className="size-4" /> {t('common.pause')}
               </Button>
             ) : (
               <Button
@@ -234,13 +235,13 @@ export function Component() {
                 disabled={publish.isPending}
                 onClick={() => publish.mutate(checklist.id)}
               >
-                <PlayCircle className="size-4" /> Publish
+                <PlayCircle className="size-4" /> {t('common.publish')}
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Delete checklist"
+              aria-label={t('checklists.delete_checklist')}
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="size-4" />
@@ -257,11 +258,11 @@ export function Component() {
           <div className="grid gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Settings</CardTitle>
+                <CardTitle className="text-sm">{t('common.settings')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-name">Name</Label>
+                  <Label htmlFor="checklist-name">{t('common.name')}</Label>
                   <Input
                     id="checklist-name"
                     value={name}
@@ -270,7 +271,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-desc">Description</Label>
+                  <Label htmlFor="checklist-desc">{t('common.description')}</Label>
                   <Textarea
                     id="checklist-desc"
                     rows={2}
@@ -280,7 +281,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-launcher">Launcher label</Label>
+                  <Label htmlFor="checklist-launcher">{t('checklists.launcher_label')}</Label>
                   <Input
                     id="checklist-launcher"
                     value={launcherLabel}
@@ -289,17 +290,17 @@ export function Component() {
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="checklist-auto-open">Auto-open once</Label>
+                  <Label htmlFor="checklist-auto-open">{t('checklists.auto_open_once')}</Label>
                   <Switch
                     id="checklist-auto-open"
                     checked={autoOpenOnce}
                     disabled={!canManage}
-                    aria-label="Auto-open once"
+                    aria-label={t('checklists.auto_open_once')}
                     onCheckedChange={setAutoOpenOnce}
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-accent">Accent color</Label>
+                  <Label htmlFor="checklist-accent">{t('common.accent_color')}</Label>
                   <div className="flex items-center gap-2">
                     <input
                       id="checklist-accent"
@@ -311,7 +312,7 @@ export function Component() {
                     />
                     <Input
                       className="font-mono text-xs"
-                      aria-label="Accent hex"
+                      aria-label={t('common.accent_hex')}
                       value={accent}
                       disabled={!canManage}
                       onChange={(e) => setAccent(e.target.value)}
@@ -319,7 +320,7 @@ export function Component() {
                   </div>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-position">Position</Label>
+                  <Label htmlFor="checklist-position">{t('checklists.position')}</Label>
                   <NativeSelect
                     id="checklist-position"
                     className="w-full"
@@ -339,11 +340,11 @@ export function Component() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Targeting</CardTitle>
+                <CardTitle className="text-sm">{t('common.targeting')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-trigger">Trigger</Label>
+                  <Label htmlFor="checklist-trigger">{t('common.trigger')}</Label>
                   <NativeSelect
                     id="checklist-trigger"
                     className="w-full"
@@ -351,13 +352,13 @@ export function Component() {
                     disabled={!canManage}
                     onChange={(e) => setTriggerType(e.target.value as 'manual' | 'url_match')}
                   >
-                    <NativeSelectOption value="manual">Manual / API</NativeSelectOption>
-                    <NativeSelectOption value="url_match">On URL match</NativeSelectOption>
+                    <NativeSelectOption value="manual">{t('common.manual_api')}</NativeSelectOption>
+                    <NativeSelectOption value="url_match">{t('common.on_url_match')}</NativeSelectOption>
                   </NativeSelect>
                 </div>
                 {triggerType === 'url_match' ? (
                   <div className="grid gap-1.5">
-                    <Label htmlFor="checklist-url">URL pattern</Label>
+                    <Label htmlFor="checklist-url">{t('common.url_pattern')}</Label>
                     <Input
                       id="checklist-url"
                       className="font-mono text-xs"
@@ -378,7 +379,7 @@ export function Component() {
                 />
 
                 <div className="grid gap-1.5">
-                  <Label htmlFor="checklist-priority">Priority</Label>
+                  <Label htmlFor="checklist-priority">{t('common.priority')}</Label>
                   <Input
                     id="checklist-priority"
                     type="number"
@@ -389,7 +390,7 @@ export function Component() {
                     onChange={(e) => setPriority(Number(e.target.value))}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Higher wins when several experiences match the same page.
+                    {t('common.higher_wins_when_several_experiences_match')}
                   </p>
                 </div>
               </CardContent>
@@ -399,7 +400,7 @@ export function Component() {
           <div className="grid gap-4">
             <StatsStrip checklistId={checklist.id} published={checklist.status !== 'draft'} />
             <div>
-              <h2 className="mb-3 text-sm font-medium">Items</h2>
+              <h2 className="mb-3 text-sm font-medium">{t('checklists.items')}</h2>
               <ItemEditor
                 items={items}
                 tours={tours.data ?? []}
@@ -421,7 +422,7 @@ export function Component() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
                 await remove.mutateAsync(checklist.id)
@@ -429,7 +430,7 @@ export function Component() {
                 navigate('/checklists')
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

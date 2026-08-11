@@ -38,6 +38,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { Role } from '../api'
 import { useCreateRole, useDeleteRole, usePermissionCatalog, useRoles, useUpdateRole } from '../hooks'
 import { PermissionMatrix } from './PermissionMatrix'
+import { t } from '@/i18n'
 
 function RoleEditorDialog({
   open,
@@ -82,21 +83,21 @@ function RoleEditorDialog({
         <DialogHeader>
           <DialogTitle>{role ? 'Edit role' : 'New role'}</DialogTitle>
           <DialogDescription>
-            Custom roles grant an explicit set of permissions to their members.
+            {t('settings.custom_roles_grant_an_explicit_set')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="role-name">Name</Label>
+            <Label htmlFor="role-name">{t('common.name')}</Label>
             <Input
               id="role-name"
               value={name}
-              placeholder="e.g. Billing agent"
+              placeholder={t('settings.e_g_billing_agent')}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="role-desc">Description</Label>
+            <Label htmlFor="role-desc">{t('common.description')}</Label>
             <Textarea
               id="role-desc"
               rows={2}
@@ -105,7 +106,7 @@ function RoleEditorDialog({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label>Permissions</Label>
+            <Label>{t('settings.permissions')}</Label>
             <PermissionMatrix
               all={allPermissions}
               selected={permissions}
@@ -115,7 +116,7 @@ function RoleEditorDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!name.trim() || saving}>
             {saving ? 'Saving…' : role ? 'Save role' : 'Create role'}
@@ -150,14 +151,14 @@ export function RolesPanel() {
             setEditorOpen(true)
           }}
         >
-          <Plus className="size-4" /> New role
+          <Plus className="size-4" /> {t('settings.new_role')}
         </Button>
       </div>
 
       {catalog.data ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Built-in roles</CardTitle>
+            <CardTitle className="text-sm">{t('settings.built_in_roles')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {Object.entries(catalog.data.builtin_roles).map(([name, perms]) => (
@@ -177,9 +178,9 @@ export function RolesPanel() {
             <EmptyMedia variant="icon">
               <ShieldCheck />
             </EmptyMedia>
-            <EmptyTitle>No custom roles</EmptyTitle>
+            <EmptyTitle>{t('settings.no_custom_roles')}</EmptyTitle>
             <EmptyDescription>
-              Create a role to grant a tailored set of permissions.
+              {t('settings.create_a_role_to_grant_a')}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -189,7 +190,7 @@ export function RolesPanel() {
                 setEditorOpen(true)
               }}
             >
-              <Plus className="size-4" /> Create a role
+              <Plus className="size-4" /> {t('settings.create_a_role')}
             </Button>
           </EmptyContent>
         </Empty>
@@ -244,18 +245,18 @@ export function RolesPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              Members with this role will fall back to no permissions until reassigned.
+              {t('settings.members_with_this_role_will_fall')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

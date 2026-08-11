@@ -25,6 +25,7 @@ import { ChannelIcon, StatusBadge } from '@/features/inbox/components/atoms'
 import { RunMacroMenu } from '@/features/inbox/components/RunMacroMenu'
 import { usePatchConversation, useMembers, useTeams } from '@/features/inbox/hooks'
 import type { Conversation, Priority } from '@/features/inbox/api'
+import { t } from '@/i18n'
 
 const SNOOZE_PRESETS: { label: string; ms: number }[] = [
   { label: 'In 1 hour', ms: 60 * 60 * 1000 },
@@ -66,7 +67,7 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
             type="button"
             onClick={copyNumber}
             className="inline-flex items-center gap-1 hover:text-foreground"
-            aria-label="Copy conversation number"
+            aria-label={t('inbox.copy_conversation_number')}
           >
             #{conversation.number}
             <Copy className="size-3" />
@@ -81,7 +82,7 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
           onValueChange={(v) => patch.mutate({ priority: v as Priority })}
           disabled={!canManage}
         >
-          <SelectTrigger size="sm" aria-label="Priority" className="w-[7.5rem]">
+          <SelectTrigger size="sm" aria-label={t('common.priority')} className="w-[7.5rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -103,7 +104,7 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>Assign to</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('inbox.assign_to')}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => patch.mutate({ assignee_user_id: null })}>
               Unassigned
               {!conversation.assignee ? <Check className="ml-auto size-4" /> : null}
@@ -129,7 +130,7 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
             {teams.length ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>Team</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('inbox.team')}</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => patch.mutate({ team_id: null })}>
                   No team
                   {!conversation.team_id ? <Check className="ml-auto size-4" /> : null}
@@ -158,12 +159,12 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
         {/* Snooze */}
         <Popover>
           <PopoverTrigger asChild disabled={!canManage}>
-            <Button variant="outline" size="icon-sm" aria-label="Snooze">
+            <Button variant="outline" size="icon-sm" aria-label={t('inbox.snooze')}>
               <Clock className="size-4" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-52 space-y-1">
-            <p className="px-1 pb-1 text-xs font-medium text-muted-foreground">Snooze until</p>
+            <p className="px-1 pb-1 text-xs font-medium text-muted-foreground">{t('inbox.snooze_until')}</p>
             {SNOOZE_PRESETS.map((preset) => (
               <Button
                 key={preset.label}
@@ -180,10 +181,10 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
                 {preset.label}
               </Button>
             ))}
-            <label className="block px-1 pt-1 text-xs text-muted-foreground">Custom</label>
+            <label className="block px-1 pt-1 text-xs text-muted-foreground">{t('inbox.custom')}</label>
             <input
               type="datetime-local"
-              aria-label="Custom snooze time"
+              aria-label={t('inbox.custom_snooze_time')}
               className="w-full rounded-md border bg-transparent px-2 py-1 text-sm"
               onChange={(e) => {
                 if (!e.target.value) return
@@ -204,7 +205,7 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
             disabled={!canManage}
             onClick={() => patch.mutate({ status: 'open' })}
           >
-            Reopen
+            {t('inbox.reopen')}
           </Button>
         ) : (
           <Button
@@ -213,7 +214,7 @@ export function ThreadHeader({ conversation }: { conversation: Conversation }) {
             onClick={() => patch.mutate({ status: 'resolved' })}
           >
             <Check className="size-4" />
-            Resolve
+            {t('inbox.resolve')}
           </Button>
         )}
       </div>

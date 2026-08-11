@@ -30,13 +30,14 @@ import type { Webhook } from '../api'
 import { useDeleteWebhook, useTestWebhook, useWebhooks } from '../hooks'
 import { DeliveriesDialog } from './DeliveriesDialog'
 import { WebhookEditorDialog } from './WebhookEditorDialog'
+import { t } from '@/i18n'
 
 async function copy(text: string, label: string) {
   try {
     await navigator.clipboard.writeText(text)
     toast.success(`${label} copied`)
   } catch {
-    toast.error('Could not copy')
+    toast.error(t('common.could_not_copy'))
   }
 }
 
@@ -55,7 +56,7 @@ export function WebhooksTab() {
   if (!canManage) {
     return (
       <Card className="p-6 text-center text-sm text-muted-foreground">
-        You need the “Manage webhooks” permission to view outbound webhooks.
+        {t('automation.you_need_the_manage_webhooks_permission')}
       </Card>
     )
   }
@@ -63,7 +64,7 @@ export function WebhooksTab() {
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Send domain events to external URLs.</p>
+        <p className="text-sm text-muted-foreground">{t('automation.send_domain_events_to_external_urls')}</p>
         <Button
           size="sm"
           onClick={() => {
@@ -71,7 +72,7 @@ export function WebhooksTab() {
             setEditorOpen(true)
           }}
         >
-          <Plus className="size-4" /> New webhook
+          <Plus className="size-4" /> {t('automation.new_webhook')}
         </Button>
       </div>
 
@@ -85,7 +86,7 @@ export function WebhooksTab() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load webhooks.{' '}
           <Button variant="link" className="px-1" onClick={() => webhooks.refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Card>
       ) : !webhooks.data || webhooks.data.length === 0 ? (
@@ -94,9 +95,9 @@ export function WebhooksTab() {
             <EmptyMedia variant="icon">
               <WebhookIcon />
             </EmptyMedia>
-            <EmptyTitle>No webhooks yet</EmptyTitle>
+            <EmptyTitle>{t('automation.no_webhooks_yet')}</EmptyTitle>
             <EmptyDescription>
-              Notify external systems whenever things happen in your workspace.
+              {t('automation.notify_external_systems_whenever_things_happen')}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -106,7 +107,7 @@ export function WebhooksTab() {
                 setEditorOpen(true)
               }}
             >
-              <Plus className="size-4" /> Add a webhook
+              <Plus className="size-4" /> {t('automation.add_a_webhook')}
             </Button>
           </EmptyContent>
         </Empty>
@@ -120,9 +121,9 @@ export function WebhooksTab() {
                     <div className="flex items-center gap-2">
                       <span className="truncate font-mono text-sm">{webhook.url}</span>
                       {webhook.enabled ? (
-                        <Badge variant="secondary">Enabled</Badge>
+                        <Badge variant="secondary">{t('common.enabled')}</Badge>
                       ) : (
-                        <Badge variant="outline">Disabled</Badge>
+                        <Badge variant="outline">{t('common.disabled')}</Badge>
                       )}
                     </div>
                     {webhook.description ? (
@@ -143,15 +144,15 @@ export function WebhooksTab() {
                       disabled={test.isPending}
                       onClick={() => test.mutate(webhook.id)}
                     >
-                      <Send className="size-4" /> Test
+                      <Send className="size-4" /> {t('automation.test')}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setDeliveriesFor(webhook)}>
-                      Deliveries
+                      {t('automation.deliveries')}
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="Edit webhook"
+                      aria-label={t('automation.edit_webhook')}
                       onClick={() => {
                         setEditing(webhook)
                         setEditorOpen(true)
@@ -162,7 +163,7 @@ export function WebhooksTab() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="Delete webhook"
+                      aria-label={t('automation.delete_webhook')}
                       onClick={() => setDeleting(webhook)}
                     >
                       <Trash2 className="size-4" />
@@ -171,7 +172,7 @@ export function WebhooksTab() {
                 </div>
 
                 <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
-                  <span className="text-muted-foreground">Signing secret</span>
+                  <span className="text-muted-foreground">{t('automation.signing_secret')}</span>
                   <code className="flex-1 truncate font-mono">
                     {revealed[webhook.id] ? webhook.secret : '•'.repeat(24)}
                   </code>
@@ -194,7 +195,7 @@ export function WebhooksTab() {
                     variant="ghost"
                     size="icon"
                     className="size-7"
-                    aria-label="Copy secret"
+                    aria-label={t('automation.copy_secret')}
                     onClick={() => copy(webhook.secret, 'Secret')}
                   >
                     <Copy className="size-4" />
@@ -215,20 +216,20 @@ export function WebhooksTab() {
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this webhook?</AlertDialogTitle>
+            <AlertDialogTitle>{t('automation.delete_this_webhook')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Deliveries will stop immediately. This cannot be undone.
+              {t('automation.deliveries_will_stop_immediately_this_cannot')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth'
+import { t } from '@/i18n'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -52,13 +53,13 @@ export function Component() {
 
   return (
     <AuthCard
-      title="Welcome back"
+      title={t('auth.welcome_back')}
       subtitle="Log in to your Stept workspace"
       footer={
         <p>
           No account?{' '}
           <Link className="text-brand underline-offset-4 hover:underline" to="/signup">
-            Sign up
+            {t('auth.sign_up')}
           </Link>
         </p>
       }
@@ -72,18 +73,18 @@ export function Component() {
       <SocialLoginButtons next="/" />
       <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="you@company.com" {...form.register('email')} />
+          <Label htmlFor="email">{t('common.email')}</Label>
+          <Input id="email" type="email" placeholder={t('auth.you_company_com')} {...form.register('email')} />
           <FieldError message={form.formState.errors.email?.message} />
         </div>
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t('auth.password')}</Label>
             <Link
               to="/forgot-password"
               className="text-xs text-muted-foreground underline-offset-4 hover:underline"
             >
-              Forgot password?
+              {t('auth.forgot_password')}
             </Link>
           </div>
           <Input id="password" type="password" {...form.register('password')} />

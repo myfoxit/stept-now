@@ -15,6 +15,7 @@ import {
 import { SidebarMenuButton } from '@/components/ui/sidebar'
 import { initials } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
+import { t } from '@/i18n'
 
 function toggleTheme() {
   const dark = document.documentElement.classList.toggle('dark')
@@ -47,15 +48,15 @@ export function UserMenu() {
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start" side="top">
-        <DropdownMenuLabel>Account</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('common.account')}</DropdownMenuLabel>
         <DropdownMenuItem onClick={toggleTheme}>
           <Sun className="size-4 dark:hidden" />
           <Moon className="hidden size-4 dark:block" />
-          Toggle theme
+          {t('common.toggle_theme')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={logout}>
-          <LogOut className="size-4" /> Log out
+          <LogOut className="size-4" /> {t('common.log_out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

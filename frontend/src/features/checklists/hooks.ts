@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client'
 import { currentWorkspaceId } from '@/stores/auth'
 
 import { checklistsApi, listTourOptions, type ChecklistCreate, type ChecklistUpdate } from './api'
+import { t } from '@/i18n'
 
 const AREA = 'checklists'
 
@@ -68,7 +69,7 @@ export function useCreateChecklist() {
   return useMutation({
     mutationFn: (body: ChecklistCreate) => checklistsApi.create(body),
     onSuccess: () => {
-      toast.success('Checklist created')
+      toast.success(t('checklists.checklist_created'))
       invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create checklist')),
@@ -81,7 +82,7 @@ export function useUpdateChecklist() {
     mutationFn: ({ id, body }: { id: string; body: ChecklistUpdate }) =>
       checklistsApi.update(id, body),
     onSuccess: (checklist) => {
-      toast.success('Checklist saved')
+      toast.success(t('checklists.checklist_saved'))
       invalidate(checklist.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save checklist')),
@@ -93,7 +94,7 @@ export function useDeleteChecklist() {
   return useMutation({
     mutationFn: (id: string) => checklistsApi.remove(id),
     onSuccess: () => {
-      toast.success('Checklist deleted')
+      toast.success(t('checklists.checklist_deleted'))
       invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete checklist')),
@@ -105,7 +106,7 @@ export function usePublishChecklist() {
   return useMutation({
     mutationFn: (id: string) => checklistsApi.publish(id),
     onSuccess: (checklist) => {
-      toast.success('Checklist is live')
+      toast.success(t('checklists.checklist_is_live'))
       invalidate(checklist.id)
     },
     onError: (error) => toast.error(publishError(error, 'Could not publish checklist')),
@@ -117,7 +118,7 @@ export function usePauseChecklist() {
   return useMutation({
     mutationFn: (id: string) => checklistsApi.pause(id),
     onSuccess: (checklist) => {
-      toast.success('Checklist paused')
+      toast.success(t('checklists.checklist_paused'))
       invalidate(checklist.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not pause checklist')),

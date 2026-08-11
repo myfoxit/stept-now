@@ -9,6 +9,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { t } from '@/i18n'
 
 export function PageShell({ children }: { children: ReactNode }) {
   return <div className="flex h-full min-h-0 flex-col">{children}</div>
@@ -87,12 +88,12 @@ export function ErrorState({ onRetry }: { onRetry?: () => void }) {
         <EmptyMedia variant="icon">
           <AlertTriangle />
         </EmptyMedia>
-        <EmptyTitle>Something went wrong</EmptyTitle>
+        <EmptyTitle>{t('common.something_went_wrong')}</EmptyTitle>
         <EmptyDescription>We couldn't load this data. Please try again.</EmptyDescription>
       </EmptyHeader>
       {onRetry ? (
         <Button variant="outline" onClick={onRetry}>
-          Retry
+          {t('common.retry')}
         </Button>
       ) : null}
     </Empty>

@@ -12,6 +12,7 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 
 import { useExtensionRelease, useRecorderToken } from '../hooks'
+import { t } from '@/i18n'
 
 function formatSize(bytes: number | null | undefined): string {
   if (!bytes) return ''
@@ -97,23 +98,22 @@ export function RecorderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Record a tour with the Chrome extension</DialogTitle>
+          <DialogTitle>{t('tours.record_a_tour_with_the_chrome')}</DialogTitle>
           <DialogDescription>
-            Click through your product once — the recorder captures every step, its selectors and
-            a screenshot, then hands the draft back here to edit and publish.
+            {t('tours.click_through_your_product_once_the')}
           </DialogDescription>
         </DialogHeader>
 
         <ol className="grid min-w-0 gap-5 py-2 text-sm">
-          <Step n={1} title="Install the recorder">
+          <Step n={1} title={t('tours.install_the_recorder')}>
             {release.isPending ? (
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Spinner className="size-4" /> Checking for a build…
+                <Spinner className="size-4" /> {t('tours.checking_for_a_build')}
               </div>
             ) : webStore ? (
               <Button asChild size="sm">
                 <a href={webStore} target="_blank" rel="noreferrer">
-                  <Puzzle className="size-4" /> Add to Chrome
+                  <Puzzle className="size-4" /> {t('tours.add_to_chrome')}
                   <ExternalLink className="size-3.5 opacity-70" />
                 </a>
               </Button>
@@ -121,40 +121,40 @@ export function RecorderDialog({
               <>
                 <Button asChild size="sm">
                   <a href={info.download_url ?? undefined} download>
-                    <Download className="size-4" /> Download the extension
+                    <Download className="size-4" /> {t('tours.download_the_extension')}
                   </a>
                 </Button>
                 <p className="text-xs text-muted-foreground">
                   v{info.version} · {formatSize(info.size_bytes)} · unzip it, then load the folder
-                  at <code className="font-mono">chrome://extensions</code> with{' '}
-                  <span className="font-medium">Developer mode</span> on →{' '}
-                  <span className="font-medium">Load unpacked</span>.
+                  at <code className="font-mono">{t('tours.chrome_extensions')}</code> with{' '}
+                  <span className="font-medium">{t('tours.developer_mode')}</span> on →{' '}
+                  <span className="font-medium">{t('tours.load_unpacked')}</span>.
                 </p>
               </>
             ) : (
               <p className="text-xs text-muted-foreground">
                 No build found on the server. Run{' '}
-                <code className="font-mono">pnpm --filter @stept/extension zip</code> and reload
+                <code className="font-mono">{t('tours.pnpm_filter_stept_extension_zip')}</code> and reload
                 this dialog.
               </p>
             )}
           </Step>
 
-          <Step n={2} title="Point it at this Stept">
+          <Step n={2} title={t('tours.point_it_at_this_stept')}>
             <p className="text-xs text-muted-foreground">
               Open the Stept side panel, then sign in with your Stept email and password using this
               server address:
             </p>
             <CopyField
               value={info?.api_base ?? ''}
-              label="Copy server address"
+              label={t('tours.copy_server_address')}
               testId="recorder-api-base"
             />
           </Step>
 
-          <Step n={3} title="Record">
+          <Step n={3} title={t('tours.record')}>
             <p className="text-xs text-muted-foreground">
-              Go to where your flow starts, hit <span className="font-medium">Start recording</span>{' '}
+              {t('tours.go_to_where_your_flow_starts')} <span className="font-medium">{t('tours.start_recording')}</span>{' '}
               in the panel, click through it, then save. The draft appears in Tours.
             </p>
           </Step>
@@ -164,22 +164,22 @@ export function RecorderDialog({
             `min-width: auto` lets the unbroken JWT widen the whole dialog. */}
         <details className="group min-w-0 border-t pt-3">
           <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-            Can’t sign in from the extension? Use a paste-in token
+            {t('tours.can_t_sign_in_from_the')}
           </summary>
           <div className="mt-3 min-w-0 space-y-2">
             <p className="text-xs text-muted-foreground">
-              Paste this under <span className="font-medium">Advanced</span> on the extension’s sign
+              {t('tours.paste_this_under')} <span className="font-medium">{t('tours.advanced')}</span> on the extension’s sign
               in screen. It is workspace-scoped and expires in{' '}
               {recorder.data?.expires_days ?? 7} days.
             </p>
             {recorder.isPending ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Generating…
+                <Loader2 className="size-4 animate-spin" /> {t('tours.generating')}
               </div>
             ) : token ? (
-              <CopyField value={token} label="Copy token" testId="recorder-token" />
+              <CopyField value={token} label={t('tours.copy_token')} testId="recorder-token" />
             ) : (
-              <p className="text-xs text-destructive">Could not generate a token.</p>
+              <p className="text-xs text-destructive">{t('tours.could_not_generate_a_token')}</p>
             )}
           </div>
         </details>

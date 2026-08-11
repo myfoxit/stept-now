@@ -22,6 +22,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { t } from '@/i18n'
 
 const SOURCE_ICONS: Record<string, LucideIcon> = {
   files: Files,
@@ -43,14 +44,14 @@ export function SourceStatusBadge({ status, error }: { status: string; error?: s
   if (status === 'syncing') {
     return (
       <Badge variant="secondary" className="gap-1">
-        <Loader2 className="size-3 animate-spin" /> Syncing
+        <Loader2 className="size-3 animate-spin" /> {t('knowledge.syncing')}
       </Badge>
     )
   }
   if (status === 'error') {
     const badge = (
       <Badge variant="destructive" className="gap-1">
-        <AlertCircle className="size-3" /> Error
+        <AlertCircle className="size-3" /> {t('common.error')}
       </Badge>
     )
     if (!error) return badge
@@ -65,7 +66,7 @@ export function SourceStatusBadge({ status, error }: { status: string; error?: s
   }
   return (
     <Badge variant="outline" className="gap-1">
-      <CheckCircle2 className="size-3 text-emerald-500" /> Idle
+      <CheckCircle2 className="size-3 text-emerald-500" /> {t('knowledge.idle')}
     </Badge>
   )
 }
@@ -95,7 +96,7 @@ export function CredentialsBadge({ hasSecrets }: { hasSecrets: boolean }) {
   if (!hasSecrets) return null
   return (
     <Badge variant="outline" className="gap-1">
-      <KeyRound className="size-3" /> Credentials set
+      <KeyRound className="size-3" /> {t('knowledge.credentials_set')}
     </Badge>
   )
 }

@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { currentWorkspaceId } from '@/stores/auth'
 
 import { aiApi, aiKeys, type CustomAction } from '../api'
+import { t } from '@/i18n'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 const DEFAULT_SCHEMA = `{
@@ -113,19 +114,18 @@ export function ActionDialog({
         <DialogHeader>
           <DialogTitle>{action ? 'Edit action' : 'New custom action'}</DialogTitle>
           <DialogDescription>
-            Let the agent call an external API. Parameters are described to the model via a JSON
-            schema.
+            {t('ai.let_the_agent_call_an_external')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="action-name">Name</Label>
+              <Label htmlFor="action-name">{t('common.name')}</Label>
               <Input
                 id="action-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="lookup_order"
+                placeholder={t('ai.lookup_order')}
               />
             </div>
             <div className="grid gap-1.5">
@@ -147,12 +147,12 @@ export function ActionDialog({
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Look up the status of a customer order by id."
+              placeholder={t('ai.look_up_the_status_of_a')}
             />
           </div>
           <div className="grid grid-cols-[110px_1fr] gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="action-method">Method</Label>
+              <Label htmlFor="action-method">{t('ai.method')}</Label>
               <NativeSelect
                 id="action-method"
                 value={method}
@@ -178,10 +178,10 @@ export function ActionDialog({
           </div>
 
           <div className="grid gap-1.5">
-            <Label>Headers</Label>
+            <Label>{t('ai.headers')}</Label>
             {action ? (
               <p className="text-xs text-muted-foreground">
-                Stored values are hidden. Re-enter a value to change it.
+                {t('ai.stored_values_are_hidden_re_enter')}
               </p>
             ) : null}
             {headers.map((header, i) => (
@@ -192,7 +192,7 @@ export function ActionDialog({
                   onChange={(e) =>
                     setHeaders((prev) => prev.map((h, idx) => (idx === i ? { ...h, key: e.target.value } : h)))
                   }
-                  placeholder="Authorization"
+                  placeholder={t('ai.authorization')}
                   className="h-8"
                 />
                 <Input
@@ -222,7 +222,7 @@ export function ActionDialog({
               className="w-fit"
               onClick={() => setHeaders((prev) => [...prev, { key: '', value: '' }])}
             >
-              <Plus className="size-4" /> Add header
+              <Plus className="size-4" /> {t('ai.add_header')}
             </Button>
           </div>
 
@@ -255,7 +255,7 @@ export function ActionDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={() => mutation.mutate()}

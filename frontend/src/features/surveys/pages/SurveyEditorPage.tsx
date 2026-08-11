@@ -46,6 +46,7 @@ import {
   type FilterDraft,
   type SurveyQuestionDraft,
 } from '../lib'
+import { t } from '@/i18n'
 
 export function Component() {
   const { surveyId } = useParams<{ surveyId: string }>()
@@ -146,7 +147,7 @@ export function Component() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load this survey.{' '}
           <Button variant="link" asChild className="px-1">
-            <Link to="/surveys">Back to surveys</Link>
+            <Link to="/surveys">{t('surveys.back_to_surveys')}</Link>
           </Button>
         </Card>
       </div>
@@ -156,7 +157,7 @@ export function Component() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to surveys">
+        <Button variant="ghost" size="icon" asChild aria-label={t('surveys.back_to_surveys')}>
           <Link to="/surveys">
             <ArrowLeft className="size-4" />
           </Link>
@@ -172,7 +173,7 @@ export function Component() {
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={`/surveys/${survey.id}/results`}>
-              <BarChart3 className="size-4" /> Results
+              <BarChart3 className="size-4" /> {t('surveys.results')}
             </Link>
           </Button>
           {canManage ? (
@@ -184,7 +185,7 @@ export function Component() {
                   disabled={pause.isPending}
                   onClick={() => pause.mutate(survey.id)}
                 >
-                  <PauseCircle className="size-4" /> Pause
+                  <PauseCircle className="size-4" /> {t('common.pause')}
                 </Button>
               ) : (
                 <Button
@@ -193,13 +194,13 @@ export function Component() {
                   disabled={publish.isPending}
                   onClick={() => publish.mutate(survey.id)}
                 >
-                  <PlayCircle className="size-4" /> Publish
+                  <PlayCircle className="size-4" /> {t('common.publish')}
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Delete survey"
+                aria-label={t('surveys.delete_survey')}
                 onClick={() => setConfirmDelete(true)}
               >
                 <Trash2 className="size-4" />
@@ -217,11 +218,11 @@ export function Component() {
           <div className="grid gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Settings</CardTitle>
+                <CardTitle className="text-sm">{t('common.settings')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-name">Name</Label>
+                  <Label htmlFor="survey-name">{t('common.name')}</Label>
                   <Input
                     id="survey-name"
                     value={name}
@@ -230,7 +231,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-presentation">Presentation</Label>
+                  <Label htmlFor="survey-presentation">{t('surveys.presentation')}</Label>
                   <NativeSelect
                     id="survey-presentation"
                     className="w-full"
@@ -256,7 +257,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-accent">Accent color</Label>
+                  <Label htmlFor="survey-accent">{t('common.accent_color')}</Label>
                   <div className="flex items-center gap-2">
                     <input
                       id="survey-accent"
@@ -268,7 +269,7 @@ export function Component() {
                     />
                     <Input
                       className="font-mono text-xs"
-                      aria-label="Accent hex"
+                      aria-label={t('common.accent_hex')}
                       value={accent}
                       disabled={!canManage}
                       onChange={(e) => setAccent(e.target.value)}
@@ -280,11 +281,11 @@ export function Component() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Targeting</CardTitle>
+                <CardTitle className="text-sm">{t('common.targeting')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-trigger">Trigger</Label>
+                  <Label htmlFor="survey-trigger">{t('common.trigger')}</Label>
                   <NativeSelect
                     id="survey-trigger"
                     className="w-full"
@@ -292,13 +293,13 @@ export function Component() {
                     disabled={!canManage}
                     onChange={(e) => setTriggerType(e.target.value as 'manual' | 'url_match')}
                   >
-                    <NativeSelectOption value="manual">Manual / API</NativeSelectOption>
-                    <NativeSelectOption value="url_match">On URL match</NativeSelectOption>
+                    <NativeSelectOption value="manual">{t('common.manual_api')}</NativeSelectOption>
+                    <NativeSelectOption value="url_match">{t('common.on_url_match')}</NativeSelectOption>
                   </NativeSelect>
                 </div>
                 {triggerType === 'url_match' ? (
                   <div className="grid gap-1.5">
-                    <Label htmlFor="survey-url">URL pattern</Label>
+                    <Label htmlFor="survey-url">{t('common.url_pattern')}</Label>
                     <Input
                       id="survey-url"
                       className="font-mono text-xs"
@@ -326,7 +327,7 @@ export function Component() {
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-start">Starts</Label>
+                  <Label htmlFor="survey-start">{t('common.starts')}</Label>
                   <Input
                     id="survey-start"
                     type="datetime-local"
@@ -336,7 +337,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-end">Ends</Label>
+                  <Label htmlFor="survey-end">{t('common.ends')}</Label>
                   <Input
                     id="survey-end"
                     type="datetime-local"
@@ -345,11 +346,11 @@ export function Component() {
                     onChange={(e) => setEndAt(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave both empty to run continuously.
+                    {t('common.leave_both_empty_to_run_continuously')}
                   </p>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-frequency">Frequency</Label>
+                  <Label htmlFor="survey-frequency">{t('surveys.frequency')}</Label>
                   <NativeSelect
                     id="survey-frequency"
                     className="w-full"
@@ -379,7 +380,7 @@ export function Component() {
                   </div>
                 ) : null}
                 <div className="grid gap-1.5">
-                  <Label htmlFor="survey-priority">Priority</Label>
+                  <Label htmlFor="survey-priority">{t('common.priority')}</Label>
                   <Input
                     id="survey-priority"
                     type="number"
@@ -390,7 +391,7 @@ export function Component() {
                     onChange={(e) => setPriority(Number(e.target.value))}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Higher wins when several experiences match the same page.
+                    {t('common.higher_wins_when_several_experiences_match')}
                   </p>
                 </div>
               </CardContent>
@@ -398,7 +399,7 @@ export function Component() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-medium">Questions</h2>
+            <h2 className="mb-3 text-sm font-medium">{t('surveys.questions')}</h2>
             <QuestionEditor
               questions={questions}
               disabled={!canManage}
@@ -413,12 +414,11 @@ export function Component() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete &ldquo;{survey.name}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the survey and every response collected so far. This cannot
-              be undone.
+              {t('surveys.this_permanently_removes_the_survey_and')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
                 await remove.mutateAsync(survey.id)
@@ -426,7 +426,7 @@ export function Component() {
                 navigate('/surveys')
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

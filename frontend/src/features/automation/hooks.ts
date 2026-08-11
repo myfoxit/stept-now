@@ -16,6 +16,7 @@ import {
   type WebhookCreate,
   type WebhookUpdate,
 } from './api'
+import { t } from '@/i18n'
 
 function errMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback
@@ -42,7 +43,7 @@ export function useCreateRule() {
   return useMutation({
     mutationFn: (body: AutomationRuleCreate) => automationApi.create(body),
     onSuccess: () => {
-      toast.success('Rule created')
+      toast.success(t('automation.rule_created'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create rule')),
@@ -55,7 +56,7 @@ export function useUpdateRule() {
     mutationFn: ({ id, body }: { id: string; body: AutomationRuleUpdate }) =>
       automationApi.update(id, body),
     onSuccess: () => {
-      toast.success('Rule saved')
+      toast.success(t('automation.rule_saved'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save rule')),
@@ -76,7 +77,7 @@ export function useDeleteRule() {
   return useMutation({
     mutationFn: (id: string) => automationApi.remove(id),
     onSuccess: () => {
-      toast.success('Rule deleted')
+      toast.success(t('automation.rule_deleted'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete rule')),
@@ -131,7 +132,7 @@ export function useCreateMacro() {
   return useMutation({
     mutationFn: (body: MacroCreate) => macrosApi.create(body),
     onSuccess: () => {
-      toast.success('Macro created')
+      toast.success(t('automation.macro_created'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create macro')),
@@ -143,7 +144,7 @@ export function useUpdateMacro() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: MacroUpdate }) => macrosApi.update(id, body),
     onSuccess: () => {
-      toast.success('Macro saved')
+      toast.success(t('automation.macro_saved'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save macro')),
@@ -155,7 +156,7 @@ export function useDeleteMacro() {
   return useMutation({
     mutationFn: (id: string) => macrosApi.remove(id),
     onSuccess: () => {
-      toast.success('Macro deleted')
+      toast.success(t('automation.macro_deleted'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete macro')),
@@ -183,7 +184,7 @@ export function useCreateWebhook() {
   return useMutation({
     mutationFn: (body: WebhookCreate) => webhooksApi.create(body),
     onSuccess: () => {
-      toast.success('Webhook created')
+      toast.success(t('automation.webhook_created'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create webhook')),
@@ -195,7 +196,7 @@ export function useUpdateWebhook() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: WebhookUpdate }) => webhooksApi.update(id, body),
     onSuccess: () => {
-      toast.success('Webhook saved')
+      toast.success(t('automation.webhook_saved'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save webhook')),
@@ -207,7 +208,7 @@ export function useDeleteWebhook() {
   return useMutation({
     mutationFn: (id: string) => webhooksApi.remove(id),
     onSuccess: () => {
-      toast.success('Webhook deleted')
+      toast.success(t('automation.webhook_deleted'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete webhook')),

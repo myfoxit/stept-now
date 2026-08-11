@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { aiApi, type AgentTestResult } from '../api'
 import { RunStatusBadge } from './status'
 import { StepTrace } from './StepTrace'
+import { t } from '@/i18n'
 
 const PLACEHOLDER =
   'Ask the agent something…\n\nTip (mock provider): drive a tool with\n[[tool:search_knowledge {"query":"widget"}]]'
@@ -41,9 +42,9 @@ export function TestSandbox({ agentId }: { agentId: string }) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b p-3">
         <FlaskConical className="size-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Test sandbox</span>
+        <span className="text-sm font-medium">{t('ai.test_sandbox')}</span>
         <Badge variant="outline" className="ml-auto text-[10px]">
-          Runs saved config · no messages sent
+          {t('ai.runs_saved_config_no_messages_sent')}
         </Badge>
       </div>
 
@@ -52,7 +53,7 @@ export function TestSandbox({ agentId }: { agentId: string }) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={PLACEHOLDER}
-          aria-label="Sandbox message"
+          aria-label={t('ai.sandbox_message')}
           rows={4}
           className="text-sm"
           onKeyDown={(e) => {
@@ -89,7 +90,7 @@ export function TestSandbox({ agentId }: { agentId: string }) {
 
             {result.reply ? (
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Reply</p>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{t('common.reply')}</p>
                 <p className="whitespace-pre-wrap text-sm">{result.reply}</p>
               </div>
             ) : null}
@@ -105,7 +106,7 @@ export function TestSandbox({ agentId }: { agentId: string }) {
             ) : null}
 
             <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground">Trace</p>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">{t('ai.trace')}</p>
               <StepTrace steps={result.steps} />
             </div>
           </div>

@@ -25,6 +25,7 @@ import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
 import { knowledgeApi, knowledgeKeys, type Collection } from '../api'
 import { useArticle } from '../hooks'
 import { Markdown } from './markdown'
+import { t } from '@/i18n'
 
 export function ArticleEditor({
   articleId,
@@ -68,7 +69,7 @@ export function ArticleEditor({
       }),
     onSuccess: () => {
       invalidate()
-      toast.success('Article saved')
+      toast.success(t('knowledge.article_saved'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Save failed'),
   })
@@ -87,7 +88,7 @@ export function ArticleEditor({
     mutationFn: () => knowledgeApi.deleteArticle(articleId),
     onSuccess: () => {
       invalidate()
-      toast.success('Article deleted')
+      toast.success(t('knowledge.article_deleted'))
       onDeleted()
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Delete failed'),
@@ -139,7 +140,7 @@ export function ArticleEditor({
                 size="icon"
                 variant="ghost"
                 className="size-8 text-destructive"
-                aria-label="Delete article"
+                aria-label={t('knowledge.delete_article')}
                 onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
               >
@@ -153,7 +154,7 @@ export function ArticleEditor({
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
           <div className="grid gap-1.5">
-            <Label htmlFor="article-title">Title</Label>
+            <Label htmlFor="article-title">{t('common.title')}</Label>
             <Input
               id="article-title"
               value={title}
@@ -163,7 +164,7 @@ export function ArticleEditor({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="article-collection">Collection</Label>
+            <Label htmlFor="article-collection">{t('knowledge.collection')}</Label>
             <NativeSelect
               id="article-collection"
               value={collectionId}
@@ -171,7 +172,7 @@ export function ArticleEditor({
               disabled={!canWrite}
               className="w-full"
             >
-              <NativeSelectOption value="">Uncategorised</NativeSelectOption>
+              <NativeSelectOption value="">{t('knowledge.uncategorised')}</NativeSelectOption>
               {collections.map((c) => (
                 <NativeSelectOption key={c.id} value={c.id}>
                   {c.icon ? `${c.icon} ` : ''}
@@ -185,13 +186,13 @@ export function ArticleEditor({
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="write">
-              <PencilLine className="size-4" /> Write
+              <PencilLine className="size-4" /> {t('knowledge.write')}
             </TabsTrigger>
             <TabsTrigger value="markdown">
-              <Code2 className="size-4" /> Markdown
+              <Code2 className="size-4" /> {t('knowledge.markdown')}
             </TabsTrigger>
             <TabsTrigger value="preview">
-              <Eye className="size-4" /> Preview
+              <Eye className="size-4" /> {t('common.preview')}
             </TabsTrigger>
           </TabsList>
           {/* Both editors are mounted from the same `body` state, so switching
@@ -203,19 +204,19 @@ export function ArticleEditor({
               variant="full"
               disabled={!canWrite}
               ariaLabel="Article body"
-              placeholder="Write your article…"
+              placeholder={t('knowledge.write_your_article')}
               className="min-h-[24rem]"
             />
           </TabsContent>
           <TabsContent value="markdown" className="mt-3">
             <Textarea
-              aria-label="Article markdown"
+              aria-label={t('knowledge.article_markdown')}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={!canWrite}
               rows={18}
               className="font-mono text-sm"
-              placeholder="Write your article in markdown…"
+              placeholder={t('knowledge.write_your_article_in_markdown')}
             />
           </TabsContent>
           <TabsContent value="preview" className="mt-3">
@@ -223,7 +224,7 @@ export function ArticleEditor({
               {body.trim() ? (
                 <Markdown content={body} />
               ) : (
-                <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>
+                <p className="text-sm text-muted-foreground">{t('knowledge.nothing_to_preview_yet')}</p>
               )}
             </div>
           </TabsContent>

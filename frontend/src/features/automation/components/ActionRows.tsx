@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 import { ACTION_SPECS, ACTION_TYPES, type Option, type ParamField } from '../constants'
 import { emptyActionRow, localId, type ActionRow } from '../lib'
+import { t } from '@/i18n'
 
 export function ActionRows({
   rows,
@@ -47,7 +48,7 @@ export function ActionRows({
           >
             <div className="flex items-center gap-2">
               <NativeSelect
-                aria-label="Action"
+                aria-label={t('common.action')}
                 className="w-48"
                 value={row.type}
                 onChange={(event) => update(row.id, { type: event.target.value, params: {} })}
@@ -63,7 +64,7 @@ export function ActionRows({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Remove action"
+                aria-label={t('automation.remove_action')}
                 onClick={() => remove(row.id)}
               >
                 <X className="size-4" />
@@ -81,7 +82,7 @@ export function ActionRows({
                         value={row.params[field.key] ?? ''}
                         onChange={(event) => setParam(row.id, field.key, event.target.value)}
                       >
-                        <NativeSelectOption value="">Select…</NativeSelectOption>
+                        <NativeSelectOption value="">{t('automation.select')}</NativeSelectOption>
                         {field.options?.map((option) => (
                           <NativeSelectOption key={option.value} value={option.value}>
                             {option.label}
@@ -113,7 +114,7 @@ export function ActionRows({
       })}
       <div>
         <Button type="button" variant="outline" size="sm" onClick={add}>
-          <Plus className="size-4" /> Add action
+          <Plus className="size-4" /> {t('automation.add_action')}
         </Button>
       </div>
     </div>

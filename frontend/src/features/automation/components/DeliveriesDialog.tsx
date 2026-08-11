@@ -19,6 +19,7 @@ import { fullDateTime } from '@/lib/format'
 
 import type { Webhook } from '../api'
 import { useWebhookDeliveries } from '../hooks'
+import { t } from '@/i18n'
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'success') return 'default'
@@ -39,7 +40,7 @@ export function DeliveriesDialog({
     <Dialog open={webhook !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Recent deliveries</DialogTitle>
+          <DialogTitle>{t('automation.recent_deliveries')}</DialogTitle>
           <DialogDescription className="truncate font-mono text-xs">{webhook?.url}</DialogDescription>
         </DialogHeader>
 
@@ -51,18 +52,18 @@ export function DeliveriesDialog({
           </div>
         ) : !deliveries.data || deliveries.data.items.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No deliveries yet. Send a test to try it out.
+            {t('automation.no_deliveries_yet_send_a_test')}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Code</TableHead>
-                  <TableHead className="text-right">Attempts</TableHead>
-                  <TableHead>When</TableHead>
+                  <TableHead>{t('common.event')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="text-right">{t('automation.code')}</TableHead>
+                  <TableHead className="text-right">{t('automation.attempts')}</TableHead>
+                  <TableHead>{t('common.when')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

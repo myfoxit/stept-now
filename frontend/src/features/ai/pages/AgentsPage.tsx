@@ -13,6 +13,7 @@ import { aiApi, aiKeys } from '../api'
 import { AgentStatusBadge } from '../components/status'
 import { AiNav, ErrorState, ListSkeleton, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { useAgents } from '../hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const navigate = useNavigate()
@@ -38,12 +39,12 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="AI agents"
-        description="Autonomous agents that resolve conversations for you"
+        title={t('ai.ai_agents')}
+        description={t('ai.autonomous_agents_that_resolve_conversations_for')}
         actions={
           canManage ? (
             <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-              <Plus className="size-4" /> New agent
+              <Plus className="size-4" /> {t('ai.new_agent')}
             </Button>
           ) : null
         }
@@ -60,16 +61,15 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <Bot />
               </EmptyMedia>
-              <EmptyTitle>No agents yet</EmptyTitle>
+              <EmptyTitle>{t('ai.no_agents_yet')}</EmptyTitle>
               <EmptyDescription>
-                Build an AI agent that answers questions, cites your knowledge base and hands off to
-                your team when needed.
+                {t('ai.build_an_ai_agent_that_answers')}
               </EmptyDescription>
             </EmptyHeader>
             {canManage ? (
               <EmptyContent>
                 <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-                  <Plus className="size-4" /> Create your first agent
+                  <Plus className="size-4" /> {t('ai.create_your_first_agent')}
                 </Button>
               </EmptyContent>
             ) : null}

@@ -13,6 +13,7 @@ import { billingKeys, type Billing, type BillingPlan, type PaidPlan } from '@/fe
 import { useBilling, useOpenBillingPortal, useStartCheckout } from '@/features/billing/hooks'
 import { fullDateTime } from '@/lib/format'
 import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
+import { t } from '@/i18n'
 
 /** Display mirror of the backend PLAN_CATALOG (services/billing.py). */
 const PLANS: Array<{
@@ -77,7 +78,7 @@ function UsageMeter({ billing }: { billing: Billing }) {
   if (billing.included_ai_runs <= 0) {
     return (
       <Card className="p-4">
-        <p className="text-sm font-medium">AI usage</p>
+        <p className="text-sm font-medium">{t('settings.ai_usage')}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {billing.ai_runs_this_period} AI runs this month — no runs are included on the Free plan.
           Upgrade to add a monthly allowance.
@@ -89,7 +90,7 @@ function UsageMeter({ billing }: { billing: Billing }) {
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">AI usage</span>
+        <span className="font-medium">{t('settings.ai_usage')}</span>
         <span className="text-muted-foreground">
           {billing.ai_runs_this_period} / {billing.included_ai_runs} AI runs this month
         </span>
@@ -116,7 +117,7 @@ export function BillingPanel() {
   useEffect(() => {
     if (!checkoutResult) return
     if (checkoutResult === 'success') {
-      toast.success('Subscription updated')
+      toast.success(t('settings.subscription_updated'))
       void queryClient.invalidateQueries({ queryKey: billingKeys.all(currentWorkspaceId()) })
     } else if (checkoutResult === 'canceled') {
       toast('Checkout canceled — nothing changed')
@@ -142,7 +143,7 @@ export function BillingPanel() {
       <Card className="p-6 text-center text-sm text-muted-foreground">
         Could not load billing.{' '}
         <Button variant="link" className="px-1" onClick={() => billing.refetch()}>
-          Retry
+          {t('common.retry')}
         </Button>
       </Card>
     )
@@ -155,10 +156,9 @@ export function BillingPanel() {
       <Card className="flex flex-row items-start gap-3 p-6">
         <CreditCard className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <div>
-          <p className="font-medium">Billing is not enabled on this instance</p>
+          <p className="font-medium">{t('settings.billing_is_not_enabled_on_this')}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Self-hosted Stept includes every feature with no seat limits. Billing only applies on
-            managed Stept Cloud.
+            {t('settings.self_hosted_stept_includes_every_feature')}
           </p>
         </div>
       </Card>
@@ -169,7 +169,7 @@ export function BillingPanel() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Your plan, seats and AI usage for this workspace.
+          {t('settings.your_plan_seats_and_ai_usage')}
         </p>
         {canManage && data.plan !== 'free' ? (
           <Button
@@ -194,7 +194,7 @@ export function BillingPanel() {
             <Card key={plan.key} className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{plan.name}</span>
-                {isCurrent ? <Badge variant="secondary">Current plan</Badge> : null}
+                {isCurrent ? <Badge variant="secondary">{t('settings.current_plan')}</Badge> : null}
               </div>
               <p>
                 <span className="text-2xl font-semibold">{plan.price}</span>{' '}
@@ -224,8 +224,7 @@ export function BillingPanel() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Plan changes and cancellation are handled securely by Stripe. Downgrades take effect at the
-        end of the billing period.
+        {t('settings.plan_changes_and_cancellation_are_handled')}
       </p>
     </div>
   )

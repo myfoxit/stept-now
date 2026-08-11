@@ -14,6 +14,7 @@ import { BreakdownTable } from '@/features/reports/components/BreakdownTable'
 import { SlaAttainmentTable } from '@/features/reports/components/SlaAttainmentTable'
 import { useReportOverview } from '../hooks'
 import { DAY_RANGES } from '../lib'
+import { t } from '@/i18n'
 
 export function Component() {
   const canRead = useHasPerm('reports:read')
@@ -24,7 +25,7 @@ export function Component() {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <Card className="p-6 text-center text-sm text-muted-foreground">
-          You don’t have access to reports.
+          {t('reports.you_don_t_have_access_to')}
         </Card>
       </div>
     )
@@ -34,13 +35,13 @@ export function Component() {
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex items-center justify-between gap-4 border-b px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold">Reports</h1>
+          <h1 className="text-lg font-semibold">{t('reports.reports')}</h1>
           <p className="text-sm text-muted-foreground">
-            Volume, responsiveness, satisfaction and AI performance.
+            {t('reports.volume_responsiveness_satisfaction_and_ai_performance')}
           </p>
         </div>
         <NativeSelect
-          aria-label="Date range"
+          aria-label={t('common.date_range')}
           className="w-40"
           value={String(days)}
           onChange={(e) => setDays(Number(e.target.value))}
@@ -72,7 +73,7 @@ export function Component() {
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Could not load reports.{' '}
               <Button variant="link" className="px-1" onClick={() => overview.refetch()}>
-                Retry
+                {t('common.retry')}
               </Button>
             </Card>
           ) : overview.data ? (

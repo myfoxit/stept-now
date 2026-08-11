@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner'
 
 import { usePreviewToken } from '../hooks'
 import { previewLink } from '../lib'
+import { t } from '@/i18n'
 
 /**
  * Mints a one-hour, single-tour preview token and hands the author the hash
@@ -32,10 +33,10 @@ export function PreviewLinkCard({
       try {
         await navigator.clipboard.writeText(url)
         setCopied(true)
-        toast.success('Preview link copied')
+        toast.success(t('tours.preview_link_copied'))
         setTimeout(() => setCopied(false), 2000)
       } catch {
-        toast.message('Preview link ready — copy it below')
+        toast.message(t('tours.preview_link_ready_copy_it_below'))
       }
     } catch {
       /* toast handled in the hook */
@@ -45,7 +46,7 @@ export function PreviewLinkCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Preview on your site</CardTitle>
+        <CardTitle className="text-sm">{t('tours.preview_on_your_site')}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-2">
         <Button
@@ -74,7 +75,7 @@ export function PreviewLinkCard({
           </code>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          Append that <code className="font-mono">#stept-preview=…</code> hash to any page of your
+          {t('tours.append_that')} <code className="font-mono">#stept-preview=…</code> hash to any page of your
           site that loads the Stept widget: the tour plays immediately, even as a draft. The link
           works for one hour.
         </p>

@@ -30,6 +30,7 @@ import {
   useFilterPreview,
   useSavedViews,
 } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 export function ViewsBar({
   activeViewId,
@@ -54,7 +55,7 @@ export function ViewsBar({
             : 'text-muted-foreground hover:bg-accent'
         )}
       >
-        All
+        {t('inbox.all')}
       </button>
       {views.map((view) => (
         <span key={view.id} className="group relative flex items-center">
@@ -91,7 +92,7 @@ export function ViewsBar({
         onClick={() => setDialogOpen(true)}
       >
         <BookmarkPlus className="mr-1 size-3.5" />
-        New view
+        {t('inbox.new_view')}
       </Button>
 
       <SaveViewDialog open={dialogOpen} onOpenChange={setDialogOpen} onSaved={onSelect} />
@@ -145,18 +146,18 @@ export function SaveViewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>New view</DialogTitle>
+          <DialogTitle>{t('inbox.new_view')}</DialogTitle>
           <DialogDescription>
-            Save a filter so you can come back to this queue in one click.
+            {t('inbox.save_a_filter_so_you_can')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="view-name">Name</Label>
+            <Label htmlFor="view-name">{t('common.name')}</Label>
             <Input
               id="view-name"
-              placeholder="e.g. Unassigned VIP"
+              placeholder={t('inbox.e_g_unassigned_vip')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -172,7 +173,7 @@ export function SaveViewDialog({
                 checked={shared}
                 onChange={(e) => setShared(e.target.checked)}
               />
-              Share with the whole workspace
+              {t('inbox.share_with_the_whole_workspace')}
             </label>
           ) : null}
 
@@ -189,10 +190,10 @@ export function SaveViewDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!name.trim() || create.isPending}>
-            Save view
+            {t('inbox.save_view')}
           </Button>
         </DialogFooter>
       </DialogContent>

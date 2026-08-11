@@ -12,6 +12,7 @@ import {
 
 import type { TourDayStat } from '../api'
 import { byDaySeries, isEmptySeries, shortDay } from '../lib'
+import { t } from '@/i18n'
 
 // Categorical slots 1 (blue) + 3 (aqua) from the validated dataviz palette,
 // stepped per mode — same two series colors the reports dashboard uses.
@@ -26,12 +27,12 @@ export function TourByDayChart({ data }: { data: TourDayStat[] | undefined }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Starts vs completions</CardTitle>
+        <CardTitle className="text-sm">{t('tours.starts_vs_completions')}</CardTitle>
       </CardHeader>
       <CardContent>
         {isEmptySeries(data) ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
-            No activity in the last 30 days.
+            {t('tours.no_activity_in_the_last_30')}
           </p>
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">

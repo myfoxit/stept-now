@@ -10,6 +10,7 @@ import {
 
 import type { AnalyticsQueriesPerDay } from '../api'
 import { shortDay } from '../lib'
+import { t } from '@/i18n'
 
 // Categorical slot 1 (blue) from the validated dataviz palette, stepped per mode.
 // Single series ⇒ no legend box — the card title names it (dataviz).
@@ -21,11 +22,11 @@ export function QueryVolumeChart({ data }: { data: AnalyticsQueriesPerDay[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Queries over time</CardTitle>
+        <CardTitle className="text-sm">{t('knowledge.queries_over_time')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No data for this range.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">{t('common.no_data_for_this_range')}</p>
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
             <AreaChart data={data} margin={{ left: 4, right: 12, top: 8 }}>

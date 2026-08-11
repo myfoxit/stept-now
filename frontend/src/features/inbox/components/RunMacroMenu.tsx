@@ -14,6 +14,7 @@ import {
 import { useHasPerm } from '@/stores/auth'
 
 import { useRunMacro, useRunnableMacros } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 export function RunMacroMenu({ conversationId }: { conversationId: string }) {
   const canManage = useHasPerm('conversations:manage')
@@ -26,18 +27,18 @@ export function RunMacroMenu({ conversationId }: { conversationId: string }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={run.isPending} aria-label="Run macro">
+        <Button variant="outline" size="sm" disabled={run.isPending} aria-label={t('inbox.run_macro')}>
           <Wand2 className="size-4" />
-          Macro
+          {t('inbox.macro')}
           <ChevronDown className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Run macro</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('inbox.run_macro')}</DropdownMenuLabel>
         {macros.isLoading ? (
-          <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
+          <DropdownMenuItem disabled>{t('inbox.loading')}</DropdownMenuItem>
         ) : !macros.data || macros.data.length === 0 ? (
-          <DropdownMenuItem disabled>No macros yet</DropdownMenuItem>
+          <DropdownMenuItem disabled>{t('common.no_macros_yet')}</DropdownMenuItem>
         ) : (
           macros.data.map((macro) => (
             <DropdownMenuItem key={macro.id} onClick={() => run.mutate(macro.id)}>

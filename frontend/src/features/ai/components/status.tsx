@@ -6,23 +6,24 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 import type { ProviderKind } from '../api'
+import { t } from '@/i18n'
 
 export function AgentStatusBadge({ status }: { status: string }) {
   if (status === 'live') {
     return (
       <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600/90">
-        <span className="size-1.5 rounded-full bg-white" /> Live
+        <span className="size-1.5 rounded-full bg-white" /> {t('ai.live')}
       </Badge>
     )
   }
   if (status === 'off') {
     return (
       <Badge variant="outline" className="text-muted-foreground">
-        Off
+        {t('common.off')}
       </Badge>
     )
   }
-  return <Badge variant="secondary">Draft</Badge>
+  return <Badge variant="secondary">{t('common.draft')}</Badge>
 }
 
 const RUN_STATUS: Record<string, { label: string; className: string; spin?: boolean }> = {

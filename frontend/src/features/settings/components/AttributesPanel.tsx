@@ -44,6 +44,7 @@ import {
   useDeleteAttribute,
   useUpdateAttribute,
 } from '@/features/settings/hooks'
+import { t } from '@/i18n'
 
 const TYPES = ['text', 'number', 'currency', 'percent', 'link', 'date', 'list', 'checkbox'] as const
 
@@ -64,7 +65,7 @@ export function AttributesPanel() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Select value={model} onValueChange={setModel}>
-          <SelectTrigger className="w-40" aria-label="Attribute model">
+          <SelectTrigger className="w-40" aria-label={t('settings.attribute_model')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -85,7 +86,7 @@ export function AttributesPanel() {
             }}
           >
             <Plus className="mr-1 size-4" />
-            New attribute
+            {t('settings.new_attribute')}
           </Button>
         ) : null}
       </div>
@@ -94,16 +95,15 @@ export function AttributesPanel() {
         <Skeleton className="h-40 w-full" />
       ) : definitions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No typed attributes yet. Free-form values keep working — a definition just adds a label,
-          validation and filter operators.
+          {t('settings.no_typed_attributes_yet_free_form')}
         </p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Key</TableHead>
-              <TableHead>Type</TableHead>
+              <TableHead>{t('common.name')}</TableHead>
+              <TableHead>{t('settings.key')}</TableHead>
+              <TableHead>{t('common.type')}</TableHead>
               <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
@@ -236,29 +236,29 @@ function AttributeDialog({
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="attr-name">Display name</Label>
+            <Label htmlFor="attr-name">{t('common.display_name')}</Label>
             <Input
               id="attr-name"
-              placeholder="e.g. Monthly revenue"
+              placeholder={t('settings.e_g_monthly_revenue')}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="attr-key">Key</Label>
+            <Label htmlFor="attr-key">{t('settings.key')}</Label>
             <Input
               id="attr-key"
-              placeholder="mrr"
+              placeholder={t('settings.mrr')}
               value={key}
               disabled={!!definition}
               onChange={(e) => setKey(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Lowercase letters, digits and underscores.
+              {t('settings.lowercase_letters_digits_and_underscores')}
             </p>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="attr-type">Type</Label>
+            <Label htmlFor="attr-type">{t('common.type')}</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger id="attr-type">
                 <SelectValue />
@@ -274,15 +274,15 @@ function AttributeDialog({
           </div>
           {type === 'list' ? (
             <div className="grid gap-1.5">
-              <Label htmlFor="attr-options">Options</Label>
+              <Label htmlFor="attr-options">{t('common.options')}</Label>
               <Input
                 id="attr-options"
-                placeholder="free, pro, enterprise"
+                placeholder={t('settings.free_pro_enterprise')}
                 value={options}
                 onChange={(e) => setOptions(e.target.value)}
               />
               {needsOptions ? (
-                <p className="text-xs text-destructive">A list attribute needs an option.</p>
+                <p className="text-xs text-destructive">{t('settings.a_list_attribute_needs_an_option')}</p>
               ) : null}
             </div>
           ) : null}
@@ -298,10 +298,10 @@ function AttributeDialog({
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="attr-cue">Hint shown when it fails</Label>
+                <Label htmlFor="attr-cue">{t('settings.hint_shown_when_it_fails')}</Label>
                 <Input
                   id="attr-cue"
-                  placeholder="Use the format ACME-123"
+                  placeholder={t('settings.use_the_format_acme_123')}
                   value={cue}
                   onChange={(e) => setCue(e.target.value)}
                 />
@@ -312,10 +312,10 @@ function AttributeDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!canSave || create.isPending || update.isPending}>
-            Save
+            {t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

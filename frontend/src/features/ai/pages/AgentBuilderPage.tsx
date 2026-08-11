@@ -26,6 +26,7 @@ import { TestSandbox } from '../components/TestSandbox'
 import { ToolPolicyMatrix, type PolicyRow } from '../components/ToolPolicyMatrix'
 import { useActions, useAgent, useModelsFlat } from '../hooks'
 import { BUILTIN_TOOLS, DEFAULT_ACTION_POLICY } from '../tools'
+import { t } from '@/i18n'
 
 export function Component() {
   const { agentId = '' } = useParams()
@@ -141,7 +142,7 @@ export function Component() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: aiKeys.agent(workspaceId, agentId) })
       queryClient.invalidateQueries({ queryKey: aiKeys.agents(workspaceId) })
-      toast.success('Agent saved')
+      toast.success(t('ai.agent_saved'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Save failed'),
   })
@@ -169,9 +170,9 @@ export function Component() {
     <PageShell>
       <PageHeader
         title={name || 'Agent'}
-        description="Configure behaviour, tools and guardrails"
+        description={t('ai.configure_behaviour_tools_and_guardrails')}
         back={
-          <Button variant="ghost" size="icon" asChild aria-label="Back to agents">
+          <Button variant="ghost" size="icon" asChild aria-label={t('ai.back_to_agents')}>
             <Link to="/ai/agents">
               <ArrowLeft className="size-4" />
             </Link>
@@ -183,12 +184,12 @@ export function Component() {
               <NativeSelect
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                aria-label="Agent status"
+                aria-label={t('ai.agent_status')}
                 size="sm"
               >
-                <NativeSelectOption value="draft">Draft</NativeSelectOption>
-                <NativeSelectOption value="live">Live</NativeSelectOption>
-                <NativeSelectOption value="off">Off</NativeSelectOption>
+                <NativeSelectOption value="draft">{t('common.draft')}</NativeSelectOption>
+                <NativeSelectOption value="live">{t('ai.live')}</NativeSelectOption>
+                <NativeSelectOption value="off">{t('common.off')}</NativeSelectOption>
               </NativeSelect>
               <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? (
@@ -209,12 +210,12 @@ export function Component() {
             {/* Identity */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Identity</CardTitle>
+                <CardTitle className="text-sm">{t('ai.identity')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid grid-cols-[80px_1fr] gap-3">
                   <div className="grid gap-1.5">
-                    <Label htmlFor="agent-avatar">Avatar</Label>
+                    <Label htmlFor="agent-avatar">{t('ai.avatar')}</Label>
                     <Input
                       id="agent-avatar"
                       value={avatar}
@@ -225,7 +226,7 @@ export function Component() {
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="agent-name">Name</Label>
+                    <Label htmlFor="agent-name">{t('common.name')}</Label>
                     <Input
                       id="agent-name"
                       value={name}
@@ -235,12 +236,12 @@ export function Component() {
                   </div>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="agent-desc">Description</Label>
+                  <Label htmlFor="agent-desc">{t('common.description')}</Label>
                   <Input
                     id="agent-desc"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What this agent does"
+                    placeholder={t('ai.what_this_agent_does')}
                     disabled={!canManage}
                   />
                 </div>
@@ -250,11 +251,11 @@ export function Component() {
             {/* Model */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Model</CardTitle>
+                <CardTitle className="text-sm">{t('ai.model')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="agent-model">Model</Label>
+                  <Label htmlFor="agent-model">{t('ai.model')}</Label>
                   <NativeSelect
                     id="agent-model"
                     value={modelRef}
@@ -262,7 +263,7 @@ export function Component() {
                     className="w-full"
                     disabled={!canManage}
                   >
-                    <NativeSelectOption value="">Workspace default</NativeSelectOption>
+                    <NativeSelectOption value="">{t('common.workspace_default')}</NativeSelectOption>
                     {chatModels.map((m) => (
                       <NativeSelectOption
                         key={`${m.provider_id}:${m.model_key}`}
@@ -275,7 +276,7 @@ export function Component() {
                 </div>
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="agent-temp-toggle">Override temperature</Label>
+                    <Label htmlFor="agent-temp-toggle">{t('ai.override_temperature')}</Label>
                     <Switch
                       id="agent-temp-toggle"
                       checked={tempEnabled}
@@ -306,16 +307,16 @@ export function Component() {
             {/* System prompt */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">System prompt</CardTitle>
+                <CardTitle className="text-sm">{t('ai.system_prompt')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Textarea
-                  aria-label="System prompt"
+                  aria-label={t('ai.system_prompt')}
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   rows={7}
                   disabled={!canManage}
-                  placeholder="You are a friendly support agent for Acme…"
+                  placeholder={t('ai.you_are_a_friendly_support_agent')}
                   className="text-sm"
                 />
               </CardContent>
@@ -324,11 +325,11 @@ export function Component() {
             {/* Retrieval */}
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm">Knowledge retrieval</CardTitle>
+                <CardTitle className="text-sm">{t('ai.knowledge_retrieval')}</CardTitle>
                 <Switch
                   checked={retrievalEnabled}
                   onCheckedChange={setRetrievalEnabled}
-                  aria-label="Enable retrieval"
+                  aria-label={t('ai.enable_retrieval')}
                   disabled={!canManage}
                 />
               </CardHeader>
@@ -349,7 +350,7 @@ export function Component() {
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>Scope to sources</Label>
+                    <Label>{t('ai.scope_to_sources')}</Label>
                     <p className="text-xs text-muted-foreground">
                       {sourceIds == null ? 'Searching all sources' : `${sourceIds.length} selected`}
                     </p>
@@ -387,16 +388,15 @@ export function Component() {
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
                 <div>
-                  <CardTitle className="text-sm">In-app guidance</CardTitle>
+                  <CardTitle className="text-sm">{t('ai.in_app_guidance')}</CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    Let this agent see the page the visitor is on, play a tour, or point at the
-                    right control.
+                    {t('ai.let_this_agent_see_the_page')}
                   </p>
                 </div>
                 <Switch
                   checked={pageControl}
                   onCheckedChange={setPageControl}
-                  aria-label="Enable in-app guidance"
+                  aria-label={t('ai.enable_in_app_guidance')}
                   disabled={!canManage}
                 />
               </CardHeader>
@@ -404,7 +404,7 @@ export function Component() {
                 <CardContent className="grid gap-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="grid gap-1">
-                      <Label htmlFor="allow-page-actions">Let it act on the page</Label>
+                      <Label htmlFor="allow-page-actions">{t('ai.let_it_act_on_the_page')}</Label>
                       <p className="text-xs text-muted-foreground">
                         Click, type and navigate on the visitor&rsquo;s behalf. Each visitor still
                         has to allow it in their own conversation, and password fields are never
@@ -415,12 +415,12 @@ export function Component() {
                       id="allow-page-actions"
                       checked={allowPageActions}
                       onCheckedChange={setAllowPageActions}
-                      aria-label="Allow page actions"
+                      aria-label={t('ai.allow_page_actions')}
                       disabled={!canManage}
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Add <code>data-stept-no-ai</code> to any element on your site to fence it off
+                    {t('common.add')} <code>data-stept-no-ai</code> to any element on your site to fence it off
                     from the assistant.
                   </p>
                 </CardContent>
@@ -431,9 +431,9 @@ export function Component() {
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
                 <div>
-                  <CardTitle className="text-sm">Client actions</CardTitle>
+                  <CardTitle className="text-sm">{t('ai.client_actions')}</CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    Functions your site registers with <code>Stept(&apos;action&apos;, …)</code>{' '}
+                    {t('ai.functions_your_site_registers_with')} <code>Stept(&apos;action&apos;, …)</code>{' '}
                     become tools this agent can run in the visitor&rsquo;s browser. Each action
                     decides whether the visitor confirms first or your team approves.
                   </p>
@@ -441,7 +441,7 @@ export function Component() {
                 <Switch
                   checked={clientActionsEnabled}
                   onCheckedChange={setClientActionsEnabled}
-                  aria-label="Enable client actions"
+                  aria-label={t('ai.enable_client_actions')}
                   disabled={!canManage}
                 />
               </CardHeader>
@@ -469,12 +469,12 @@ export function Component() {
             {/* Guardrails */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Guardrails</CardTitle>
+                <CardTitle className="text-sm">{t('ai.guardrails')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between">
-                    <Label>Max tool calls per run</Label>
+                    <Label>{t('ai.max_tool_calls_per_run')}</Label>
                     <span className="text-sm tabular-nums text-muted-foreground">{maxToolCalls}</span>
                   </div>
                   <Slider
@@ -488,9 +488,9 @@ export function Component() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label htmlFor="require-citations">Require citations</Label>
+                    <Label htmlFor="require-citations">{t('ai.require_citations')}</Label>
                     <p className="text-xs text-muted-foreground">
-                      Replies must cite retrieved sources.
+                      {t('ai.replies_must_cite_retrieved_sources')}
                     </p>
                   </div>
                   <Switch
@@ -501,14 +501,14 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="handoff-message">Handoff message</Label>
+                  <Label htmlFor="handoff-message">{t('ai.handoff_message')}</Label>
                   <Textarea
                     id="handoff-message"
                     rows={2}
                     value={handoffMessage}
                     onChange={(e) => setHandoffMessage(e.target.value)}
                     disabled={!canManage}
-                    placeholder="Let me connect you with a teammate who can help."
+                    placeholder={t('ai.let_me_connect_you_with_a')}
                   />
                 </div>
               </CardContent>

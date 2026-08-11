@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { initials } from '@/lib/format'
+import { t } from '@/i18n'
 
 const CHANNEL_ICONS: Record<string, LucideIcon> = {
   widget: MessageSquare,
@@ -52,7 +53,7 @@ export function ContactAvatar({
       {online ? (
         <span
           className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-emerald-500"
-          aria-label="online"
+          aria-label={t('inbox.online')}
         />
       ) : null}
     </span>

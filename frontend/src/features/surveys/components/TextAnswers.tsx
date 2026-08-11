@@ -7,6 +7,7 @@ import { fullDateTime } from '@/lib/format'
 
 import type { SurveyQuestion } from '../api'
 import { useSurveyResponses } from '../hooks'
+import { t } from '@/i18n'
 
 const PAGE_SIZE = 10
 
@@ -43,7 +44,7 @@ export function TextAnswers({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Written feedback</CardTitle>
+        <CardTitle className="text-sm">{t('surveys.written_feedback')}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
         {page.isLoading ? (
@@ -55,7 +56,7 @@ export function TextAnswers({
           <p className="py-4 text-center text-sm text-muted-foreground">
             Could not load responses.{' '}
             <Button variant="link" className="px-1" onClick={() => page.refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           </p>
         ) : entries.length === 0 ? (
@@ -90,7 +91,7 @@ export function TextAnswers({
                 disabled={offset === 0 || page.isFetching}
                 onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 variant="outline"
@@ -98,7 +99,7 @@ export function TextAnswers({
                 disabled={offset + PAGE_SIZE >= total || page.isFetching}
                 onClick={() => setOffset(offset + PAGE_SIZE)}
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
           </div>

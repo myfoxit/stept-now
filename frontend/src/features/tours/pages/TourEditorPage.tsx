@@ -63,6 +63,7 @@ import {
   type TourDraft,
   type TourMode,
 } from '../lib'
+import { t } from '@/i18n'
 
 function SettingSwitch({
   id,
@@ -122,7 +123,7 @@ export function Component() {
   async function save() {
     if (!tourId || !draft) return
     if (!draft.name.trim()) {
-      toast.error('The tour needs a name')
+      toast.error(t('tours.the_tour_needs_a_name'))
       return
     }
     const problem = validateSteps(steps)
@@ -153,7 +154,7 @@ export function Component() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load this tour.{' '}
           <Button variant="link" asChild className="px-1">
-            <Link to="/tours">Back to tours</Link>
+            <Link to="/tours">{t('tours.back_to_tours')}</Link>
           </Button>
         </Card>
       </div>
@@ -168,7 +169,7 @@ export function Component() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to tours">
+        <Button variant="ghost" size="icon" asChild aria-label={t('tours.back_to_tours')}>
           <Link to="/tours">
             <ArrowLeft className="size-4" />
           </Link>
@@ -186,16 +187,16 @@ export function Component() {
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={`/tours/${tour.id}/analytics`}>
-              <BarChart3 className="size-4" /> Analytics
+              <BarChart3 className="size-4" /> {t('tours.analytics')}
             </Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => setSandboxOpen(true)}>
-            <MonitorPlay className="size-4" /> Sandbox
+            <MonitorPlay className="size-4" /> {t('tours.sandbox')}
           </Button>
           {canManage ? (
             <>
               <Button variant="outline" size="sm" onClick={() => setRecorderOpen(true)}>
-                <Radio className="size-4" /> Connect recorder
+                <Radio className="size-4" /> {t('tours.connect_recorder')}
               </Button>
               {tour.status === 'live' ? (
                 <Button
@@ -204,7 +205,7 @@ export function Component() {
                   disabled={pause.isPending}
                   onClick={() => pause.mutate(tour.id)}
                 >
-                  <PauseCircle className="size-4" /> Pause
+                  <PauseCircle className="size-4" /> {t('common.pause')}
                 </Button>
               ) : (
                 <Button
@@ -213,13 +214,13 @@ export function Component() {
                   disabled={publish.isPending}
                   onClick={() => publish.mutate(tour.id)}
                 >
-                  <PlayCircle className="size-4" /> Publish
+                  <PlayCircle className="size-4" /> {t('common.publish')}
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Delete tour"
+                aria-label={t('tours.delete_tour')}
                 onClick={() => setConfirmDelete(true)}
               >
                 <Trash2 className="size-4" />
@@ -237,11 +238,11 @@ export function Component() {
           <div className="grid content-start gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Settings</CardTitle>
+                <CardTitle className="text-sm">{t('common.settings')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="tour-name">Name</Label>
+                  <Label htmlFor="tour-name">{t('common.name')}</Label>
                   <Input
                     id="tour-name"
                     value={draft.name}
@@ -250,7 +251,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="tour-desc">Description</Label>
+                  <Label htmlFor="tour-desc">{t('common.description')}</Label>
                   <Textarea
                     id="tour-desc"
                     rows={2}
@@ -260,7 +261,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="tour-kind">Kind</Label>
+                  <Label htmlFor="tour-kind">{t('tours.kind')}</Label>
                   <NativeSelect
                     id="tour-kind"
                     className="w-full"
@@ -276,7 +277,7 @@ export function Component() {
                   </NativeSelect>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="tour-trigger">Trigger</Label>
+                  <Label htmlFor="tour-trigger">{t('common.trigger')}</Label>
                   <NativeSelect
                     id="tour-trigger"
                     className="w-full"
@@ -286,13 +287,13 @@ export function Component() {
                       patch({ triggerType: e.target.value as 'manual' | 'url_match' })
                     }
                   >
-                    <NativeSelectOption value="manual">Manual / API</NativeSelectOption>
-                    <NativeSelectOption value="url_match">On URL match</NativeSelectOption>
+                    <NativeSelectOption value="manual">{t('common.manual_api')}</NativeSelectOption>
+                    <NativeSelectOption value="url_match">{t('common.on_url_match')}</NativeSelectOption>
                   </NativeSelect>
                 </div>
                 {draft.triggerType === 'url_match' ? (
                   <div className="grid gap-1.5">
-                    <Label htmlFor="tour-url">URL pattern</Label>
+                    <Label htmlFor="tour-url">{t('common.url_pattern')}</Label>
                     <Input
                       id="tour-url"
                       className="font-mono text-xs"
@@ -304,7 +305,7 @@ export function Component() {
                   </div>
                 ) : null}
                 <div className="grid gap-1.5">
-                  <Label htmlFor="tour-accent">Accent color</Label>
+                  <Label htmlFor="tour-accent">{t('common.accent_color')}</Label>
                   <div className="flex items-center gap-2">
                     <input
                       id="tour-accent"
@@ -315,7 +316,7 @@ export function Component() {
                       onChange={(e) => patch({ accent: e.target.value })}
                     />
                     <Input
-                      aria-label="Accent hex"
+                      aria-label={t('common.accent_hex')}
                       className="font-mono text-xs"
                       value={draft.accent}
                       disabled={!canManage}
@@ -329,7 +330,7 @@ export function Component() {
             {showsBanner ? (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Banner design</CardTitle>
+                  <CardTitle className="text-sm">{t('tours.banner_design')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <BannerDesigner draft={draft} disabled={!canManage} onChange={patch} />
@@ -339,7 +340,7 @@ export function Component() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Audience</CardTitle>
+                <CardTitle className="text-sm">{t('common.audience')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <AudienceEditor
@@ -354,11 +355,11 @@ export function Component() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Scheduling</CardTitle>
+                <CardTitle className="text-sm">{t('tours.scheduling')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="start-at">Starts</Label>
+                  <Label htmlFor="start-at">{t('common.starts')}</Label>
                   <Input
                     id="start-at"
                     type="datetime-local"
@@ -368,7 +369,7 @@ export function Component() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="end-at">Ends</Label>
+                  <Label htmlFor="end-at">{t('common.ends')}</Label>
                   <Input
                     id="end-at"
                     type="datetime-local"
@@ -377,11 +378,11 @@ export function Component() {
                     onChange={(e) => patch({ endAt: e.target.value })}
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Leave both empty to run continuously.
+                    {t('common.leave_both_empty_to_run_continuously')}
                   </p>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="frequency">Show it</Label>
+                  <Label htmlFor="frequency">{t('tours.show_it')}</Label>
                   <NativeSelect
                     id="frequency"
                     className="w-full"
@@ -403,7 +404,7 @@ export function Component() {
                       id="cooldown"
                       type="number"
                       min={1}
-                      placeholder="No cooldown"
+                      placeholder={t('tours.no_cooldown')}
                       value={draft.cooldownHours}
                       disabled={!canManage}
                       onChange={(e) => patch({ cooldownHours: e.target.value })}
@@ -411,7 +412,7 @@ export function Component() {
                   </div>
                 ) : null}
                 <div className="grid gap-1.5">
-                  <Label htmlFor="priority">Priority</Label>
+                  <Label htmlFor="priority">{t('common.priority')}</Label>
                   <Input
                     id="priority"
                     type="number"
@@ -420,7 +421,7 @@ export function Component() {
                     onChange={(e) => patch({ priority: e.target.value })}
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Higher wins when several experiences match the same page.
+                    {t('common.higher_wins_when_several_experiences_match')}
                   </p>
                 </div>
               </CardContent>
@@ -428,11 +429,11 @@ export function Component() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Behaviour</CardTitle>
+                <CardTitle className="text-sm">{t('tours.behaviour')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="mode">Mode</Label>
+                  <Label htmlFor="mode">{t('tours.mode')}</Label>
                   <NativeSelect
                     id="mode"
                     className="w-full"
@@ -452,7 +453,7 @@ export function Component() {
                 </div>
                 <SettingSwitch
                   id="backdrop"
-                  label="Backdrop"
+                  label={t('tours.backdrop')}
                   hint="Dim the page around the highlighted element."
                   checked={draft.backdrop}
                   disabled={!canManage}
@@ -460,7 +461,7 @@ export function Component() {
                 />
                 <SettingSwitch
                   id="show-progress"
-                  label="Show progress"
+                  label={t('tours.show_progress')}
                   hint="Display “2 of 5” and a progress bar."
                   checked={draft.showProgress}
                   disabled={!canManage}
@@ -468,7 +469,7 @@ export function Component() {
                 />
                 <SettingSwitch
                   id="dismissable"
-                  label="Dismissable"
+                  label={t('tours.dismissable')}
                   hint="Let people close it with × or Esc."
                   checked={draft.dismissable}
                   disabled={!canManage}
@@ -479,7 +480,7 @@ export function Component() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Preview</CardTitle>
+                <CardTitle className="text-sm">{t('common.preview')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <StepPreview
@@ -496,7 +497,7 @@ export function Component() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-medium">Steps</h2>
+            <h2 className="mb-3 text-sm font-medium">{t('tours.steps')}</h2>
             <StepEditor
               steps={steps}
               onChange={setSteps}
@@ -513,10 +514,9 @@ export function Component() {
       <Dialog open={sandboxOpen} onOpenChange={setSandboxOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Sandbox</DialogTitle>
+            <DialogTitle>{t('tours.sandbox')}</DialogTitle>
             <DialogDescription>
-              Walk the tour against the screens the recorder captured — no sign-in, no risk of
-              touching real data.
+              {t('tours.walk_the_tour_against_the_screens')}
             </DialogDescription>
           </DialogHeader>
           <SandboxPlayer
@@ -533,11 +533,11 @@ export function Component() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{tour.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the tour and its stats. This cannot be undone.
+              {t('tours.this_permanently_removes_the_tour_and')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
                 await remove.mutateAsync(tour.id)
@@ -545,7 +545,7 @@ export function Component() {
                 navigate('/tours')
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

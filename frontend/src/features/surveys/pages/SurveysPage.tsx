@@ -46,31 +46,32 @@ import {
   useSurveys,
 } from '../hooks'
 import { describeTrigger, formatRate } from '../lib'
+import { t } from '@/i18n'
 
 function SurveyResponseCount({ survey }: { survey: Survey }) {
   const results = useSurveyResults(survey.id, survey.status !== 'draft')
 
   if (survey.status === 'draft') {
-    return <p className="text-xs text-muted-foreground">Not published yet</p>
+    return <p className="text-xs text-muted-foreground">{t('common.not_published_yet')}</p>
   }
   if (results.isLoading) return <Skeleton className="h-8 w-32" />
-  if (!results.data) return <p className="text-xs text-muted-foreground">No data</p>
+  if (!results.data) return <p className="text-xs text-muted-foreground">{t('common.no_data')}</p>
 
   return (
     <div className="flex items-center gap-5">
       <div>
         <div className="text-sm font-semibold tabular-nums">{results.data.responses}</div>
-        <div className="text-[11px] text-muted-foreground">responses</div>
+        <div className="text-[11px] text-muted-foreground">{t('surveys.responses_2')}</div>
       </div>
       <div>
         <div className="text-sm font-semibold tabular-nums">{results.data.completed}</div>
-        <div className="text-[11px] text-muted-foreground">completed</div>
+        <div className="text-[11px] text-muted-foreground">{t('common.completed')}</div>
       </div>
       <div>
         <div className="text-sm font-semibold tabular-nums">
           {formatRate(results.data.completion_rate)}
         </div>
-        <div className="text-[11px] text-muted-foreground">completion rate</div>
+        <div className="text-[11px] text-muted-foreground">{t('common.completion_rate_2')}</div>
       </div>
     </div>
   )
@@ -186,14 +187,14 @@ export function Component() {
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex items-center justify-between gap-4 border-b px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold">Surveys</h1>
+          <h1 className="text-lg font-semibold">{t('surveys.surveys')}</h1>
           <p className="text-sm text-muted-foreground">
-            Ask for NPS, ratings or open feedback right inside your product.
+            {t('surveys.ask_for_nps_ratings_or_open')}
           </p>
         </div>
         {canManage ? (
           <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="size-4" /> New survey
+            <Plus className="size-4" /> {t('surveys.new_survey')}
           </Button>
         ) : null}
       </header>
@@ -214,7 +215,7 @@ export function Component() {
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Could not load surveys.{' '}
               <Button variant="link" className="px-1" onClick={() => surveys.refetch()}>
-                Retry
+                {t('common.retry')}
               </Button>
             </Card>
           ) : !surveys.data || surveys.data.length === 0 ? (
@@ -223,15 +224,15 @@ export function Component() {
                 <EmptyMedia variant="icon">
                   <MessageSquareHeart />
                 </EmptyMedia>
-                <EmptyTitle>No surveys yet</EmptyTitle>
+                <EmptyTitle>{t('surveys.no_surveys_yet')}</EmptyTitle>
                 <EmptyDescription>
-                  Start with an NPS question, then ask the people who answered why.
+                  {t('surveys.start_with_an_nps_question_then')}
                 </EmptyDescription>
               </EmptyHeader>
               {canManage ? (
                 <EmptyContent>
                   <Button onClick={() => setDialogOpen(true)}>
-                    <Plus className="size-4" /> Create your first survey
+                    <Plus className="size-4" /> {t('surveys.create_your_first_survey')}
                   </Button>
                 </EmptyContent>
               ) : null}
@@ -251,16 +252,16 @@ export function Component() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New survey</DialogTitle>
+            <DialogTitle>{t('surveys.new_survey')}</DialogTitle>
             <DialogDescription>
               Name it now — you&rsquo;ll add questions and targeting in the editor.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-1.5">
-            <Label htmlFor="survey-new-name">Name</Label>
+            <Label htmlFor="survey-new-name">{t('common.name')}</Label>
             <Input
               id="survey-new-name"
-              placeholder="How are we doing?"
+              placeholder={t('surveys.how_are_we_doing')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -270,7 +271,7 @@ export function Component() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={submit} disabled={!name.trim() || create.isPending}>
               {create.isPending ? 'Creating…' : 'Create'}
@@ -284,19 +285,18 @@ export function Component() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete &ldquo;{deleting?.name}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
-              The survey stops showing and every collected response is deleted. This cannot be
-              undone.
+              {t('surveys.the_survey_stops_showing_and_every')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

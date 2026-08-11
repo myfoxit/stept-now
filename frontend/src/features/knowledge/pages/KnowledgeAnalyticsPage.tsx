@@ -14,6 +14,7 @@ import { QueryVolumeChart } from '../components/QueryVolumeChart'
 import { ErrorState, KnowledgeNav, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { useKnowledgeAnalytics } from '../hooks'
 import { DAY_RANGES } from '../lib'
+import { t } from '@/i18n'
 
 export function Component() {
   const canRead = useHasPerm('reports:read')
@@ -23,11 +24,11 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="Search analytics"
-        description="How well your knowledge base answers what people ask"
+        title={t('knowledge.search_analytics')}
+        description={t('knowledge.how_well_your_knowledge_base_answers')}
         actions={
           <NativeSelect
-            aria-label="Date range"
+            aria-label={t('common.date_range')}
             className="w-40"
             value={String(days)}
             onChange={(e) => setDays(Number(e.target.value))}
@@ -45,7 +46,7 @@ export function Component() {
         <div className="mx-auto grid max-w-5xl gap-4">
           {!canRead ? (
             <Card className="p-6 text-center text-sm text-muted-foreground">
-              You don’t have access to search analytics.
+              {t('knowledge.you_don_t_have_access_to')}
             </Card>
           ) : overview.isLoading ? (
             <>
@@ -69,10 +70,9 @@ export function Component() {
                   <EmptyMedia variant="icon">
                     <BarChart3 />
                   </EmptyMedia>
-                  <EmptyTitle>No search activity yet</EmptyTitle>
+                  <EmptyTitle>{t('knowledge.no_search_activity_yet')}</EmptyTitle>
                   <EmptyDescription>
-                    Once contacts and AI agents start searching your knowledge base, query volume,
-                    result quality and content gaps show up here.
+                    {t('knowledge.once_contacts_and_ai_agents_start')}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>

@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 import type { AgentStep } from '../api'
+import { t } from '@/i18n'
 
 const KIND_META: Record<string, { label: string; icon: LucideIcon; className: string }> = {
   llm_call: { label: 'LLM call', icon: Sparkles, className: 'text-brand' },
@@ -53,7 +54,7 @@ function stepText(step: AgentStep): string | null {
 
 export function StepTrace({ steps }: { steps: AgentStep[] }) {
   if (steps.length === 0) {
-    return <p className="text-sm text-muted-foreground">No steps recorded.</p>
+    return <p className="text-sm text-muted-foreground">{t('ai.no_steps_recorded')}</p>
   }
   return (
     <ol className="space-y-0">

@@ -7,6 +7,7 @@ import { AuthCard } from '@/features/auth/components/AuthCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { t } from '@/i18n'
 
 export function Component() {
   const [email, setEmail] = useState('')
@@ -20,7 +21,7 @@ export function Component() {
       await authApi.requestPasswordReset(email)
       setSent(true)
     } catch {
-      toast.error('Something went wrong — try again')
+      toast.error(t('auth.something_went_wrong_try_again'))
     } finally {
       setSubmitting(false)
     }
@@ -28,23 +29,23 @@ export function Component() {
 
   return (
     <AuthCard
-      title="Reset your password"
+      title={t('auth.reset_your_password')}
       subtitle="We'll email you a reset link"
       footer={
         <Link className="text-brand underline-offset-4 hover:underline" to="/login">
-          Back to login
+          {t('auth.back_to_login')}
         </Link>
       }
     >
       {sent ? (
         <p className="text-center text-sm text-muted-foreground">
-          If an account exists for <span className="font-medium">{email}</span>, a reset link is on
+          {t('auth.if_an_account_exists_for')} <span className="font-medium">{email}</span>, a reset link is on
           its way.
         </p>
       ) : (
         <form className="grid gap-4" onSubmit={submit}>
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('common.email')}</Label>
             <Input
               id="email"
               type="email"

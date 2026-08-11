@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { currentWorkspaceId } from '@/stores/auth'
 
 import { knowledgeApi, knowledgeKeys, type Collection } from '../api'
+import { t } from '@/i18n'
 
 const EMOJI = ['📘', '🚀', '💳', '⚙️', '🔒', '💬', '📦', '❓', '🧩', '🎯']
 
@@ -68,20 +69,20 @@ export function CollectionDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{collection ? 'Edit collection' : 'New collection'}</DialogTitle>
-          <DialogDescription>Group related help-center articles together.</DialogDescription>
+          <DialogDescription>{t('knowledge.group_related_help_center_articles_together')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="collection-name">Name</Label>
+            <Label htmlFor="collection-name">{t('common.name')}</Label>
             <Input
               id="collection-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Getting started"
+              placeholder={t('common.getting_started')}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label>Icon</Label>
+            <Label>{t('common.icon')}</Label>
             <div className="flex flex-wrap gap-1.5">
               {EMOJI.map((e) => (
                 <button
@@ -101,7 +102,7 @@ export function CollectionDialog({
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="collection-desc">Description</Label>
+            <Label htmlFor="collection-desc">{t('common.description')}</Label>
             <Textarea
               id="collection-desc"
               rows={2}
@@ -112,7 +113,7 @@ export function CollectionDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => mutation.mutate()} disabled={!name.trim() || mutation.isPending}>
             {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}

@@ -29,6 +29,7 @@ import type { Macro } from '../api'
 import { MACRO_ACTION_SPECS } from '../constants'
 import { useDeleteMacro, useMacros } from '../hooks'
 import { MacroEditorDialog } from './MacroEditorDialog'
+import { t } from '@/i18n'
 
 function actionSummary(macro: Macro): string {
   const labels = (macro.actions ?? []).map((a) => {
@@ -69,11 +70,11 @@ export function MacrosTab() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          One-click action bundles agents run on a conversation from the inbox.
+          {t('automation.one_click_action_bundles_agents_run')}
         </p>
         {canWrite ? (
           <Button size="sm" onClick={openNew}>
-            <Plus className="size-4" /> New macro
+            <Plus className="size-4" /> {t('automation.new_macro')}
           </Button>
         ) : null}
       </div>
@@ -88,7 +89,7 @@ export function MacrosTab() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load macros.{' '}
           <Button variant="link" className="px-1" onClick={() => macros.refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Card>
       ) : !macros.data || macros.data.length === 0 ? (
@@ -97,15 +98,15 @@ export function MacrosTab() {
             <EmptyMedia variant="icon">
               <Wand2 />
             </EmptyMedia>
-            <EmptyTitle>No macros yet</EmptyTitle>
+            <EmptyTitle>{t('common.no_macros_yet')}</EmptyTitle>
             <EmptyDescription>
-              Bundle assignment, tags, status and replies into a single shortcut.
+              {t('automation.bundle_assignment_tags_status_and_replies')}
             </EmptyDescription>
           </EmptyHeader>
           {canWrite ? (
             <EmptyContent>
               <Button onClick={openNew}>
-                <Plus className="size-4" /> Create your first macro
+                <Plus className="size-4" /> {t('automation.create_your_first_macro')}
               </Button>
             </EmptyContent>
           ) : null}
@@ -159,18 +160,18 @@ export function MacrosTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              The macro will disappear for everyone who can see it. This cannot be undone.
+              {t('automation.the_macro_will_disappear_for_everyone')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

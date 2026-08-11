@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 import { useIntegrations } from '../../hooks'
+import { t } from '@/i18n'
 
 /** Marketing-ish display names for deep-link copy, keyed by provider id. */
 const PROVIDER_NAMES: Record<string, string> = {
@@ -69,7 +70,7 @@ export function ConnectionSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
-        <NativeSelectOption value="">Choose an account…</NativeSelectOption>
+        <NativeSelectOption value="">{t('settings.choose_an_account')}</NativeSelectOption>
         {connections.map((connection) => (
           <NativeSelectOption key={connection.id} value={connection.id}>
             {connection.account_label ?? connection.id}

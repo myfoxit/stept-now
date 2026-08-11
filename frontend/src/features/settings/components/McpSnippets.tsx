@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { t } from '@/i18n'
 
 /** Placeholder baked into snippets until a real key is minted. */
 export const KEY_PLACEHOLDER = 'YOUR_STEPT_KEY'
@@ -96,10 +97,10 @@ export function SnippetBlock({
     try {
       await navigator.clipboard.writeText(value)
       setCopied(true)
-      toast.success('Copied')
+      toast.success(t('settings.copied'))
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error('Could not copy')
+      toast.error(t('common.could_not_copy'))
     }
   }
 

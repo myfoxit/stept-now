@@ -17,6 +17,7 @@ import {
   stepBox,
   type PageSnapshot,
 } from '../sandbox'
+import { t } from '@/i18n'
 
 /**
  * Load one stored replica.
@@ -146,7 +147,7 @@ export function SandboxPlayer({
   if (!draft) {
     return (
       <p className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-        Add a step to preview this tour in the sandbox.
+        {t('tours.add_a_step_to_preview_this')}
       </p>
     )
   }
@@ -175,20 +176,20 @@ export function SandboxPlayer({
           type="button"
           variant="outline"
           size="sm"
-          aria-label="Previous step"
+          aria-label={t('tours.previous_step')}
           disabled={bounded === 0}
           onClick={() => setIndex(bounded - 1)}
         >
-          <ChevronLeft className="size-4" /> Back
+          <ChevronLeft className="size-4" /> {t('common.back')}
         </Button>
         <Button
           type="button"
           size="sm"
-          aria-label="Next step"
+          aria-label={t('tours.next_step')}
           disabled={bounded >= steps.length - 1}
           onClick={() => setIndex(bounded + 1)}
         >
-          Next <ChevronRight className="size-4" />
+          {t('common.next')} <ChevronRight className="size-4" />
         </Button>
       </div>
 
@@ -216,14 +217,13 @@ export function SandboxPlayer({
             />
           ) : (
             <div className="flex size-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
-              This step was authored by hand, so there is no screen to replay. Record it with the
-              extension to capture one.
+              {t('tours.this_step_was_authored_by_hand')}
             </div>
           )}
 
           {snapshot.isLoading && draft.sandboxKey ? (
             <div className="absolute inset-0 grid place-items-center bg-background/60 text-xs text-muted-foreground">
-              Loading the captured screen…
+              {t('tours.loading_the_captured_screen')}
             </div>
           ) : null}
 
@@ -260,7 +260,7 @@ export function SandboxPlayer({
       {snapshot.isError && draft.sandboxKey ? (
         <p className="flex items-start gap-1.5 text-xs text-destructive">
           <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          The captured screen could not be loaded, so this step fell back to its screenshot.
+          {t('tours.the_captured_screen_could_not_be')}
         </p>
       ) : null}
 
@@ -274,7 +274,7 @@ export function SandboxPlayer({
       {screen.kind === 'screenshot' && !draft.sandboxKey ? (
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          Turn on <span className="font-medium">Capture screens for sandbox</span> in the extension
+          {t('tours.turn_on')} <span className="font-medium">{t('tours.capture_screens_for_sandbox')}</span> in the extension
           and re-record to make these screens interactive.
         </p>
       ) : null}

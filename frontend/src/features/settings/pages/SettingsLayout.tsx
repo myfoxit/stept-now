@@ -19,6 +19,7 @@ import { SlaPanel } from '../components/SlaPanel'
 import { WorkspacePanel } from '../components/WorkspacePanel'
 import { WorkingHoursPanel } from '../components/WorkingHoursPanel'
 import { SECTIONS } from '../sections'
+import { t } from '@/i18n'
 
 const PANELS: Record<string, () => ReactElement> = {
   workspace: () => <WorkspacePanel />,
@@ -60,15 +61,15 @@ export function Component() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="border-b px-6 py-4">
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your workspace, team and account.</p>
+        <h1 className="text-lg font-semibold">{t('common.settings')}</h1>
+        <p className="text-sm text-muted-foreground">{t('settings.manage_your_workspace_team_and_account')}</p>
       </header>
 
       <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-[200px_1fr]">
           <nav
             className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible"
-            aria-label="Settings sections"
+            aria-label={t('settings.settings_sections')}
           >
             {visible.map((item) => {
               const Icon = item.icon

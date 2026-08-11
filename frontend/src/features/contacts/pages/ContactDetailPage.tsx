@@ -28,6 +28,7 @@ import {
   useContactTagMutations,
   useUpdateContact,
 } from '@/features/contacts/hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const { contactId } = useParams()
@@ -73,7 +74,7 @@ export function Component() {
       {
         onSuccess: () => {
           setEditing(false)
-          toast.success('Contact saved')
+          toast.success(t('contacts.contact_saved'))
         },
         onError: (error) => {
           // Without this the server's 422 was dropped on the floor and Save
@@ -98,9 +99,9 @@ export function Component() {
   if (contactQuery.isError || !contact) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3">
-        <p className="text-sm text-muted-foreground">Contact not found.</p>
+        <p className="text-sm text-muted-foreground">{t('contacts.contact_not_found')}</p>
         <Button variant="outline" asChild>
-          <Link to="/contacts">Back to contacts</Link>
+          <Link to="/contacts">{t('contacts.back_to_contacts')}</Link>
         </Button>
       </div>
     )
@@ -127,7 +128,7 @@ export function Component() {
       <div className="mx-auto max-w-4xl space-y-6 p-6">
         <Button variant="ghost" size="sm" asChild className="-ml-2">
           <Link to="/contacts">
-            <ArrowLeft className="size-4" /> Contacts
+            <ArrowLeft className="size-4" /> {t('contacts.contacts')}
           </Link>
         </Button>
 
@@ -141,7 +142,7 @@ export function Component() {
                 {contact.verified ? <BadgeCheck className="size-4 text-blue-500" /> : null}
                 {contact.blocked ? (
                   <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
-                    Blocked
+                    {t('contacts.blocked')}
                   </span>
                 ) : null}
               </CardTitle>
@@ -150,7 +151,7 @@ export function Component() {
             {canWrite && !editing ? (
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={startEdit}>
-                  Edit
+                  {t('common.edit')}
                 </Button>
                 <ContactAdminActions contact={contact} />
               </div>
@@ -181,12 +182,12 @@ export function Component() {
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <Label>Attributes</Label>
+                  <Label>{t('common.attributes')}</Label>
                   {attrs.map(([k, v], i) => (
                     <div key={i} className="flex gap-2">
                       <Input
                         value={k}
-                        placeholder="key"
+                        placeholder={t('contacts.key')}
                         aria-label={`Attribute ${i + 1} key`}
                         onChange={(e) =>
                           setAttrs(
@@ -196,7 +197,7 @@ export function Component() {
                       />
                       <Input
                         value={v}
-                        placeholder="value"
+                        placeholder={t('common.value')}
                         aria-label={`Attribute ${i + 1} value`}
                         onChange={(e) =>
                           setAttrs(
@@ -207,7 +208,7 @@ export function Component() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Remove attribute"
+                        aria-label={t('contacts.remove_attribute')}
                         onClick={() => setAttrs(attrs.filter((_, j) => j !== i))}
                       >
                         <Trash2 className="size-4" />
@@ -219,29 +220,29 @@ export function Component() {
                     size="sm"
                     onClick={() => setAttrs([...attrs, ['', '']])}
                   >
-                    <Plus className="size-4" /> Add attribute
+                    <Plus className="size-4" /> {t('contacts.add_attribute')}
                   </Button>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={save} disabled={update.isPending}>
-                    Save
+                    {t('common.save')}
                   </Button>
                   <Button variant="outline" onClick={() => setEditing(false)}>
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </div>
             ) : (
               <>
                 <div className="grid gap-3 text-sm sm:grid-cols-2">
-                  <Detail label="External ID" value={contact.external_id} />
-                  <Detail label="Phone" value={contact.phone} />
+                  <Detail label={t('contacts.external_id')} value={contact.external_id} />
+                  <Detail label={t('contacts.phone')} value={contact.phone} />
                   <Detail
-                    label="First seen"
+                    label={t('contacts.first_seen')}
                     value={contact.first_seen_at ? fullDateTime(contact.first_seen_at) : null}
                   />
                   <Detail
-                    label="Last seen"
+                    label={t('contacts.last_seen')}
                     value={contact.last_seen_at ? fullDateTime(contact.last_seen_at) : null}
                   />
                 </div>
@@ -261,7 +262,7 @@ export function Component() {
                 <Separator />
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Tags
+                    {t('common.tags')}
                   </p>
                   <TagsEditor
                     appliedTagIds={(contact.tags ?? []).map((t) => t.id)}
@@ -279,7 +280,7 @@ export function Component() {
           {/* Timeline */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Timeline</CardTitle>
+              <CardTitle className="text-base">{t('contacts.timeline')}</CardTitle>
             </CardHeader>
             <CardContent>
               {timeline.length ? (
@@ -312,7 +313,7 @@ export function Component() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">No activity yet.</p>
+                <p className="text-sm text-muted-foreground">{t('contacts.no_activity_yet')}</p>
               )}
             </CardContent>
           </Card>
@@ -320,7 +321,7 @@ export function Component() {
           {/* Notes */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
+              <CardTitle className="text-base">{t('contacts.notes')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {canWrite ? (
@@ -328,8 +329,8 @@ export function Component() {
                   <Textarea
                     value={noteBody}
                     onChange={(e) => setNoteBody(e.target.value)}
-                    placeholder="Add an internal note about this contact…"
-                    aria-label="New note"
+                    placeholder={t('contacts.add_an_internal_note_about_this')}
+                    aria-label={t('contacts.new_note')}
                     className="min-h-16"
                   />
                   <Button
@@ -341,7 +342,7 @@ export function Component() {
                       })
                     }
                   >
-                    Add note
+                    {t('contacts.add_note')}
                   </Button>
                 </div>
               ) : null}
@@ -355,7 +356,7 @@ export function Component() {
                         {canWrite ? (
                           <button
                             type="button"
-                            aria-label="Delete note"
+                            aria-label={t('contacts.delete_note')}
                             onClick={() => noteMutations.remove.mutate(note.id)}
                             className="hover:text-destructive"
                           >
@@ -367,7 +368,7 @@ export function Component() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">No notes yet.</p>
+                <p className="text-sm text-muted-foreground">{t('contacts.no_notes_yet')}</p>
               )}
             </CardContent>
           </Card>

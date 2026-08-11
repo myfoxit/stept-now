@@ -3,6 +3,7 @@ import { Megaphone, PanelTop, Route, Wand2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 import { kindLabel } from '../lib'
+import { t } from '@/i18n'
 
 const KIND_ICONS: Record<string, typeof Route> = {
   flow: Route,
@@ -27,7 +28,7 @@ export function TourModeBadge({ mode }: { mode: string | null | undefined }) {
   return (
     <Badge variant="secondary" className="gap-1">
       <Wand2 aria-hidden />
-      Do it for me
+      {t('tours.do_it_for_me')}
     </Badge>
   )
 }

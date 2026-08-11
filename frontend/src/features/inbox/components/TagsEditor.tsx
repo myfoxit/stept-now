@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createTag, type Tag } from '@/features/contacts/api'
 import { useTags } from '@/features/contacts/hooks'
+import { t } from '@/i18n'
 
 export function TagsEditor({
   appliedTagIds,
@@ -73,17 +74,17 @@ export function TagsEditor({
       {canManage ? (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="xs" aria-label="Add tag">
+            <Button variant="outline" size="xs" aria-label={t('inbox.add_tag')}>
               <Plus className="size-3" />
-              Tag
+              {t('common.tag')}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-56 p-2">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search or create…"
-              aria-label="Search tags"
+              placeholder={t('inbox.search_or_create')}
+              aria-label={t('inbox.search_tags')}
               className="h-8"
             />
             <ul className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
@@ -117,7 +118,7 @@ export function TagsEditor({
                 </li>
               ) : null}
               {!available.length && !query ? (
-                <li className="px-2 py-1 text-xs text-muted-foreground">No more tags</li>
+                <li className="px-2 py-1 text-xs text-muted-foreground">{t('inbox.no_more_tags')}</li>
               ) : null}
             </ul>
           </PopoverContent>

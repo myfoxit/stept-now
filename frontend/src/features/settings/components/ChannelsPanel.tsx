@@ -42,6 +42,7 @@ import type { Inbox, InboxCreate } from '../api'
 import { useCreateInbox, useDeleteInbox, useInboxes, useUpdateInbox } from '../hooks'
 import { EmailInboxWizard } from './EmailInboxWizard'
 import { CHANNEL_CONFIG_SPECS, InboxConfigDialog } from './InboxConfigDialog'
+import { t } from '@/i18n'
 
 const CHANNEL_TYPES = [
   { value: 'widget', label: 'Website widget' },
@@ -61,7 +62,7 @@ async function copy(text: string, label: string) {
     await navigator.clipboard.writeText(text)
     toast.success(`${label} copied`)
   } catch {
-    toast.error('Could not copy')
+    toast.error(t('common.could_not_copy'))
   }
 }
 
@@ -109,11 +110,11 @@ export function ChannelsPanel() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Connect the channels your customers reach you on.
+          {t('settings.connect_the_channels_your_customers_reach')}
         </p>
         {canManage ? (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" /> New channel
+            <Plus className="size-4" /> {t('settings.new_channel')}
           </Button>
         ) : null}
       </div>
@@ -126,13 +127,13 @@ export function ChannelsPanel() {
             <EmptyMedia variant="icon">
               <InboxIcon />
             </EmptyMedia>
-            <EmptyTitle>No channels yet</EmptyTitle>
-            <EmptyDescription>Add a website widget, email, or messaging channel.</EmptyDescription>
+            <EmptyTitle>{t('settings.no_channels_yet')}</EmptyTitle>
+            <EmptyDescription>{t('settings.add_a_website_widget_email_or')}</EmptyDescription>
           </EmptyHeader>
           {canManage ? (
             <EmptyContent>
               <Button onClick={() => setCreateOpen(true)}>
-                <Plus className="size-4" /> Add a channel
+                <Plus className="size-4" /> {t('settings.add_a_channel')}
               </Button>
             </EmptyContent>
           ) : null}
@@ -149,10 +150,10 @@ export function ChannelsPanel() {
                       <Badge variant="secondary" className="capitalize">
                         {inbox.channel_type}
                       </Badge>
-                      {inbox.has_secrets ? <Badge variant="outline">Configured</Badge> : null}
+                      {inbox.has_secrets ? <Badge variant="outline">{t('settings.configured')}</Badge> : null}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Enabled</span>
+                      <span className="text-xs text-muted-foreground">{t('common.enabled')}</span>
                       <Switch
                         checked={inbox.enabled}
                         disabled={!canManage || updateInbox.isPending}
@@ -187,7 +188,7 @@ export function ChannelsPanel() {
                 {inbox.embed_snippet ? (
                   <CardContent>
                     <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <Code2 className="size-3.5" /> Embed snippet
+                      <Code2 className="size-3.5" /> {t('settings.embed_snippet')}
                     </div>
                     <div className="flex items-start gap-2 rounded-md border bg-muted/50 p-3">
                       <pre className="flex-1 overflow-x-auto text-xs">
@@ -197,7 +198,7 @@ export function ChannelsPanel() {
                         variant="ghost"
                         size="icon"
                         className="size-7 shrink-0"
-                        aria-label="Copy embed snippet"
+                        aria-label={t('settings.copy_embed_snippet')}
                         onClick={() => copy(inbox.embed_snippet!, 'Snippet')}
                       >
                         <Copy className="size-4" />
@@ -214,21 +215,21 @@ export function ChannelsPanel() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New channel</DialogTitle>
-            <DialogDescription>Create an inbox for a communication channel.</DialogDescription>
+            <DialogTitle>{t('settings.new_channel')}</DialogTitle>
+            <DialogDescription>{t('settings.create_an_inbox_for_a_communication')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-1.5">
-              <Label htmlFor="inbox-name">Name</Label>
+              <Label htmlFor="inbox-name">{t('common.name')}</Label>
               <Input
                 id="inbox-name"
-                placeholder="e.g. Website chat"
+                placeholder={t('settings.e_g_website_chat')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="inbox-type">Channel type</Label>
+              <Label htmlFor="inbox-type">{t('settings.channel_type')}</Label>
               <NativeSelect
                 id="inbox-type"
                 className="w-full"
@@ -245,7 +246,7 @@ export function ChannelsPanel() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={submit} disabled={!name.trim() || createInbox.isPending}>
               {channelType === 'email'
@@ -275,18 +276,18 @@ export function ChannelsPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              Conversations from this channel will stop syncing. This cannot be undone.
+              {t('settings.conversations_from_this_channel_will_stop')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) deleteInbox.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

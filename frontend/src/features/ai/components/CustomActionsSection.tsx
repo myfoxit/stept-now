@@ -14,6 +14,7 @@ import { currentWorkspaceId, useHasPerm } from '@/stores/auth'
 import { aiApi, aiKeys, type CustomAction } from '../api'
 import { useActions } from '../hooks'
 import { ActionDialog } from './ActionDialog'
+import { t } from '@/i18n'
 
 export function CustomActionsSection() {
   const workspaceId = currentWorkspaceId()
@@ -26,7 +27,7 @@ export function CustomActionsSection() {
     mutationFn: (id: string) => aiApi.deleteAction(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: aiKeys.actions(workspaceId) })
-      toast.success('Action deleted')
+      toast.success(t('ai.action_deleted'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Delete failed'),
   })
@@ -37,12 +38,12 @@ export function CustomActionsSection() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium">Custom actions</p>
-          <p className="text-xs text-muted-foreground">HTTP tools the agent can call</p>
+          <p className="text-sm font-medium">{t('ai.custom_actions')}</p>
+          <p className="text-xs text-muted-foreground">{t('ai.http_tools_the_agent_can_call')}</p>
         </div>
         {canManage ? (
           <Button size="sm" variant="outline" onClick={() => setDialog({ open: true, edit: null })}>
-            <Plus className="size-4" /> New action
+            <Plus className="size-4" /> {t('ai.new_action')}
           </Button>
         ) : null}
       </div>
@@ -51,7 +52,7 @@ export function CustomActionsSection() {
         <Spinner className="size-4" />
       ) : items.length === 0 ? (
         <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          No custom actions yet. Add one to let the agent hit your APIs.
+          {t('ai.no_custom_actions_yet_add_one')}
         </p>
       ) : (
         <ul className="space-y-2">

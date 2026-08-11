@@ -14,6 +14,7 @@ import { SurveyStatusBadge } from '../components/SurveyStatusBadge'
 import { TextAnswers } from '../components/TextAnswers'
 import { useLiveSurveyResults, useSurvey, useSurveyResults } from '../hooks'
 import { formatRate, ratingRows, selectRows } from '../lib'
+import { t } from '@/i18n'
 
 function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
@@ -51,7 +52,7 @@ export function Component() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to surveys">
+        <Button variant="ghost" size="icon" asChild aria-label={t('surveys.back_to_surveys')}>
           <Link to="/surveys">
             <ArrowLeft className="size-4" />
           </Link>
@@ -61,12 +62,12 @@ export function Component() {
             <h1 className="truncate text-lg font-semibold">{survey?.name ?? 'Survey results'}</h1>
             {survey ? <SurveyStatusBadge status={survey.status} /> : null}
           </div>
-          <p className="text-sm text-muted-foreground">Live responses and score breakdown.</p>
+          <p className="text-sm text-muted-foreground">{t('surveys.live_responses_and_score_breakdown')}</p>
         </div>
         {canManage && surveyId ? (
           <Button variant="outline" size="sm" asChild>
             <Link to={`/surveys/${surveyId}`}>
-              <Pencil className="size-4" /> Edit survey
+              <Pencil className="size-4" /> {t('surveys.edit_survey')}
             </Link>
           </Button>
         ) : null}
@@ -88,16 +89,16 @@ export function Component() {
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Could not load results.{' '}
               <Button variant="link" className="px-1" onClick={() => results.refetch()}>
-                Retry
+                {t('common.retry')}
               </Button>
             </Card>
           ) : results.data ? (
             <>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                <StatTile label="Responses" value={results.data.responses} />
-                <StatTile label="Completed" value={results.data.completed} />
+                <StatTile label={t('surveys.responses')} value={results.data.responses} />
+                <StatTile label={t('common.completed_2')} value={results.data.completed} />
                 <StatTile
-                  label="Completion rate"
+                  label={t('common.completion_rate')}
                   value={formatRate(results.data.completion_rate)}
                   hint={`${results.data.completed} of ${results.data.responses} finished`}
                 />
@@ -108,7 +109,7 @@ export function Component() {
               <div className="grid gap-4 lg:grid-cols-2">
                 {results.data.ratings ? (
                   <DistributionBars
-                    title="Rating distribution"
+                    title={t('surveys.rating_distribution')}
                     description={`Average ${results.data.ratings.avg.toFixed(1)} out of 5`}
                     rows={ratingRows(results.data.ratings.distribution).map((row) => ({
                       label: `${row.rating} star${row.rating === '1' ? '' : 's'}`,

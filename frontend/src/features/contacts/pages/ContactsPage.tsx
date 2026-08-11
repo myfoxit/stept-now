@@ -32,6 +32,7 @@ import { ContactAvatar } from '@/features/inbox/components/atoms'
 import { ImportDialog } from '@/features/contacts/components/ImportDialog'
 import { contactAdminApi } from '@/features/contacts/api'
 import { useContactsList, useSegments } from '@/features/contacts/hooks'
+import { t } from '@/i18n'
 
 /** Fetch the CSV with the session's auth header, then hand it to the browser. */
 async function downloadExport() {
@@ -71,19 +72,19 @@ export function Component() {
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b px-6 py-4">
         <Users className="size-5" />
-        <h1 className="text-lg font-semibold">Contacts</h1>
+        <h1 className="text-lg font-semibold">{t('contacts.contacts')}</h1>
         {canWrite ? (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => downloadExport()}>
               <Download className="mr-1 size-4" />
-              Export
+              {t('contacts.export')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="mr-1 size-4" />
-              Import
+              {t('contacts.import')}
             </Button>
             <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="size-4" /> New contact
+              <Plus className="size-4" /> {t('common.new_contact')}
             </Button>
           </div>
         ) : (
@@ -94,7 +95,7 @@ export function Component() {
             onClick={() => downloadExport()}
           >
             <Download className="mr-1 size-4" />
-            Export
+            {t('contacts.export')}
           </Button>
         )}
       </div>
@@ -111,8 +112,8 @@ export function Component() {
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, email, or ID"
-            aria-label="Search contacts"
+            placeholder={t('contacts.search_by_name_email_or_id_2')}
+            aria-label={t('common.search_contacts')}
             className="pl-8"
           />
         </div>
@@ -120,11 +121,11 @@ export function Component() {
           value={segmentId ?? ALL}
           onValueChange={(v) => setSegmentId(v === ALL ? undefined : v)}
         >
-          <SelectTrigger aria-label="Segment" className="w-52">
-            <SelectValue placeholder="All contacts" />
+          <SelectTrigger aria-label={t('common.segment')} className="w-52">
+            <SelectValue placeholder={t('contacts.all_contacts')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>All contacts</SelectItem>
+            <SelectItem value={ALL}>{t('contacts.all_contacts')}</SelectItem>
             {segments.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.name}
@@ -144,9 +145,9 @@ export function Component() {
         ) : isError ? (
           <div className="flex flex-col items-center gap-3 p-12 text-center">
             <AlertCircle className="size-8 text-destructive" />
-            <p className="text-sm text-muted-foreground">Could not load contacts.</p>
+            <p className="text-sm text-muted-foreground">{t('contacts.could_not_load_contacts')}</p>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           </div>
         ) : contacts.length === 0 ? (
@@ -155,7 +156,7 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <Users className="size-5" />
               </EmptyMedia>
-              <EmptyTitle>No contacts found</EmptyTitle>
+              <EmptyTitle>{t('contacts.no_contacts_found')}</EmptyTitle>
               <EmptyDescription>
                 {q || segmentId
                   ? 'Try a different search or segment.'
@@ -164,7 +165,7 @@ export function Component() {
             </EmptyHeader>
             {!q && !segmentId && canWrite ? (
               <Button size="sm" onClick={() => setCreating(true)}>
-                <Plus className="size-4" /> New contact
+                <Plus className="size-4" /> {t('common.new_contact')}
               </Button>
             ) : null}
           </Empty>
@@ -173,10 +174,10 @@ export function Component() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Contact</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead className="text-right">Last seen</TableHead>
+                <TableHead>{t('common.contact')}</TableHead>
+                <TableHead>{t('common.tags')}</TableHead>
+                <TableHead>{t('contacts.plan')}</TableHead>
+                <TableHead className="text-right">{t('contacts.last_seen')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -36,6 +36,7 @@ import {
   type ToolConfig,
 } from '../api'
 import { useActions } from '../hooks'
+import { t } from '@/i18n'
 
 const APPROVAL_MODES: { value: McpApprovalMode; label: string; help: string }[] = [
   {
@@ -209,7 +210,7 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
         <Switch
           checked={mcp.enabled}
           onCheckedChange={(enabled) => updateMcp.mutate({ ...mcp, enabled })}
-          aria-label="Enable MCP channel"
+          aria-label={t('ai.enable_mcp_channel')}
           disabled={!canManage}
         />
       </CardHeader>
@@ -218,13 +219,13 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
         <CardContent className="grid gap-5">
           {/* Endpoint */}
           <div className="grid gap-1.5">
-            <Label>Endpoint URL</Label>
+            <Label>{t('common.endpoint_url')}</Label>
             <SnippetBlock value={endpoint} copyLabel="Copy agent MCP endpoint" />
           </div>
 
           {/* Approval mode */}
           <div className="grid gap-1.5">
-            <Label htmlFor="mcp-approval-mode">Approval mode for write tools</Label>
+            <Label htmlFor="mcp-approval-mode">{t('ai.approval_mode_for_write_tools')}</Label>
             <NativeSelect
               id="mcp-approval-mode"
               value={mcp.approval_mode}
@@ -245,7 +246,7 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
 
           {/* Tool exposure preview */}
           <div className="grid gap-1.5">
-            <Label>Tools the external client will see</Label>
+            <Label>{t('ai.tools_the_external_client_will_see')}</Label>
             <div className="grid grid-cols-2 gap-3 rounded-md border p-3">
               <div className="grid content-start gap-1">
                 <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -262,7 +263,7 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
                   Writes (require approval)
                 </span>
                 {exposure.writes.length === 0 ? (
-                  <span className="text-[11px] text-muted-foreground">none</span>
+                  <span className="text-[11px] text-muted-foreground">{t('ai.none')}</span>
                 ) : (
                   exposure.writes.map((tool) => (
                     <span key={tool} className="font-mono text-[11px]">
@@ -277,7 +278,7 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
           {/* Install + agent-bound keys */}
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label>Install in your client</Label>
+              <Label>{t('common.install_in_your_client')}</Label>
               {canManageKeys ? (
                 <Button
                   size="sm"
@@ -302,10 +303,10 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
                 <p className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
                   <TriangleAlert className="size-4 shrink-0" />
-                  This key is shown once — copy it now. The snippets above already contain it.
+                  {t('common.this_key_is_shown_once_copy')}
                 </p>
                 <Button size="sm" variant="outline" onClick={() => setRawKey(null)}>
-                  Done
+                  {t('common.done')}
                 </Button>
               </div>
             ) : null}
@@ -326,7 +327,7 @@ export function McpChannelCard({ agent }: { agent: Agent }) {
                       {key.prefix}…
                     </span>
                     <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                      agent-bound
+                      {t('common.agent_bound')}
                     </Badge>
                     {canManageKeys ? (
                       <Button

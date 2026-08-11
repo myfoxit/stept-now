@@ -10,6 +10,7 @@ import {
 
 import type { ReportByChannel } from '../api'
 import { channelLabel } from '../lib'
+import { t } from '@/i18n'
 
 // Single measure across categories ⇒ one hue, no legend (axis names the category).
 const chartConfig = {
@@ -22,11 +23,11 @@ export function ByChannelChart({ data }: { data: ReportByChannel[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">By channel</CardTitle>
+        <CardTitle className="text-sm">{t('reports.by_channel')}</CardTitle>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No data for this range.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">{t('common.no_data_for_this_range')}</p>
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
             <BarChart data={rows} margin={{ top: 20, left: 4, right: 4 }}>

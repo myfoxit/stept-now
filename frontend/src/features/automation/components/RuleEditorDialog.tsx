@@ -28,6 +28,7 @@ import {
 } from '../lib'
 import { ActionRows } from './ActionRows'
 import { ConditionRows } from './ConditionRows'
+import { t } from '@/i18n'
 
 export function RuleEditorDialog({
   open,
@@ -90,23 +91,23 @@ export function RuleEditorDialog({
         <DialogHeader>
           <DialogTitle>{rule ? 'Edit rule' : 'New rule'}</DialogTitle>
           <DialogDescription>
-            When the event fires and all conditions match, the actions run in order.
+            {t('automation.when_the_event_fires_and_all')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="rule-name">Name</Label>
+            <Label htmlFor="rule-name">{t('common.name')}</Label>
             <Input
               id="rule-name"
               value={name}
-              placeholder="e.g. Route billing to finance"
+              placeholder={t('automation.e_g_route_billing_to_finance')}
               onChange={(event) => setName(event.target.value)}
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="rule-event">When…</Label>
+            <Label htmlFor="rule-event">{t('automation.when')}</Label>
             <NativeSelect
               id="rule-event"
               className="w-full"
@@ -123,23 +124,23 @@ export function RuleEditorDialog({
 
           <Separator />
           <div className="grid gap-2">
-            <Label>Conditions</Label>
+            <Label>{t('automation.conditions')}</Label>
             <ConditionRows rows={conditions} onChange={setConditions} />
           </div>
 
           <Separator />
           <div className="grid gap-2">
-            <Label>Actions</Label>
+            <Label>{t('automation.actions')}</Label>
             <ActionRows rows={actions} onChange={setActions} />
             {actions.length === 0 ? (
-              <p className="text-xs text-destructive">Add at least one action.</p>
+              <p className="text-xs text-destructive">{t('automation.add_at_least_one_action')}</p>
             ) : null}
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!canSave || saving}>
             {saving ? 'Saving…' : rule ? 'Save changes' : 'Create rule'}

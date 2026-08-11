@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Contact } from '@/features/contacts/api'
 import { useContactsList, useMergeContacts, useSetContactBlocked } from '@/features/contacts/hooks'
+import { t } from '@/i18n'
 
 export function ContactAdminActions({ contact }: { contact: Contact }) {
   const [confirmBlock, setConfirmBlock] = useState(false)
@@ -43,7 +44,7 @@ export function ContactAdminActions({ contact }: { contact: Contact }) {
     <>
       <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)}>
         <Merge className="mr-1 size-4" />
-        Merge
+        {t('contacts.merge')}
       </Button>
       <Button
         variant={contact.blocked ? 'default' : 'outline'}
@@ -57,12 +58,12 @@ export function ContactAdminActions({ contact }: { contact: Contact }) {
         {contact.blocked ? (
           <>
             <ShieldCheck className="mr-1 size-4" />
-            Unblock
+            {t('contacts.unblock')}
           </>
         ) : (
           <>
             <Ban className="mr-1 size-4" />
-            Block
+            {t('contacts.block')}
           </>
         )}
       </Button>
@@ -70,16 +71,15 @@ export function ContactAdminActions({ contact }: { contact: Contact }) {
       <AlertDialog open={confirmBlock} onOpenChange={setConfirmBlock}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Block this contact?</AlertDialogTitle>
+            <AlertDialogTitle>{t('contacts.block_this_contact')}</AlertDialogTitle>
             <AlertDialogDescription>
-              They will not be able to start conversations, and inbound messages from them are
-              dropped at the channel. Existing conversations stay put.
+              {t('contacts.they_will_not_be_able_to')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => setBlocked.mutate({ id: contact.id, blocked: true })}>
-              Block
+              {t('contacts.block')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -123,7 +123,7 @@ function MergeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Merge a duplicate into this contact</DialogTitle>
+          <DialogTitle>{t('contacts.merge_a_duplicate_into_this_contact')}</DialogTitle>
           <DialogDescription>
             {contact.name || 'This contact'} is kept. The one you pick is folded in — its
             conversations, notes and channel identities move here, and it stays as a tombstone so
@@ -133,10 +133,10 @@ function MergeDialog({
 
         <div className="grid gap-3 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="merge-search">Find the duplicate</Label>
+            <Label htmlFor="merge-search">{t('contacts.find_the_duplicate')}</Label>
             <Input
               id="merge-search"
-              placeholder="Search by name, email or ID"
+              placeholder={t('contacts.search_by_name_email_or_id')}
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -165,7 +165,7 @@ function MergeDialog({
             ))}
             {candidates.length === 0 ? (
               <li className="px-2 py-1.5 text-sm text-muted-foreground">
-                No other contacts found.
+                {t('contacts.no_other_contacts_found')}
               </li>
             ) : null}
           </ul>
@@ -173,10 +173,10 @@ function MergeDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={run} disabled={!selected || merge.isPending}>
-            Merge into this contact
+            {t('contacts.merge_into_this_contact')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MessageBubble } from '@/features/inbox/components/MessageBubble'
 import type { Message } from '@/features/inbox/api'
+import { t } from '@/i18n'
 
 function sameDay(a: Date, b: Date): boolean {
   return (
@@ -75,9 +76,9 @@ export function MessageTimeline({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         <AlertCircle className="size-8 text-destructive" />
-        <p className="text-sm text-muted-foreground">Could not load this conversation.</p>
+        <p className="text-sm text-muted-foreground">{t('inbox.could_not_load_this_conversation')}</p>
         <Button variant="outline" size="sm" onClick={onRetry}>
-          Retry
+          {t('common.retry')}
         </Button>
       </div>
     )

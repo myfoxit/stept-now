@@ -42,6 +42,7 @@ import {
   useSlaPolicies,
   useUpdateSlaPolicy,
 } from '../hooks'
+import { t } from '@/i18n'
 
 const THRESHOLDS = [
   { key: 'first_response_minutes', label: 'First response (minutes)' },
@@ -142,25 +143,25 @@ function EditorDialog({
         <DialogHeader>
           <DialogTitle>{policy ? 'Edit SLA policy' : 'New SLA policy'}</DialogTitle>
           <DialogDescription>
-            Target times for responses and resolution. Leave a field empty to skip it.
+            {t('settings.target_times_for_responses_and_resolution')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="sla-name">Name</Label>
+            <Label htmlFor="sla-name">{t('common.name')}</Label>
             <Input
               id="sla-name"
-              placeholder="e.g. Premium support"
+              placeholder={t('settings.e_g_premium_support')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="sla-description">Description</Label>
+            <Label htmlFor="sla-description">{t('common.description')}</Label>
             <Input
               id="sla-description"
-              placeholder="Optional"
+              placeholder={t('settings.optional')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -184,23 +185,23 @@ function EditorDialog({
               className="mt-0.5 size-4 accent-primary"
               checked={businessHoursOnly}
               onChange={(e) => setBusinessHoursOnly(e.target.checked)}
-              aria-label="Count business hours only"
+              aria-label={t('settings.count_business_hours_only')}
             />
             <span>
-              <span className="font-medium">Count business hours only</span>
+              <span className="font-medium">{t('settings.count_business_hours_only')}</span>
               <span className="block text-xs text-muted-foreground">
                 Nights and weekends are excluded, using the inbox&rsquo;s working hours.
               </span>
             </span>
           </label>
           {!hasThreshold ? (
-            <p className="text-xs text-destructive">Set at least one target time.</p>
+            <p className="text-xs text-destructive">{t('settings.set_at_least_one_target_time')}</p>
           ) : null}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!canSave || saving}>
             {saving ? 'Saving…' : policy ? 'Save changes' : 'Create policy'}
@@ -233,11 +234,11 @@ export function SlaPanel() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Response and resolution targets you can apply to conversations.
+          {t('settings.response_and_resolution_targets_you_can')}
         </p>
         {canManage ? (
           <Button size="sm" onClick={openNew}>
-            <Plus className="size-4" /> New policy
+            <Plus className="size-4" /> {t('settings.new_policy')}
           </Button>
         ) : null}
       </div>
@@ -248,7 +249,7 @@ export function SlaPanel() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load SLA policies.{' '}
           <Button variant="link" className="px-1" onClick={() => policies.refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Card>
       ) : !policies.data || policies.data.length === 0 ? (
@@ -257,15 +258,15 @@ export function SlaPanel() {
             <EmptyMedia variant="icon">
               <Timer />
             </EmptyMedia>
-            <EmptyTitle>No SLA policies yet</EmptyTitle>
+            <EmptyTitle>{t('settings.no_sla_policies_yet')}</EmptyTitle>
             <EmptyDescription>
-              Define response-time targets and apply them to conversations.
+              {t('settings.define_response_time_targets_and_apply')}
             </EmptyDescription>
           </EmptyHeader>
           {canManage ? (
             <EmptyContent>
               <Button onClick={openNew}>
-                <Plus className="size-4" /> Create a policy
+                <Plus className="size-4" /> {t('settings.create_a_policy')}
               </Button>
             </EmptyContent>
           ) : null}
@@ -321,19 +322,18 @@ export function SlaPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              Conversations currently under this policy keep their history, but no new targets will
-              be tracked. This cannot be undone.
+              {t('settings.conversations_currently_under_this_policy_keep')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

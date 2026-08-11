@@ -36,6 +36,7 @@ import { fullDateTime } from '@/lib/format'
 
 import type { ApiKeyCreated } from '../api'
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '../hooks'
+import { t } from '@/i18n'
 
 const SCOPES = [
   { value: 'read', label: 'Read', hint: 'Read-only access' },
@@ -74,9 +75,9 @@ export function ApiKeysPanel() {
     if (!created) return
     try {
       await navigator.clipboard.writeText(created.key)
-      toast.success('Key copied')
+      toast.success(t('settings.key_copied'))
     } catch {
-      toast.error('Could not copy')
+      toast.error(t('common.could_not_copy'))
     }
   }
 
@@ -84,10 +85,10 @@ export function ApiKeysPanel() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Programmatic access to the Stept API. Keys are shown once at creation.
+          {t('settings.programmatic_access_to_the_stept_api')}
         </p>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="size-4" /> New key
+          <Plus className="size-4" /> {t('settings.new_key')}
         </Button>
       </div>
 
@@ -99,8 +100,8 @@ export function ApiKeysPanel() {
             <EmptyMedia variant="icon">
               <KeyRound />
             </EmptyMedia>
-            <EmptyTitle>No API keys</EmptyTitle>
-            <EmptyDescription>Create a key to call the Stept API from your systems.</EmptyDescription>
+            <EmptyTitle>{t('settings.no_api_keys')}</EmptyTitle>
+            <EmptyDescription>{t('settings.create_a_key_to_call_the')}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -109,10 +110,10 @@ export function ApiKeysPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Prefix</TableHead>
-                  <TableHead>Scopes</TableHead>
-                  <TableHead>Last used</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('settings.prefix')}</TableHead>
+                  <TableHead>{t('settings.scopes')}</TableHead>
+                  <TableHead>{t('settings.last_used')}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -135,7 +136,7 @@ export function ApiKeysPanel() {
                     </TableCell>
                     <TableCell>
                       {key.revoked_at ? (
-                        <Badge variant="outline">Revoked</Badge>
+                        <Badge variant="outline">{t('settings.revoked')}</Badge>
                       ) : (
                         <Button
                           variant="ghost"
@@ -143,7 +144,7 @@ export function ApiKeysPanel() {
                           disabled={revoke.isPending}
                           onClick={() => revoke.mutate(key.id)}
                         >
-                          Revoke
+                          {t('settings.revoke')}
                         </Button>
                       )}
                     </TableCell>
@@ -159,21 +160,21 @@ export function ApiKeysPanel() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New API key</DialogTitle>
-            <DialogDescription>Choose the scopes this key should be able to use.</DialogDescription>
+            <DialogTitle>{t('settings.new_api_key')}</DialogTitle>
+            <DialogDescription>{t('settings.choose_the_scopes_this_key_should')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-1.5">
-              <Label htmlFor="key-name">Name</Label>
+              <Label htmlFor="key-name">{t('common.name')}</Label>
               <Input
                 id="key-name"
-                placeholder="e.g. Zapier integration"
+                placeholder={t('settings.e_g_zapier_integration')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
-              <Label>Scopes</Label>
+              <Label>{t('settings.scopes')}</Label>
               {SCOPES.map((scope) => (
                 <label
                   key={scope.value}
@@ -193,7 +194,7 @@ export function ApiKeysPanel() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={submit} disabled={!name.trim() || scopes.length === 0 || create.isPending}>
               {create.isPending ? 'Creating…' : 'Create key'}
@@ -206,9 +207,9 @@ export function ApiKeysPanel() {
       <Dialog open={created !== null} onOpenChange={(open) => !open && setCreated(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Copy your API key</DialogTitle>
+            <DialogTitle>{t('settings.copy_your_api_key')}</DialogTitle>
             <DialogDescription>
-              This is the only time the full key is shown. Store it somewhere safe.
+              {t('settings.this_is_the_only_time_the')}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-2">
@@ -216,16 +217,16 @@ export function ApiKeysPanel() {
               <code className="flex-1 truncate font-mono text-xs" data-testid="revealed-key">
                 {created?.key}
               </code>
-              <Button variant="ghost" size="icon" className="size-7" aria-label="Copy key" onClick={copyKey}>
+              <Button variant="ghost" size="icon" className="size-7" aria-label={t('settings.copy_key')} onClick={copyKey}>
                 <Copy className="size-4" />
               </Button>
             </div>
             <p className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-              <TriangleAlert className="size-4" /> You won’t be able to see this key again.
+              <TriangleAlert className="size-4" /> {t('settings.you_won_t_be_able_to')}
             </p>
           </div>
           <DialogFooter>
-            <Button onClick={() => setCreated(null)}>Done</Button>
+            <Button onClick={() => setCreated(null)}>{t('common.done')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

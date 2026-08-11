@@ -12,6 +12,7 @@ import {
   readableTextOn,
   type TourDraft,
 } from '../lib'
+import { t } from '@/i18n'
 
 /** A colour input paired with its hex field; blank means "use the accent". */
 function ColorField({
@@ -66,7 +67,7 @@ function BannerPreview({ draft }: { draft: TourDraft }) {
 
   return (
     <div className="grid gap-1.5">
-      <span className="text-xs font-medium">Preview</span>
+      <span className="text-xs font-medium">{t('common.preview')}</span>
       <div
         className={cn(
           'flex flex-col gap-1 rounded-md border bg-muted/40 p-2',
@@ -93,7 +94,7 @@ function BannerPreview({ draft }: { draft: TourDraft }) {
             className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium"
             style={{ backgroundColor: color, color: background }}
           >
-            Next
+            {t('common.next')}
           </span>
         </div>
         {draft.bannerPosition === 'top' ? (
@@ -133,7 +134,7 @@ export function BannerDesigner({
       <BannerPreview draft={draft} />
 
       <div className="grid gap-1.5">
-        <Label htmlFor="banner-position">Dock it</Label>
+        <Label htmlFor="banner-position">{t('tours.dock_it')}</Label>
         <NativeSelect
           id="banner-position"
           className="w-full"
@@ -141,13 +142,13 @@ export function BannerDesigner({
           disabled={disabled}
           onChange={(e) => onChange({ bannerPosition: e.target.value as 'top' | 'bottom' })}
         >
-          <NativeSelectOption value="top">Top of the page</NativeSelectOption>
-          <NativeSelectOption value="bottom">Bottom of the page</NativeSelectOption>
+          <NativeSelectOption value="top">{t('tours.top_of_the_page')}</NativeSelectOption>
+          <NativeSelectOption value="bottom">{t('tours.bottom_of_the_page')}</NativeSelectOption>
         </NativeSelect>
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor="banner-layout">Layout</Label>
+        <Label htmlFor="banner-layout">{t('tours.layout')}</Label>
         <NativeSelect
           id="banner-layout"
           className="w-full"
@@ -170,8 +171,8 @@ export function BannerDesigner({
 
       <div className="flex items-start justify-between gap-3">
         <div className="grid gap-0.5">
-          <Label htmlFor="banner-full-width">Full width</Label>
-          <p className="text-[11px] text-muted-foreground">Off to centre a narrower bar.</p>
+          <Label htmlFor="banner-full-width">{t('tours.full_width')}</Label>
+          <p className="text-[11px] text-muted-foreground">{t('tours.off_to_centre_a_narrower_bar')}</p>
         </div>
         <Switch
           id="banner-full-width"
@@ -184,8 +185,8 @@ export function BannerDesigner({
       {draft.bannerFullWidth ? (
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-0.5">
-            <Label htmlFor="banner-rounded">Rounded corners</Label>
-            <p className="text-[11px] text-muted-foreground">Softens a full-bleed bar.</p>
+            <Label htmlFor="banner-rounded">{t('tours.rounded_corners')}</Label>
+            <p className="text-[11px] text-muted-foreground">{t('tours.softens_a_full_bleed_bar')}</p>
           </div>
           <Switch
             id="banner-rounded"
@@ -208,12 +209,12 @@ export function BannerDesigner({
             disabled={disabled}
             onChange={(e) => onChange({ bannerMaxWidth: e.target.value })}
           />
-          <p className="text-[11px] text-muted-foreground">Anything from 240 to 2000.</p>
+          <p className="text-[11px] text-muted-foreground">{t('tours.anything_from_240_to_2000')}</p>
         </div>
       )}
 
       <div className="grid gap-1.5">
-        <Label htmlFor="banner-align">Align</Label>
+        <Label htmlFor="banner-align">{t('tours.align')}</Label>
         <NativeSelect
           id="banner-align"
           className="w-full"
@@ -231,7 +232,7 @@ export function BannerDesigner({
 
       <ColorField
         id="banner-bg"
-        label="Background"
+        label={t('tours.background')}
         value={draft.bannerBackground}
         fallback={draft.accent}
         hint="Blank follows the tour accent."
@@ -240,7 +241,7 @@ export function BannerDesigner({
       />
       <ColorField
         id="banner-fg"
-        label="Text colour"
+        label={t('tours.text_colour')}
         value={draft.bannerTextColor}
         fallback={readableTextOn(background)}
         hint="Blank picks whichever of black or white reads better."
@@ -249,7 +250,7 @@ export function BannerDesigner({
       />
 
       <div className="grid gap-1.5">
-        <Label htmlFor="banner-icon">Icon</Label>
+        <Label htmlFor="banner-icon">{t('common.icon')}</Label>
         <div className="flex flex-wrap items-center gap-1">
           {BANNER_ICONS.map((icon) => (
             <button
@@ -269,10 +270,10 @@ export function BannerDesigner({
           ))}
           <Input
             id="banner-icon"
-            aria-label="Banner icon"
+            aria-label={t('tours.banner_icon')}
             className="w-20"
             maxLength={4}
-            placeholder="None"
+            placeholder={t('common.none')}
             value={draft.bannerIcon}
             disabled={disabled}
             onChange={(e) => onChange({ bannerIcon: e.target.value })}
@@ -281,7 +282,7 @@ export function BannerDesigner({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor="banner-dismiss">Close button</Label>
+        <Label htmlFor="banner-dismiss">{t('tours.close_button')}</Label>
         <NativeSelect
           id="banner-dismiss"
           className="w-full"

@@ -29,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input'
 import type { ContactImportPreview } from '@/features/contacts/api'
 import { useStartImport, useUploadImport } from '@/features/contacts/hooks'
+import { t } from '@/i18n'
 
 const SKIP = '__skip__'
 
@@ -110,17 +111,15 @@ export function ImportDialog({
     >
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Import contacts</DialogTitle>
+          <DialogTitle>{t('contacts.import_contacts')}</DialogTitle>
           <DialogDescription>
-            Upload a CSV exported from your current help desk. Existing contacts are matched by
-            external ID, then email, then phone — so re-running an export updates rather than
-            duplicates.
+            {t('contacts.upload_a_csv_exported_from_your')}
           </DialogDescription>
         </DialogHeader>
 
         {!preview ? (
           <div className="grid gap-2 py-4">
-            <Label htmlFor="import-file">CSV file</Label>
+            <Label htmlFor="import-file">{t('contacts.csv_file')}</Label>
             <Input
               id="import-file"
               type="file"
@@ -149,19 +148,19 @@ export function ImportDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={SKIP}>Skip</SelectItem>
+                    <SelectItem value={SKIP}>{t('contacts.skip')}</SelectItem>
                     {TARGETS.map((target) => (
                       <SelectItem key={target.value} value={target.value}>
                         {target.label}
                       </SelectItem>
                     ))}
-                    <SelectItem value="attributes">Custom attribute…</SelectItem>
+                    <SelectItem value="attributes">{t('contacts.custom_attribute')}</SelectItem>
                   </SelectContent>
                 </Select>
                 {mapping[header] === 'attributes' ? (
                   <Input
                     className="h-8 w-40"
-                    placeholder="attribute key"
+                    placeholder={t('contacts.attribute_key')}
                     aria-label={`Attribute key for ${header}`}
                     value={customKeys[header] ?? ''}
                     onChange={(e) =>
@@ -176,7 +175,7 @@ export function ImportDialog({
             ))}
             {!hasIdentity ? (
               <p className="text-xs text-destructive">
-                Map at least one of email, phone or external ID so rows can be matched.
+                {t('contacts.map_at_least_one_of_email')}
               </p>
             ) : null}
           </div>
@@ -184,12 +183,12 @@ export function ImportDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           {preview ? (
             <Button onClick={run} disabled={!hasIdentity || start.isPending}>
               <Upload className="mr-1 size-4" />
-              Start import
+              {t('contacts.start_import')}
             </Button>
           ) : null}
         </DialogFooter>

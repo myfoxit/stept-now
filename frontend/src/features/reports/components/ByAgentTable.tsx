@@ -10,25 +10,26 @@ import {
 
 import type { ReportByAgent } from '../api'
 import { formatMinutes } from '../lib'
+import { t } from '@/i18n'
 
 export function ByAgentTable({ data }: { data: ReportByAgent[] }) {
   const max = Math.max(1, ...data.map((row) => row.resolved))
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">By agent</CardTitle>
+        <CardTitle className="text-sm">{t('reports.by_agent')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">No agent activity yet.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">{t('reports.no_agent_activity_yet')}</p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Agent</TableHead>
-                  <TableHead className="w-1/2">Resolved</TableHead>
-                  <TableHead className="text-right">Median first response</TableHead>
+                  <TableHead>{t('common.agent')}</TableHead>
+                  <TableHead className="w-1/2">{t('reports.resolved')}</TableHead>
+                  <TableHead className="text-right">{t('reports.median_first_response')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

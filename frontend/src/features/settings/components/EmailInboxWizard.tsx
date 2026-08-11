@@ -33,6 +33,7 @@ import type { Inbox } from '../api'
 import { useCreateInbox, useIntegrations, useUpdateInbox } from '../hooks'
 import { ConnectionSelect } from './integrations/ConnectionSelect'
 import { mcpOrigin as apiOrigin } from './McpSnippets'
+import { t } from '@/i18n'
 
 type TransportId =
   | 'gmail'
@@ -131,7 +132,7 @@ async function copyText(text: string, label: string) {
     await navigator.clipboard.writeText(text)
     toast.success(`${label} copied`)
   } catch {
-    toast.error('Could not copy')
+    toast.error(t('common.could_not_copy'))
   }
 }
 
@@ -380,35 +381,35 @@ export function EmailInboxWizard({
 
         {step === 1 ? (
           <div className="grid gap-2 py-2 sm:grid-cols-2">
-            {TRANSPORTS.map((t) => {
+            {TRANSPORTS.map((transportDef) => {
               const needsConnection =
-                t.oneClickProvider !== undefined && connectionsFor(t.oneClickProvider).length === 0
-              const selected = transport === t.id
+                transportDef.oneClickProvider !== undefined && connectionsFor(transportDef.oneClickProvider).length === 0
+              const selected = transport === transportDef.id
               if (needsConnection) {
                 return (
-                  <div key={t.id} className="grid gap-2 rounded-md border border-dashed p-3">
+                  <div key={transportDef.id} className="grid gap-2 rounded-md border border-dashed p-3">
                     <div>
                       <span className="flex items-center gap-1.5 text-sm font-medium">
-                        {t.label}
+                        {transportDef.label}
                         <Badge variant="outline" className="text-[10px]">
-                          one-click
+                          {t('settings.one_click')}
                         </Badge>
                       </span>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{t.desc}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{transportDef.desc}</p>
                     </div>
                     <Link
                       to="/settings/integrations"
                       className="text-xs font-medium underline underline-offset-2 hover:text-foreground"
                       onClick={() => onOpenChange(false)}
                     >
-                      Connect {t.oneClickProvider === 'google' ? 'Google' : 'Microsoft'} first
+                      Connect {transportDef.oneClickProvider === 'google' ? 'Google' : 'Microsoft'} first
                     </Link>
                   </div>
                 )
               }
               return (
                 <button
-                  key={t.id}
+                  key={transportDef.id}
                   type="button"
                   aria-pressed={selected}
                   className={cn(
@@ -416,20 +417,20 @@ export function EmailInboxWizard({
                     selected && 'border-primary bg-accent/30'
                   )}
                   onClick={() => {
-                    setTransport(t.id)
+                    setTransport(transportDef.id)
                     setStep(2)
                   }}
                 >
                   <span className="flex items-center gap-1.5 text-sm font-medium">
-                    {t.label}
-                    {t.oneClickProvider ? (
+                    {transportDef.label}
+                    {transportDef.oneClickProvider ? (
                       <Badge variant="outline" className="text-[10px]">
-                        one-click
+                        {t('settings.one_click')}
                       </Badge>
                     ) : null}
                     {selected ? <Check className="size-3.5 text-primary" /> : null}
                   </span>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t.desc}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{transportDef.desc}</p>
                 </button>
               )
             })}
@@ -458,11 +459,11 @@ export function EmailInboxWizard({
 
             <div className="grid gap-1.5">
               <Label htmlFor="email-address">
-                Address<span className="text-destructive"> *</span>
+                {t('settings.address')}<span className="text-destructive"> *</span>
               </Label>
               <Input
                 id="email-address"
-                placeholder="support@yourcompany.com"
+                placeholder={t('settings.support_yourcompany_com')}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
@@ -475,7 +476,7 @@ export function EmailInboxWizard({
               <div className="grid gap-1 rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
                 <span>SMTP: {ONE_CLICK_HOSTS[transport].smtp}</span>
                 <span>IMAP: {ONE_CLICK_HOSTS[transport].imap}</span>
-                <span>Set automatically — sign-in uses the connected account.</span>
+                <span>{t('settings.set_automatically_sign_in_uses_the')}</span>
               </div>
             ) : null}
 
@@ -484,17 +485,17 @@ export function EmailInboxWizard({
                 <div className="grid grid-cols-[1fr_auto] gap-3">
                   <div className="grid gap-1.5">
                     <Label htmlFor="smtp-host">
-                      SMTP host<span className="text-destructive"> *</span>
+                      {t('settings.smtp_host')}<span className="text-destructive"> *</span>
                     </Label>
                     <Input
                       id="smtp-host"
-                      placeholder="mail.example.com"
+                      placeholder={t('settings.mail_example_com')}
                       value={smtpHost}
                       onChange={(e) => setSmtpHost(e.target.value)}
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="smtp-port">Port</Label>
+                    <Label htmlFor="smtp-port">{t('settings.port')}</Label>
                     <Input
                       id="smtp-port"
                       type="number"
@@ -507,7 +508,7 @@ export function EmailInboxWizard({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label htmlFor="smtp-username">
-                      Username<span className="text-destructive"> *</span>
+                      {t('settings.username')}<span className="text-destructive"> *</span>
                     </Label>
                     <Input
                       id="smtp-username"
@@ -516,7 +517,7 @@ export function EmailInboxWizard({
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="smtp-security">Security</Label>
+                    <Label htmlFor="smtp-security">{t('settings.security')}</Label>
                     <NativeSelect
                       id="smtp-security"
                       className="w-full"
@@ -525,7 +526,7 @@ export function EmailInboxWizard({
                     >
                       <NativeSelectOption value="starttls">STARTTLS</NativeSelectOption>
                       <NativeSelectOption value="tls">TLS</NativeSelectOption>
-                      <NativeSelectOption value="none">None</NativeSelectOption>
+                      <NativeSelectOption value="none">{t('common.none')}</NativeSelectOption>
                     </NativeSelect>
                   </div>
                 </div>
@@ -535,7 +536,7 @@ export function EmailInboxWizard({
             {transport === 'ses' ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="ses-region">
-                  AWS region<span className="text-destructive"> *</span>
+                  {t('settings.aws_region')}<span className="text-destructive"> *</span>
                 </Label>
                 <Input
                   id="ses-region"
@@ -550,17 +551,17 @@ export function EmailInboxWizard({
               <div className="grid grid-cols-[1fr_auto] gap-3">
                 <div className="grid gap-1.5">
                   <Label htmlFor="mailgun-domain">
-                    Sending domain<span className="text-destructive"> *</span>
+                    {t('settings.sending_domain')}<span className="text-destructive"> *</span>
                   </Label>
                   <Input
                     id="mailgun-domain"
-                    placeholder="mg.example.com"
+                    placeholder={t('settings.mg_example_com')}
                     value={mailgunDomain}
                     onChange={(e) => setMailgunDomain(e.target.value)}
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="mailgun-base">Region</Label>
+                  <Label htmlFor="mailgun-base">{t('settings.region')}</Label>
                   <NativeSelect
                     id="mailgun-base"
                     value={mailgunBase}
@@ -598,7 +599,7 @@ export function EmailInboxWizard({
           <div className="grid gap-4 py-2">
             {forwardTo ? (
               <CopyRow
-                label="Forward-to address"
+                label={t('settings.forward_to_address')}
                 value={forwardTo}
                 hint={`Set up forwarding from ${str(savedConfig.address) || 'your address'} to this address at your email provider.`}
               />
@@ -606,7 +607,7 @@ export function EmailInboxWizard({
 
             {webhookUrl ? (
               <CopyRow
-                label="Inbound webhook URL"
+                label={t('settings.inbound_webhook_url')}
                 value={webhookUrl}
                 hint={WEBHOOK_HINTS[transport] ?? 'POST inbound email JSON to this URL.'}
               />
@@ -614,8 +615,7 @@ export function EmailInboxWizard({
 
             {!forwardTo && !webhookUrl ? (
               <p className="text-sm text-muted-foreground">
-                Inbound endpoints appear here once the server has an inbound email domain
-                configured.
+                {t('settings.inbound_endpoints_appear_here_once_the')}
               </p>
             ) : null}
 
@@ -623,9 +623,9 @@ export function EmailInboxWizard({
               <div className="grid gap-3 rounded-md border p-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="grid gap-1">
-                    <Label htmlFor="imap-enabled">IMAP polling</Label>
+                    <Label htmlFor="imap-enabled">{t('settings.imap_polling')}</Label>
                     <p className="text-xs text-muted-foreground">
-                      Pull new mail directly from the mailbox — no forwarding needed.
+                      {t('settings.pull_new_mail_directly_from_the')}
                     </p>
                   </div>
                   <Switch
@@ -642,10 +642,10 @@ export function EmailInboxWizard({
                   <>
                     <div className="grid grid-cols-[1fr_auto] gap-3">
                       <div className="grid gap-1.5">
-                        <Label htmlFor="imap-host">IMAP host</Label>
+                        <Label htmlFor="imap-host">{t('settings.imap_host')}</Label>
                         <Input
                           id="imap-host"
-                          placeholder="imap.example.com"
+                          placeholder={t('settings.imap_example_com')}
                           value={imapHost}
                           onChange={(e) => {
                             setImapHost(e.target.value)
@@ -654,7 +654,7 @@ export function EmailInboxWizard({
                         />
                       </div>
                       <div className="grid gap-1.5">
-                        <Label htmlFor="imap-port">Port</Label>
+                        <Label htmlFor="imap-port">{t('settings.port')}</Label>
                         <Input
                           id="imap-port"
                           type="number"
@@ -669,7 +669,7 @@ export function EmailInboxWizard({
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1.5">
-                        <Label htmlFor="imap-username">IMAP username</Label>
+                        <Label htmlFor="imap-username">{t('settings.imap_username')}</Label>
                         <Input
                           id="imap-username"
                           value={imapUsername}
@@ -680,7 +680,7 @@ export function EmailInboxWizard({
                         />
                       </div>
                       <div className="grid gap-1.5">
-                        <Label htmlFor="imap-password">IMAP password</Label>
+                        <Label htmlFor="imap-password">{t('settings.imap_password')}</Label>
                         <Input
                           id="imap-password"
                           type="password"
@@ -727,15 +727,15 @@ export function EmailInboxWizard({
         <DialogFooter>
           {step === 1 ? (
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           ) : step === 2 ? (
             <Button variant="outline" onClick={() => setStep(1)}>
-              Back
+              {t('common.back')}
             </Button>
           ) : null}
           {step === 1 ? (
-            <Button onClick={() => setStep(2)}>Continue</Button>
+            <Button onClick={() => setStep(2)}>{t('settings.continue')}</Button>
           ) : step === 2 ? (
             <Button onClick={save} disabled={!canSave || saving}>
               {saving ? 'Saving…' : editing ? 'Save' : 'Create inbox'}

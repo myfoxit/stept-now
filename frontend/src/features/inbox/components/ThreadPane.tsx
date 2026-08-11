@@ -15,6 +15,7 @@ import {
   useMessages,
   useTypingIndicator,
 } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 export function ThreadPane({ conversationId }: { conversationId?: string }) {
   const canWrite = useHasPerm('conversations:write')
@@ -37,8 +38,8 @@ export function ThreadPane({ conversationId }: { conversationId?: string }) {
             <EmptyMedia variant="icon">
               <MessagesSquare className="size-5" />
             </EmptyMedia>
-            <EmptyTitle>No conversation selected</EmptyTitle>
-            <EmptyDescription>Pick a conversation from the list to get started.</EmptyDescription>
+            <EmptyTitle>{t('inbox.no_conversation_selected')}</EmptyTitle>
+            <EmptyDescription>{t('inbox.pick_a_conversation_from_the_list')}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </div>

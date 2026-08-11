@@ -25,6 +25,7 @@ import { integrationsKeys } from '../api'
 import { useIntegrations } from '../hooks'
 import { IntegrationCard } from './integrations/IntegrationCard'
 import { CATEGORY_LABELS, CATEGORY_ORDER, oauthErrorMessage } from './integrations/lib'
+import { t } from '@/i18n'
 
 export function IntegrationsPanel() {
   const integrations = useIntegrations()
@@ -69,7 +70,7 @@ export function IntegrationsPanel() {
           <EmptyMedia variant="icon">
             <Blocks />
           </EmptyMedia>
-          <EmptyTitle>No integrations available</EmptyTitle>
+          <EmptyTitle>{t('settings.no_integrations_available')}</EmptyTitle>
           <EmptyDescription>
             {integrations.isError
               ? 'Integrations could not be loaded — try again shortly.'
@@ -83,8 +84,7 @@ export function IntegrationsPanel() {
   return (
     <div className="grid gap-6">
       <p className="text-sm text-muted-foreground">
-        Connect the accounts Stept sends mail through, syncs knowledge from and posts to.
-        Connections belong to the workspace and can be managed by any admin.
+        {t('settings.connect_the_accounts_stept_sends_mail')}
       </p>
       {CATEGORY_ORDER.map((category) => {
         const group = providers.filter((p) => p.category === category)

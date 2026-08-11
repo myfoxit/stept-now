@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { timeAgo } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
+import { t } from '@/i18n'
 
 interface Notification {
   id: string
@@ -56,7 +57,7 @@ export function NotificationsBell() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative shrink-0" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative shrink-0" aria-label={t('common.notifications')}>
           <Bell className="size-4" />
           {unread.length > 0 ? (
             <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-brand-foreground">
@@ -67,10 +68,10 @@ export function NotificationsBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         <div className="flex items-center justify-between border-b px-3 py-2">
-          <span className="text-sm font-semibold">Notifications</span>
+          <span className="text-sm font-semibold">{t('common.notifications')}</span>
           {unread.length > 0 ? (
             <Button variant="ghost" size="sm" onClick={() => markAll.mutate()}>
-              Mark all read
+              {t('common.mark_all_read')}
             </Button>
           ) : null}
         </div>

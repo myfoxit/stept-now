@@ -15,6 +15,7 @@ import { timeAgo } from '@/lib/format'
 import { currentWorkspaceId } from '@/stores/auth'
 
 import { aiApi, aiKeys, type Approval } from '../api'
+import { t } from '@/i18n'
 
 export function ApprovalCard({ approval }: { approval: Approval }) {
   const workspaceId = currentWorkspaceId()
@@ -42,7 +43,7 @@ export function ApprovalCard({ approval }: { approval: Approval }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{approval.agent_name ?? 'Agent'}</span>
-            <span className="text-sm text-muted-foreground">wants to run</span>
+            <span className="text-sm text-muted-foreground">{t('ai.wants_to_run')}</span>
             <Badge variant="outline" className="font-mono text-xs">
               {approval.tool_key}
             </Badge>
@@ -53,7 +54,7 @@ export function ApprovalCard({ approval }: { approval: Approval }) {
         </div>
         <Button variant="ghost" size="sm" asChild>
           <Link to={`/inbox/${approval.conversation_id}`}>
-            View <ExternalLink className="size-3.5" />
+            {t('ai.view')} <ExternalLink className="size-3.5" />
           </Link>
         </Button>
       </CardHeader>
@@ -67,8 +68,8 @@ export function ApprovalCard({ approval }: { approval: Approval }) {
           <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Add a note (optional)"
-            aria-label="Decision note"
+            placeholder={t('ai.add_a_note_optional')}
+            aria-label={t('ai.decision_note')}
             className="h-9"
           />
           <div className="flex gap-2">

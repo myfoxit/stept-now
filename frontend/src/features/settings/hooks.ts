@@ -30,6 +30,7 @@ import {
   type SlaPolicyUpdate,
   type WorkspaceUpdate,
 } from './api'
+import { t } from '@/i18n'
 
 function errMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback
@@ -51,7 +52,7 @@ export function useUpdateWorkspace() {
   return useMutation({
     mutationFn: (body: WorkspaceUpdate) => workspaceApi.update(body),
     onSuccess: () => {
-      toast.success('Workspace updated')
+      toast.success(t('settings.workspace_updated'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not update workspace')),
@@ -74,7 +75,7 @@ export function useUpdateMember() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: MemberUpdate }) => membersApi.update(id, body),
     onSuccess: () => {
-      toast.success('Member updated')
+      toast.success(t('settings.member_updated'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not update member')),
@@ -87,7 +88,7 @@ export function useRemoveMember() {
   return useMutation({
     mutationFn: (id: string) => membersApi.remove(id),
     onSuccess: () => {
-      toast.success('Member removed')
+      toast.success(t('settings.member_removed'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not remove member')),
@@ -100,7 +101,7 @@ export function useInvite() {
   return useMutation({
     mutationFn: (body: InvitationCreate) => membersApi.invite(body),
     onSuccess: () => {
-      toast.success('Invitation sent')
+      toast.success(t('settings.invitation_sent'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not send invite')),
@@ -113,7 +114,7 @@ export function useRevokeInvitation() {
   return useMutation({
     mutationFn: (id: string) => membersApi.revokeInvitation(id),
     onSuccess: () => {
-      toast.success('Invitation revoked')
+      toast.success(t('settings.invitation_revoked'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not revoke invite')),
@@ -136,7 +137,7 @@ export function useCreateRole() {
   return useMutation({
     mutationFn: (body: RoleCreate) => rolesApi.create(body),
     onSuccess: () => {
-      toast.success('Role created')
+      toast.success(t('settings.role_created'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create role')),
@@ -149,7 +150,7 @@ export function useUpdateRole() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: RoleUpdate }) => rolesApi.update(id, body),
     onSuccess: () => {
-      toast.success('Role saved')
+      toast.success(t('settings.role_saved'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save role')),
@@ -162,7 +163,7 @@ export function useDeleteRole() {
   return useMutation({
     mutationFn: (id: string) => rolesApi.remove(id),
     onSuccess: () => {
-      toast.success('Role deleted')
+      toast.success(t('settings.role_deleted'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete role')),
@@ -191,7 +192,7 @@ export function useRevokeApiKey() {
   return useMutation({
     mutationFn: (id: string) => apiKeysApi.revoke(id),
     onSuccess: () => {
-      toast.success('Key revoked')
+      toast.success(t('settings.key_revoked'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not revoke key')),
@@ -219,7 +220,7 @@ export function useCreateInbox() {
   return useMutation({
     mutationFn: (body: InboxCreate) => channelsApi.create(body),
     onSuccess: () => {
-      toast.success('Channel created')
+      toast.success(t('settings.channel_created'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create channel')),
@@ -232,7 +233,7 @@ export function useUpdateInbox() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: InboxUpdate }) => channelsApi.update(id, body),
     onSuccess: () => {
-      toast.success('Channel updated')
+      toast.success(t('settings.channel_updated'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not update channel')),
@@ -245,7 +246,7 @@ export function useDeleteInbox() {
   return useMutation({
     mutationFn: (id: string) => channelsApi.remove(id),
     onSuccess: () => {
-      toast.success('Channel deleted')
+      toast.success(t('settings.channel_deleted'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete channel')),
@@ -287,7 +288,7 @@ export function useDisconnectConnection() {
   return useMutation({
     mutationFn: (connectionId: string) => integrationsApi.disconnect(connectionId),
     onSuccess: () => {
-      toast.success('Disconnected')
+      toast.success(t('settings.disconnected'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not disconnect')),
@@ -301,7 +302,7 @@ export function usePutCredentials() {
     mutationFn: ({ provider, body }: { provider: string; body: CredentialIn }) =>
       integrationsApi.putCredentials(provider, body),
     onSuccess: () => {
-      toast.success('App credentials saved')
+      toast.success(t('settings.app_credentials_saved'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save credentials')),
@@ -314,7 +315,7 @@ export function useDeleteCredentials() {
   return useMutation({
     mutationFn: (provider: string) => integrationsApi.deleteCredentials(provider),
     onSuccess: () => {
-      toast.success('Workspace credentials removed')
+      toast.success(t('settings.workspace_credentials_removed'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not remove credentials')),
@@ -333,7 +334,7 @@ export function useCreateSlaPolicy() {
   return useMutation({
     mutationFn: (body: SlaPolicyCreate) => slasApi.create(body),
     onSuccess: () => {
-      toast.success('SLA policy created')
+      toast.success(t('settings.sla_policy_created'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create SLA policy')),
@@ -346,7 +347,7 @@ export function useUpdateSlaPolicy() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: SlaPolicyUpdate }) => slasApi.update(id, body),
     onSuccess: () => {
-      toast.success('SLA policy saved')
+      toast.success(t('settings.sla_policy_saved'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save SLA policy')),
@@ -359,7 +360,7 @@ export function useDeleteSlaPolicy() {
   return useMutation({
     mutationFn: (id: string) => slasApi.remove(id),
     onSuccess: () => {
-      toast.success('SLA policy deleted')
+      toast.success(t('settings.sla_policy_deleted'))
       void queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete SLA policy')),
@@ -370,8 +371,9 @@ export function useDeleteSlaPolicy() {
 
 export function useUpdateProfile() {
   return useMutation({
-    mutationFn: (body: { name?: string; avatar_url?: string }) => profileApi.update(body),
-    onSuccess: () => toast.success('Profile updated'),
+    mutationFn: (body: { name?: string; avatar_url?: string; locale?: string }) =>
+      profileApi.update(body),
+    onSuccess: () => toast.success(t('settings.profile_updated')),
     onError: (error) => toast.error(errMessage(error, 'Could not update profile')),
   })
 }
@@ -380,7 +382,7 @@ export function useChangePassword() {
   return useMutation({
     mutationFn: (body: { current_password: string; new_password: string }) =>
       profileApi.changePassword(body),
-    onSuccess: () => toast.success('Password changed'),
+    onSuccess: () => toast.success(t('settings.password_changed')),
     onError: (error) => toast.error(errMessage(error, 'Could not change password')),
   })
 }
@@ -413,7 +415,7 @@ export function useCreateAttribute() {
     mutationFn: attributesApi.create,
     onSuccess: () => {
       invalidate()
-      toast.success('Attribute created')
+      toast.success(t('settings.attribute_created'))
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create the attribute')),
   })
@@ -426,7 +428,7 @@ export function useUpdateAttribute() {
       attributesApi.update(id, body),
     onSuccess: () => {
       invalidate()
-      toast.success('Attribute updated')
+      toast.success(t('settings.attribute_updated'))
     },
     onError: (error) => toast.error(errMessage(error, 'Could not update the attribute')),
   })
@@ -438,7 +440,7 @@ export function useDeleteAttribute() {
     mutationFn: attributesApi.remove,
     onSuccess: () => {
       invalidate()
-      toast.success('Attribute deleted — stored values are untouched')
+      toast.success(t('settings.attribute_deleted_stored_values_are_untouched'))
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete the attribute')),
   })

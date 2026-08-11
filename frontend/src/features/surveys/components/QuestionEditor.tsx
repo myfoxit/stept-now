@@ -19,6 +19,7 @@ import {
   type QuestionOptionDraft,
   type SurveyQuestionDraft,
 } from '../lib'
+import { t } from '@/i18n'
 
 /** The 0–10 / 1–5 scales the widget renders; shown here as a read-only preview. */
 function ScalePreview({ type }: { type: QuestionType }) {
@@ -50,7 +51,7 @@ function OptionsEditor({
 }) {
   return (
     <div className="grid gap-2">
-      <Label>Options</Label>
+      <Label>{t('common.options')}</Label>
       {options.map((option, optionIndex) => (
         <div key={option.key} className="flex items-center gap-2" data-testid="question-option">
           <Input
@@ -84,7 +85,7 @@ function OptionsEditor({
           disabled={disabled || options.length >= MAX_OPTIONS}
           onClick={() => onChange([...options, emptyOption()])}
         >
-          <Plus className="size-4" /> Add option
+          <Plus className="size-4" /> {t('surveys.add_option')}
         </Button>
         <span className="text-xs text-muted-foreground">
           {options.length} of {MAX_OPTIONS} options
@@ -115,7 +116,7 @@ export function QuestionEditor({
     <div className="grid gap-3">
       {questions.length === 0 ? (
         <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No questions yet. Start with an NPS score, then ask why.
+          {t('surveys.no_questions_yet_start_with_an')}
         </p>
       ) : null}
 
@@ -161,7 +162,7 @@ export function QuestionEditor({
 
             <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
               <div className="grid gap-1.5">
-                <Label htmlFor={`question-type-${index}`}>Type</Label>
+                <Label htmlFor={`question-type-${index}`}>{t('common.type')}</Label>
                 <NativeSelect
                   id={`question-type-${index}`}
                   className="w-full"
@@ -177,7 +178,7 @@ export function QuestionEditor({
                 </NativeSelect>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor={`question-text-${index}`}>Question</Label>
+                <Label htmlFor={`question-text-${index}`}>{t('surveys.question')}</Label>
                 <Input
                   id={`question-text-${index}`}
                   placeholder={meta?.hint}
@@ -194,7 +195,7 @@ export function QuestionEditor({
 
             {question.type === 'text' ? (
               <p className="text-xs text-muted-foreground">
-                Answered in a free-text box — shown in full on the results page.
+                {t('surveys.answered_in_a_free_text_box')}
               </p>
             ) : null}
 
@@ -208,7 +209,7 @@ export function QuestionEditor({
             ) : null}
 
             <div className="flex items-center justify-between gap-3">
-              <Label htmlFor={`question-required-${index}`}>Required</Label>
+              <Label htmlFor={`question-required-${index}`}>{t('surveys.required')}</Label>
               <Switch
                 id={`question-required-${index}`}
                 aria-label={`Question ${index + 1} required`}
@@ -229,7 +230,7 @@ export function QuestionEditor({
           disabled={disabled || questions.length >= MAX_QUESTIONS}
           onClick={() => onChange([...questions, emptyQuestion()])}
         >
-          <Plus className="size-4" /> Add question
+          <Plus className="size-4" /> {t('surveys.add_question')}
         </Button>
         <span className="text-xs text-muted-foreground">
           {questions.length} of {MAX_QUESTIONS} questions

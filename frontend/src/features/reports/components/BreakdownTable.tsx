@@ -33,6 +33,7 @@ import { useDrilldownStore } from '@/stores/drilldown'
 import type { FilterQuery } from '@/features/inbox/api'
 import { DIMENSIONS, reportsExtraApi, type ReportDimensionRow } from '@/features/reports/api'
 import { useBreakdown } from '@/features/reports/hooks'
+import { t } from '@/i18n'
 
 async function downloadCsv(url: string, filename: string) {
   const response = await fetch(url, { headers: authHeaders() })
@@ -72,9 +73,9 @@ export function BreakdownTable({ days }: { days: number }) {
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-2 space-y-0">
-        <CardTitle className="text-base">Breakdown</CardTitle>
+        <CardTitle className="text-base">{t('reports.breakdown')}</CardTitle>
         <Select value={dimension} onValueChange={setDimension}>
-          <SelectTrigger className="ml-2 h-8 w-32" aria-label="Group by">
+          <SelectTrigger className="ml-2 h-8 w-32" aria-label={t('reports.group_by')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -104,17 +105,17 @@ export function BreakdownTable({ days }: { days: number }) {
         {isLoading ? (
           <Skeleton className="h-40 w-full" />
         ) : (data?.rows.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No conversations in this window.</p>
+          <p className="text-sm text-muted-foreground">{t('reports.no_conversations_in_this_window')}</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="capitalize">{dimension}</TableHead>
-                <TableHead className="text-right">New</TableHead>
-                <TableHead className="text-right">Resolved</TableHead>
-                <TableHead className="text-right">Resolution rate</TableHead>
-                <TableHead className="text-right">Median first reply</TableHead>
-                <TableHead className="text-right">Median resolution</TableHead>
+                <TableHead className="text-right">{t('common.new')}</TableHead>
+                <TableHead className="text-right">{t('reports.resolved')}</TableHead>
+                <TableHead className="text-right">{t('reports.resolution_rate')}</TableHead>
+                <TableHead className="text-right">{t('reports.median_first_reply')}</TableHead>
+                <TableHead className="text-right">{t('reports.median_resolution')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -42,6 +42,7 @@ import {
   type FilterQuery,
   type Message,
 } from '@/features/inbox/api'
+import { t } from '@/i18n'
 
 const AREA = 'inbox'
 
@@ -201,7 +202,7 @@ export function useRunMacro(conversationId: string) {
     onSuccess: (out: MacroRunOut) => {
       const failed = out.results.filter((r) => !r.ok)
       if (failed.length === 0) {
-        toast.success('Macro applied')
+        toast.success(t('inbox.macro_applied'))
       } else {
         toast.error('Macro partially applied', {
           description: `Failed: ${failed
@@ -575,12 +576,12 @@ export function useConversationTags(conversationId: string) {
     add: useMutation({
       mutationFn: (tagId: string) => inboxApi.addTag(conversationId, tagId),
       onSuccess: apply,
-      onError: () => toast.error('Failed to add tag'),
+      onError: () => toast.error(t('inbox.failed_to_add_tag')),
     }),
     remove: useMutation({
       mutationFn: (tagId: string) => inboxApi.removeTag(conversationId, tagId),
       onSuccess: apply,
-      onError: () => toast.error('Failed to remove tag'),
+      onError: () => toast.error(t('inbox.failed_to_remove_tag')),
     }),
   }
 }
@@ -687,7 +688,7 @@ export function useDeleteView() {
     mutationFn: viewsApi.remove,
     onSuccess: async () => {
       await invalidate()
-      toast.success('View deleted')
+      toast.success(t('inbox.view_deleted'))
     },
     onError: (error) => toast.error(errorMessage(error, 'Could not delete the view')),
   })
@@ -800,7 +801,7 @@ export function useSaveWorkingHours(inboxId: string) {
       await queryClient.invalidateQueries({
         queryKey: [AREA, workspaceId, 'working-hours', inboxId],
       })
-      toast.success('Working hours saved')
+      toast.success(t('inbox.working_hours_saved'))
     },
     onError: (error) => toast.error(errorMessage(error, 'Could not save working hours')),
   })

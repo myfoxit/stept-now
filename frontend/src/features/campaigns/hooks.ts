@@ -13,6 +13,7 @@ import {
   type CampaignCreate,
   type CampaignUpdate,
 } from './api'
+import { t } from '@/i18n'
 
 const AREA = 'campaigns'
 
@@ -61,7 +62,7 @@ export function useCreateCampaign() {
   return useMutation({
     mutationFn: (body: CampaignCreate) => campaignsApi.create(body),
     onSuccess: () => {
-      toast.success('Campaign created')
+      toast.success(t('campaigns.campaign_created'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create campaign')),
@@ -74,7 +75,7 @@ export function useUpdateCampaign() {
     mutationFn: ({ id, body }: { id: string; body: CampaignUpdate }) =>
       campaignsApi.update(id, body),
     onSuccess: () => {
-      toast.success('Campaign saved')
+      toast.success(t('campaigns.campaign_saved'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save campaign')),
@@ -86,7 +87,7 @@ export function useDeleteCampaign() {
   return useMutation({
     mutationFn: (id: string) => campaignsApi.remove(id),
     onSuccess: () => {
-      toast.success('Campaign deleted')
+      toast.success(t('campaigns.campaign_deleted'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete campaign')),
@@ -98,7 +99,7 @@ export function useActivateCampaign() {
   return useMutation({
     mutationFn: (id: string) => campaignsApi.activate(id),
     onSuccess: () => {
-      toast.success('Campaign activated')
+      toast.success(t('campaigns.campaign_activated'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not activate campaign')),
@@ -110,7 +111,7 @@ export function usePauseCampaign() {
   return useMutation({
     mutationFn: (id: string) => campaignsApi.pause(id),
     onSuccess: () => {
-      toast.success('Campaign paused')
+      toast.success(t('campaigns.campaign_paused'))
       void invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not pause campaign')),

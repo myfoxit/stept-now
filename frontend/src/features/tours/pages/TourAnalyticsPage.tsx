@@ -13,6 +13,7 @@ import { TourKindBadge } from '../components/TourBadges'
 import { TourKpiTiles } from '../components/TourKpiTiles'
 import { TourStatusBadge } from '../components/TourStatusBadge'
 import { useTour, useTourStats } from '../hooks'
+import { t } from '@/i18n'
 
 export function Component() {
   const { tourId } = useParams<{ tourId: string }>()
@@ -24,7 +25,7 @@ export function Component() {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <Card className="p-6 text-center text-sm text-muted-foreground">
-          You don’t have access to tour analytics.
+          {t('tours.you_don_t_have_access_to')}
         </Card>
       </div>
     )
@@ -35,7 +36,7 @@ export function Component() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to tours">
+        <Button variant="ghost" size="icon" asChild aria-label={t('tours.back_to_tours')}>
           <Link to="/tours">
             <ArrowLeft className="size-4" />
           </Link>
@@ -47,13 +48,13 @@ export function Component() {
             {tour ? <TourKindBadge kind={tour.kind} /> : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            Delivery, drop-off and self-healing for this experience.
+            {t('tours.delivery_drop_off_and_self_healing')}
           </p>
         </div>
         {tourId ? (
           <Button variant="outline" size="sm" asChild>
             <Link to={`/tours/${tourId}`}>
-              <Pencil className="size-4" /> Edit tour
+              <Pencil className="size-4" /> {t('tours.edit_tour')}
             </Link>
           </Button>
         ) : null}
@@ -75,7 +76,7 @@ export function Component() {
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Could not load analytics for this tour.{' '}
               <Button variant="link" className="px-1" onClick={() => statsQuery.refetch()}>
-                Retry
+                {t('common.retry')}
               </Button>
             </Card>
           ) : statsQuery.data ? (

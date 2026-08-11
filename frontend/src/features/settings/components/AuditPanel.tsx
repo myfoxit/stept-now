@@ -15,6 +15,7 @@ import {
 import { fullDateTime } from '@/lib/format'
 
 import { useAuditLog } from '../hooks'
+import { t } from '@/i18n'
 
 function useDebounced<T>(value: T, delay = 300): T {
   const [debounced, setDebounced] = useState(value)
@@ -41,24 +42,24 @@ export function AuditPanel() {
       <div className="flex flex-wrap gap-3">
         <div className="grid gap-1.5">
           <Label htmlFor="audit-action" className="text-xs text-muted-foreground">
-            Action
+            {t('common.action')}
           </Label>
           <Input
             id="audit-action"
             className="w-56"
-            placeholder="e.g. member.update"
+            placeholder={t('settings.e_g_member_update')}
             value={actionInput}
             onChange={(e) => setActionInput(e.target.value)}
           />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="audit-actor" className="text-xs text-muted-foreground">
-            Actor ID
+            {t('settings.actor_id')}
           </Label>
           <Input
             id="audit-actor"
             className="w-56"
-            placeholder="user id"
+            placeholder={t('settings.user_id')}
             value={actorInput}
             onChange={(e) => setActorInput(e.target.value)}
           />
@@ -73,16 +74,16 @@ export function AuditPanel() {
             </div>
           ) : !audit.data || audit.data.items.length === 0 ? (
             <p className="p-8 text-center text-sm text-muted-foreground">
-              No audit entries match these filters.
+              {t('settings.no_audit_entries_match_these_filters')}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Target</TableHead>
+                  <TableHead>{t('common.when')}</TableHead>
+                  <TableHead>{t('settings.actor')}</TableHead>
+                  <TableHead>{t('common.action')}</TableHead>
+                  <TableHead>{t('settings.target')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

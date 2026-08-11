@@ -25,6 +25,7 @@ import {
   type ActionRow,
 } from '../lib'
 import { ActionRows } from './ActionRows'
+import { t } from '@/i18n'
 
 export function MacroEditorDialog({
   open,
@@ -84,30 +85,30 @@ export function MacroEditorDialog({
         <DialogHeader>
           <DialogTitle>{macro ? 'Edit macro' : 'New macro'}</DialogTitle>
           <DialogDescription>
-            A saved set of actions you can apply to any conversation in one click.
+            {t('automation.a_saved_set_of_actions_you')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="macro-name">Name</Label>
+            <Label htmlFor="macro-name">{t('common.name')}</Label>
             <Input
               id="macro-name"
               value={name}
-              placeholder="e.g. Escalate to billing"
+              placeholder={t('automation.e_g_escalate_to_billing')}
               onChange={(event) => setName(event.target.value)}
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="macro-visibility">Visibility</Label>
+            <Label htmlFor="macro-visibility">{t('automation.visibility')}</Label>
             <NativeSelect
               id="macro-visibility"
               className="w-full"
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as 'personal' | 'global')}
             >
-              <NativeSelectOption value="personal">Personal — only you</NativeSelectOption>
+              <NativeSelectOption value="personal">{t('automation.personal_only_you')}</NativeSelectOption>
               <NativeSelectOption value="global" disabled={!canManage}>
                 Global — whole workspace{canManage ? '' : ' (requires manage permission)'}
               </NativeSelectOption>
@@ -116,7 +117,7 @@ export function MacroEditorDialog({
 
           <Separator />
           <div className="grid gap-2">
-            <Label>Actions</Label>
+            <Label>{t('automation.actions')}</Label>
             <ActionRows
               rows={actions}
               onChange={setActions}
@@ -124,14 +125,14 @@ export function MacroEditorDialog({
               types={MACRO_ACTION_TYPES}
             />
             {actions.length === 0 ? (
-              <p className="text-xs text-destructive">Add at least one action.</p>
+              <p className="text-xs text-destructive">{t('automation.add_at_least_one_action')}</p>
             ) : null}
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={save} disabled={!canSave || saving}>
             {saving ? 'Saving…' : macro ? 'Save changes' : 'Create macro'}

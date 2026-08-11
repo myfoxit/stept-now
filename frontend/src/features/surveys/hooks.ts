@@ -7,6 +7,7 @@ import { useRealtime } from '@/api/ws'
 import { currentWorkspaceId } from '@/stores/auth'
 
 import { surveysApi, type SurveyCreate, type SurveyUpdate } from './api'
+import { t } from '@/i18n'
 
 const AREA = 'surveys'
 
@@ -95,7 +96,7 @@ export function useCreateSurvey() {
   return useMutation({
     mutationFn: (body: SurveyCreate) => surveysApi.create(body),
     onSuccess: () => {
-      toast.success('Survey created')
+      toast.success(t('surveys.survey_created'))
       invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not create survey')),
@@ -107,7 +108,7 @@ export function useUpdateSurvey() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: SurveyUpdate }) => surveysApi.update(id, body),
     onSuccess: (survey) => {
-      toast.success('Survey saved')
+      toast.success(t('surveys.survey_saved'))
       invalidate(survey.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not save survey')),
@@ -119,7 +120,7 @@ export function useDeleteSurvey() {
   return useMutation({
     mutationFn: (id: string) => surveysApi.remove(id),
     onSuccess: () => {
-      toast.success('Survey deleted')
+      toast.success(t('surveys.survey_deleted'))
       invalidate()
     },
     onError: (error) => toast.error(errMessage(error, 'Could not delete survey')),
@@ -131,7 +132,7 @@ export function usePublishSurvey() {
   return useMutation({
     mutationFn: (id: string) => surveysApi.publish(id),
     onSuccess: (survey) => {
-      toast.success('Survey is live')
+      toast.success(t('surveys.survey_is_live'))
       invalidate(survey.id)
     },
     onError: (error) => toast.error(publishError(error, 'Could not publish survey')),
@@ -143,7 +144,7 @@ export function usePauseSurvey() {
   return useMutation({
     mutationFn: (id: string) => surveysApi.pause(id),
     onSuccess: (survey) => {
-      toast.success('Survey paused')
+      toast.success(t('surveys.survey_paused'))
       invalidate(survey.id)
     },
     onError: (error) => toast.error(errMessage(error, 'Could not pause survey')),

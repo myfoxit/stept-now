@@ -22,6 +22,7 @@ import { currentWorkspaceId } from '@/stores/auth'
 
 import { aiApi, aiKeys, type ProviderKind } from '../api'
 import { PROVIDER_KINDS } from './status'
+import { t } from '@/i18n'
 
 export function AddProviderDialog({
   open,
@@ -52,7 +53,7 @@ export function AddProviderDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: aiKeys.providers(workspaceId) })
       queryClient.invalidateQueries({ queryKey: aiKeys.models(workspaceId) })
-      toast.success('Provider added')
+      toast.success(t('ai.provider_added'))
       setName('')
       setBaseUrl('')
       setApiKey('')
@@ -67,14 +68,14 @@ export function AddProviderDialog({
     <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add AI provider</DialogTitle>
+          <DialogTitle>{t('ai.add_ai_provider')}</DialogTitle>
           <DialogDescription>
-            Connect a model provider. Your API key is stored encrypted and never shown again.
+            {t('ai.connect_a_model_provider_your_api')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="provider-kind">Provider</Label>
+            <Label htmlFor="provider-kind">{t('ai.provider')}</Label>
             <NativeSelect
               id="provider-kind"
               value={kind}
@@ -89,7 +90,7 @@ export function AddProviderDialog({
             </NativeSelect>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="provider-name">Display name</Label>
+            <Label htmlFor="provider-name">{t('common.display_name')}</Label>
             <Input
               id="provider-name"
               value={name}
@@ -99,7 +100,7 @@ export function AddProviderDialog({
           </div>
           {needsBaseUrl ? (
             <div className="grid gap-1.5">
-              <Label htmlFor="provider-base-url">Base URL</Label>
+              <Label htmlFor="provider-base-url">{t('common.base_url')}</Label>
               <Input
                 id="provider-base-url"
                 value={baseUrl}
@@ -110,7 +111,7 @@ export function AddProviderDialog({
           ) : null}
           {needsKey ? (
             <div className="grid gap-1.5">
-              <Label htmlFor="provider-key">API key</Label>
+              <Label htmlFor="provider-key">{t('ai.api_key')}</Label>
               <Input
                 id="provider-key"
                 type="password"
@@ -124,7 +125,7 @@ export function AddProviderDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => mutation.mutate()} disabled={!canSubmit}>
             {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}

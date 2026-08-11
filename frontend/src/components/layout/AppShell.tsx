@@ -4,6 +4,7 @@ import { StepMark } from '@/components/StepMark'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { CommandK } from '@/components/layout/CommandK'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { t } from '@/i18n'
 
 export function AppShell() {
   return (
@@ -20,7 +21,7 @@ export function AppShell() {
         <div className="flex items-center gap-2 border-b px-3 py-2 md:hidden">
           <SidebarTrigger />
           <StepMark className="size-4 text-brand" />
-          <span className="text-sm font-semibold tracking-tight">Stept</span>
+          <span className="text-sm font-semibold tracking-tight">{t('common.stept')}</span>
         </div>
         <div className="min-h-0 flex-1">
           <Outlet />

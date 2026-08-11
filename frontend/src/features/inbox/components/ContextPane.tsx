@@ -14,6 +14,7 @@ import { WatchersCard } from '@/features/inbox/components/WatchersCard'
 import { TagsEditor } from '@/features/inbox/components/TagsEditor'
 import { inboxApi, type Conversation } from '@/features/inbox/api'
 import { useConversationTags, usePendingApprovals } from '@/features/inbox/hooks'
+import { t } from '@/i18n'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -63,13 +64,13 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
             to={`/contacts/${contact.id}`}
             className="inline-flex items-center gap-1 text-xs text-brand hover:underline"
           >
-            View full profile <ExternalLink className="size-3" />
+            {t('inbox.view_full_profile')} <ExternalLink className="size-3" />
           </Link>
         </div>
 
         <Separator />
 
-        <Section title="Tags">
+        <Section title={t('common.tags')}>
           <TagsEditor
             appliedTagIds={conversation.tag_ids ?? []}
             canManage={canManage}
@@ -84,7 +85,7 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
         </Section>
 
         {pending.length ? (
-          <Section title="Pending approvals">
+          <Section title={t('common.pending_approvals')}>
             <div className="space-y-2">
               {pending.map((a) => (
                 <ApprovalCard key={a.id} approval={a} canApprove={canApprove} />
@@ -94,7 +95,7 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
         ) : null}
 
         {attributes.length ? (
-          <Section title="Attributes">
+          <Section title={t('common.attributes')}>
             <dl className="space-y-1 text-sm">
               {attributes.map(([key, value]) => (
                 <div key={key} className="flex justify-between gap-2">
@@ -106,7 +107,7 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
           </Section>
         ) : null}
 
-        <Section title="Recent conversations">
+        <Section title={t('inbox.recent_conversations')}>
           {otherConversations.length ? (
             <ul className="space-y-1">
               {otherConversations.slice(0, 6).map((c) => (
@@ -130,7 +131,7 @@ export function ContextPane({ conversation }: { conversation: Conversation }) {
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-muted-foreground">No other conversations.</p>
+            <p className="text-xs text-muted-foreground">{t('inbox.no_other_conversations')}</p>
           )}
         </Section>
       </div>

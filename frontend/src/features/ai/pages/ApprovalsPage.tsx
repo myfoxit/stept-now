@@ -16,6 +16,7 @@ import { aiApi, aiKeys, type Approval, type McpApproval } from '../api'
 import { ApprovalCard } from '../components/ApprovalCard'
 import { AiNav, ErrorState, ListSkeleton, PageHeader, PageShell, ScrollBody } from '../components/shell'
 import { useApprovals, useMcpApprovals } from '../hooks'
+import { t } from '@/i18n'
 
 /** Best-effort ApprovalOut built from an approval.pending broadcast payload. */
 function fromBroadcast(data: Record<string, unknown>): Approval {
@@ -66,7 +67,7 @@ function McpApprovalCard({ approval }: { approval: McpApproval }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{approval.agent_name ?? 'Agent'}</span>
-            <span className="text-sm text-muted-foreground">was asked to run</span>
+            <span className="text-sm text-muted-foreground">{t('ai.was_asked_to_run')}</span>
             <Badge variant="outline" className="font-mono text-xs">
               {approval.tool_key}
             </Badge>
@@ -137,8 +138,8 @@ export function Component() {
   return (
     <PageShell>
       <PageHeader
-        title="Approvals"
-        description="Review actions your agents want to take before they run"
+        title={t('ai.approvals')}
+        description={t('ai.review_actions_your_agents_want_to')}
       />
       <AiNav />
       <ScrollBody className="space-y-6">
@@ -152,10 +153,9 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <ShieldCheck />
               </EmptyMedia>
-              <EmptyTitle>All caught up</EmptyTitle>
+              <EmptyTitle>{t('ai.all_caught_up')}</EmptyTitle>
               <EmptyDescription>
-                There are no pending approvals. Requests appear here in real time when an agent needs
-                sign-off.
+                {t('ai.there_are_no_pending_approvals_requests')}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -169,12 +169,11 @@ export function Component() {
               </div>
             ) : null}
             {(mcp.data ?? []).length > 0 ? (
-              <section className="space-y-3" aria-label="MCP approvals">
+              <section className="space-y-3" aria-label={t('ai.mcp_approvals')}>
                 <div>
-                  <h2 className="text-sm font-semibold">MCP clients</h2>
+                  <h2 className="text-sm font-semibold">{t('ai.mcp_clients')}</h2>
                   <p className="text-xs text-muted-foreground">
-                    Write tools called from Claude, Cursor or ChatGPT that are waiting for a
-                    decision.
+                    {t('ai.write_tools_called_from_claude_cursor')}
                   </p>
                 </div>
                 <div className="grid gap-4">

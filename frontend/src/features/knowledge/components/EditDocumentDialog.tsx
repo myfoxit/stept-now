@@ -31,6 +31,7 @@ import { currentWorkspaceId } from '@/stores/auth'
 
 import { knowledgeApi, knowledgeKeys } from '../api'
 import { useDocument } from '../hooks'
+import { t } from '@/i18n'
 
 export function EditDocumentDialog({
   documentId,
@@ -79,7 +80,7 @@ function EditDocumentBody({
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.document(workspaceId, documentId) })
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.documents(workspaceId, sourceId) })
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.source(workspaceId, sourceId) })
-      toast.success('Document saved')
+      toast.success(t('knowledge.document_saved'))
       onClose()
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Save failed'),
@@ -89,8 +90,8 @@ function EditDocumentBody({
     return (
       <>
         <DialogHeader>
-          <DialogTitle>Edit document</DialogTitle>
-          <DialogDescription>Loading the stored content…</DialogDescription>
+          <DialogTitle>{t('knowledge.edit_document')}</DialogTitle>
+          <DialogDescription>{t('knowledge.loading_the_stored_content')}</DialogDescription>
         </DialogHeader>
         <div className="flex justify-center py-8">
           <Spinner />
@@ -114,7 +115,7 @@ function EditDocumentBody({
       {editable ? (
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-doc-title">Title</Label>
+            <Label htmlFor="edit-doc-title">{t('common.title')}</Label>
             <Input
               id="edit-doc-title"
               value={title}
@@ -123,7 +124,7 @@ function EditDocumentBody({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label>Content</Label>
+            <Label>{t('knowledge.content')}</Label>
             <RichTextEditor
               value={content}
               onChange={setContent}

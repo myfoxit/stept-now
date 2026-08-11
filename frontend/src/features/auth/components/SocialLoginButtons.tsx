@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { t } from '@/i18n'
 
 // Same base the api client uses (src/api/client.ts). The start endpoint is a
 // full-page navigation, not an XHR, so it needs an absolute href when the API
@@ -72,7 +73,7 @@ export function SocialLoginButtons({
           <Button variant="outline" asChild>
             <a href={startHref('google')}>
               <GoogleMark />
-              Continue with Google
+              {t('auth.continue_with_google')}
             </a>
           </Button>
         )}
@@ -80,7 +81,7 @@ export function SocialLoginButtons({
           <Button variant="outline" asChild>
             <a href={startHref('github')}>
               <GitHubMark />
-              Continue with GitHub
+              {t('auth.continue_with_github')}
             </a>
           </Button>
         )}
@@ -90,7 +91,7 @@ export function SocialLoginButtons({
           <span className="w-full border-t" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">or</span>
+          <span className="bg-card px-2 text-muted-foreground">{t('auth.or')}</span>
         </div>
       </div>
     </div>

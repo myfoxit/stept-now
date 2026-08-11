@@ -12,6 +12,7 @@ import {
 
 import type { ReportByDay } from '../api'
 import { shortDay } from '../lib'
+import { t } from '@/i18n'
 
 // Categorical slots 1 (blue) + 3 (aqua) from the validated dataviz palette,
 // stepped per mode. Two series ⇒ legend is always present (identity never color-alone).
@@ -24,11 +25,11 @@ export function ByDayChart({ data }: { data: ReportByDay[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Conversations over time</CardTitle>
+        <CardTitle className="text-sm">{t('reports.conversations_over_time')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No data for this range.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">{t('common.no_data_for_this_range')}</p>
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
             <AreaChart data={data} margin={{ left: 4, right: 12, top: 8 }}>

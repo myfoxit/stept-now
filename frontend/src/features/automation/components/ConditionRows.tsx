@@ -15,6 +15,7 @@ import {
   type Option,
 } from '../constants'
 import { emptyConditionRow, localId, type ConditionRow } from '../lib'
+import { t } from '@/i18n'
 
 const CUSTOM = '__custom'
 
@@ -50,7 +51,7 @@ export function ConditionRows({
     <div className="grid gap-2">
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No conditions — this rule runs on every matching event.
+          {t('automation.no_conditions_this_rule_runs_on')}
         </p>
       ) : null}
       {rows.map((row) => {
@@ -60,7 +61,7 @@ export function ConditionRows({
         return (
           <div key={row.id} className="flex flex-wrap items-center gap-2" data-testid="condition-row">
             <NativeSelect
-              aria-label="Field"
+              aria-label={t('common.field')}
               className="w-40"
               value={custom ? CUSTOM : row.field}
               onChange={(event) => {
@@ -73,21 +74,21 @@ export function ConditionRows({
                   {option.label}
                 </NativeSelectOption>
               ))}
-              <NativeSelectOption value={CUSTOM}>Custom field…</NativeSelectOption>
+              <NativeSelectOption value={CUSTOM}>{t('automation.custom_field_2')}</NativeSelectOption>
             </NativeSelect>
 
             {custom ? (
               <Input
-                aria-label="Custom field"
+                aria-label={t('automation.custom_field')}
                 className="w-44"
-                placeholder="contact.attributes.plan"
+                placeholder={t('automation.contact_attributes_plan')}
                 value={row.field}
                 onChange={(event) => update(row.id, { field: event.target.value })}
               />
             ) : null}
 
             <NativeSelect
-              aria-label="Operator"
+              aria-label={t('common.operator')}
               className="w-32"
               value={row.op}
               onChange={(event) => update(row.id, { op: event.target.value })}
@@ -103,12 +104,12 @@ export function ConditionRows({
               <span className="text-sm text-muted-foreground">—</span>
             ) : valueOptions ? (
               <NativeSelect
-                aria-label="Value"
+                aria-label={t('common.value_2')}
                 className="w-40"
                 value={row.value}
                 onChange={(event) => update(row.id, { value: event.target.value })}
               >
-                <NativeSelectOption value="">Select…</NativeSelectOption>
+                <NativeSelectOption value="">{t('automation.select')}</NativeSelectOption>
                 {valueOptions.map((option) => (
                   <NativeSelectOption key={option.value} value={option.value}>
                     {option.label}
@@ -117,7 +118,7 @@ export function ConditionRows({
               </NativeSelect>
             ) : (
               <Input
-                aria-label="Value"
+                aria-label={t('common.value_2')}
                 className="w-48 flex-1"
                 placeholder={LIST_OPS.has(row.op) ? 'value a, value b' : 'value'}
                 value={row.value}
@@ -129,7 +130,7 @@ export function ConditionRows({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="Remove condition"
+              aria-label={t('common.remove_condition')}
               onClick={() => remove(row.id)}
             >
               <X className="size-4" />
@@ -139,7 +140,7 @@ export function ConditionRows({
       })}
       <div>
         <Button type="button" variant="outline" size="sm" onClick={add}>
-          <Plus className="size-4" /> Add condition
+          <Plus className="size-4" /> {t('common.add_condition')}
         </Button>
       </div>
     </div>

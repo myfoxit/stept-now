@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useHasPerm } from '@/stores/auth'
 
 import { useUpdateWorkspace, useWorkspace } from '../hooks'
+import { t } from '@/i18n'
 
 export function WorkspacePanel() {
   const canManage = useHasPerm('workspace:manage')
@@ -29,11 +30,11 @@ export function WorkspacePanel() {
   return (
     <Card className="max-w-xl">
       <CardHeader>
-        <CardTitle className="text-sm">Workspace</CardTitle>
+        <CardTitle className="text-sm">{t('common.workspace')}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-1.5">
-          <Label htmlFor="ws-name">Name</Label>
+          <Label htmlFor="ws-name">{t('common.name')}</Label>
           <Input
             id="ws-name"
             value={name}
@@ -42,11 +43,11 @@ export function WorkspacePanel() {
           />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="ws-slug">Slug</Label>
+          <Label htmlFor="ws-slug">{t('settings.slug')}</Label>
           <Input id="ws-slug" value={data?.slug ?? ''} disabled />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="ws-logo">Logo URL</Label>
+          <Label htmlFor="ws-logo">{t('settings.logo_url')}</Label>
           <Input
             id="ws-logo"
             placeholder="https://…/logo.png"
@@ -66,7 +67,7 @@ export function WorkspacePanel() {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            You need the “Manage workspace” permission to edit these settings.
+            {t('settings.you_need_the_manage_workspace_permission')}
           </p>
         )}
       </CardContent>

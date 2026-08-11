@@ -10,25 +10,26 @@ import {
 
 import type { AnalyticsTopQuery, AnalyticsZeroResultQuery } from '../api'
 import { formatScore } from '../lib'
+import { t } from '@/i18n'
 
 export function TopQueriesTable({ data }: { data: AnalyticsTopQuery[] }) {
   const max = Math.max(1, ...data.map((row) => row.count))
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Top queries</CardTitle>
+        <CardTitle className="text-sm">{t('knowledge.top_queries')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">No queries yet.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">{t('knowledge.no_queries_yet')}</p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Query</TableHead>
-                  <TableHead className="w-1/3">Count</TableHead>
-                  <TableHead className="text-right">Avg score</TableHead>
+                  <TableHead>{t('knowledge.query')}</TableHead>
+                  <TableHead className="w-1/3">{t('knowledge.count')}</TableHead>
+                  <TableHead className="text-right">{t('knowledge.avg_score')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -64,23 +65,23 @@ export function ContentGapsTable({ data }: { data: AnalyticsZeroResultQuery[] })
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Content gaps</CardTitle>
+        <CardTitle className="text-sm">{t('knowledge.content_gaps')}</CardTitle>
         <CardDescription>
-          Questions your knowledge base couldn’t answer — add content for these.
+          {t('knowledge.questions_your_knowledge_base_couldn_t')}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No unanswered queries — your knowledge base is covering everything asked.
+            {t('knowledge.no_unanswered_queries_your_knowledge_base')}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Query</TableHead>
-                  <TableHead className="w-24 text-right">Count</TableHead>
+                  <TableHead>{t('knowledge.query')}</TableHead>
+                  <TableHead className="w-24 text-right">{t('knowledge.count')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

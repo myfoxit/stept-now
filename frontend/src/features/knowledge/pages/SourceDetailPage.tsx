@@ -49,6 +49,7 @@ import {
 } from '../components/status'
 import { useDocument, useDocuments, useSource } from '../hooks'
 import { isEditableDocument, refreshMinutes, sourceTypeLabel } from '../lib'
+import { t } from '@/i18n'
 
 export function Component() {
   const { sourceId = '' } = useParams()
@@ -67,7 +68,7 @@ export function Component() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.source(workspaceId, sourceId) })
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.documents(workspaceId, sourceId) })
-      toast.success('Sync started')
+      toast.success(t('knowledge.sync_started'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Sync failed'),
   })
@@ -76,7 +77,7 @@ export function Component() {
     mutationFn: (id: string) => knowledgeApi.retryDocument(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.documents(workspaceId, sourceId) })
-      toast.success('Re-indexing document')
+      toast.success(t('knowledge.re_indexing_document'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Retry failed'),
   })
@@ -86,7 +87,7 @@ export function Component() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.documents(workspaceId, sourceId) })
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.source(workspaceId, sourceId) })
-      toast.success('Document deleted')
+      toast.success(t('knowledge.document_deleted'))
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Delete failed'),
   })
@@ -105,7 +106,7 @@ export function Component() {
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
               <Link to="/knowledge">
-                <ArrowLeft className="size-4" /> Back
+                <ArrowLeft className="size-4" /> {t('common.back')}
               </Link>
             </Button>
             {canWrite && canSync ? (
@@ -115,17 +116,17 @@ export function Component() {
                 disabled={syncMutation.isPending}
                 onClick={() => syncMutation.mutate()}
               >
-                <RefreshCw className="size-4" /> Re-sync
+                <RefreshCw className="size-4" /> {t('knowledge.re_sync')}
               </Button>
             ) : null}
             {canWrite && src ? (
               <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-                <Pencil className="size-4" /> Edit
+                <Pencil className="size-4" /> {t('common.edit')}
               </Button>
             ) : null}
             {canWrite && canAdd ? (
               <Button size="sm" onClick={() => setAddOpen(true)}>
-                <Plus className="size-4" /> Add document
+                <Plus className="size-4" /> {t('knowledge.add_document')}
               </Button>
             ) : null}
           </div>
@@ -166,7 +167,7 @@ export function Component() {
               <EmptyMedia variant="icon">
                 <FileText />
               </EmptyMedia>
-              <EmptyTitle>No documents yet</EmptyTitle>
+              <EmptyTitle>{t('knowledge.no_documents_yet')}</EmptyTitle>
               <EmptyDescription>
                 {canAdd
                   ? 'Add documents to this source to start indexing.'
@@ -179,10 +180,10 @@ export function Component() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <TableHead>{t('common.title')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="text-right">{t('common.tokens')}</TableHead>
+                  <TableHead>{t('knowledge.updated')}</TableHead>
                   <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
@@ -227,7 +228,7 @@ export function Component() {
                               size="icon"
                               variant="ghost"
                               className="size-8"
-                              aria-label="Retry document"
+                              aria-label={t('knowledge.retry_document')}
                               onClick={() => retryMutation.mutate(doc.id)}
                             >
                               <RotateCcw className="size-4" />
@@ -237,7 +238,7 @@ export function Component() {
                             size="icon"
                             variant="ghost"
                             className="size-8 text-destructive"
-                            aria-label="Delete document"
+                            aria-label={t('knowledge.delete_document')}
                             onClick={() => deleteMutation.mutate(doc.id)}
                           >
                             <Trash2 className="size-4" />
@@ -304,7 +305,7 @@ function DocumentPreviewBody({ id }: { id: string }) {
             </div>
           ))}
           {data && (data.chunks?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground">No indexed chunks yet.</p>
+            <p className="text-sm text-muted-foreground">{t('knowledge.no_indexed_chunks_yet')}</p>
           ) : null}
         </div>
       )}

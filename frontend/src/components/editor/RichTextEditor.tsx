@@ -47,6 +47,7 @@ import { cn } from '@/lib/utils'
 
 import { AiMenu } from './AiMenu'
 import { htmlToMarkdown, markdownToHtml } from './markdown-bridge'
+import { t } from '@/i18n'
 
 export type RichTextEditorVariant = 'full' | 'compact'
 
@@ -214,35 +215,35 @@ export function RichTextEditor({
     >
       <div
         role="toolbar"
-        aria-label="Formatting"
+        aria-label={t('common.formatting')}
         aria-orientation="horizontal"
         className="flex flex-wrap items-center gap-0.5 rounded-t-md border-b bg-muted/40 px-1 py-1"
       >
         {isFull ? (
           <>
             <ToolbarToggle
-              label="Heading 1"
+              label={t('common.heading_1')}
               icon={Heading1}
               pressed={active?.h1 ?? false}
               disabled={disabled}
               onToggle={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
             />
             <ToolbarToggle
-              label="Heading 2"
+              label={t('common.heading_2')}
               icon={Heading2}
               pressed={active?.h2 ?? false}
               disabled={disabled}
               onToggle={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
             />
             <ToolbarToggle
-              label="Heading 3"
+              label={t('common.heading_3')}
               icon={Heading3}
               pressed={active?.h3 ?? false}
               disabled={disabled}
               onToggle={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
             />
             <ToolbarToggle
-              label="Heading 4"
+              label={t('common.heading_4')}
               icon={Heading4}
               pressed={active?.h4 ?? false}
               disabled={disabled}
@@ -253,21 +254,21 @@ export function RichTextEditor({
         ) : null}
 
         <ToolbarToggle
-          label="Bold"
+          label={t('common.bold')}
           icon={Bold}
           pressed={active?.bold ?? false}
           disabled={disabled}
           onToggle={() => editor.chain().focus().toggleBold().run()}
         />
         <ToolbarToggle
-          label="Italic"
+          label={t('common.italic')}
           icon={Italic}
           pressed={active?.italic ?? false}
           disabled={disabled}
           onToggle={() => editor.chain().focus().toggleItalic().run()}
         />
         <ToolbarToggle
-          label="Inline code"
+          label={t('common.inline_code')}
           icon={Code}
           pressed={active?.code ?? false}
           disabled={disabled}
@@ -277,7 +278,7 @@ export function RichTextEditor({
         {isFull ? (
           <>
             <ToolbarToggle
-              label="Code block"
+              label={t('common.code_block')}
               icon={SquareCode}
               pressed={active?.codeBlock ?? false}
               disabled={disabled}
@@ -285,21 +286,21 @@ export function RichTextEditor({
             />
             <Separator orientation="vertical" className="mx-1 !h-5" />
             <ToolbarToggle
-              label="Bullet list"
+              label={t('common.bullet_list')}
               icon={List}
               pressed={active?.bulletList ?? false}
               disabled={disabled}
               onToggle={() => editor.chain().focus().toggleBulletList().run()}
             />
             <ToolbarToggle
-              label="Ordered list"
+              label={t('common.ordered_list')}
               icon={ListOrdered}
               pressed={active?.orderedList ?? false}
               disabled={disabled}
               onToggle={() => editor.chain().focus().toggleOrderedList().run()}
             />
             <ToolbarToggle
-              label="Quote"
+              label={t('common.quote')}
               icon={Quote}
               pressed={active?.blockquote ?? false}
               disabled={disabled}
@@ -327,13 +328,13 @@ export function RichTextEditor({
             />
             <Separator orientation="vertical" className="mx-1 !h-5" />
             <ToolbarButton
-              label="Undo"
+              label={t('common.undo')}
               icon={Undo2}
               disabled={disabled || !(active?.canUndo ?? false)}
               onClick={() => editor.chain().focus().undo().run()}
             />
             <ToolbarButton
-              label="Redo"
+              label={t('common.redo')}
               icon={Redo2}
               disabled={disabled || !(active?.canRedo ?? false)}
               onClick={() => editor.chain().focus().redo().run()}
@@ -448,8 +449,8 @@ function LinkPopover({
       <PopoverTrigger asChild>
         <Toggle
           size="sm"
-          aria-label="Link"
-          title="Link"
+          aria-label={t('common.link')}
+          title={t('common.link')}
           pressed={isActive}
           disabled={disabled}
           onMouseDown={(e) => e.preventDefault()}
@@ -458,7 +459,7 @@ function LinkPopover({
         </Toggle>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 space-y-2">
-        <Label htmlFor="rte-link-url">Link URL</Label>
+        <Label htmlFor="rte-link-url">{t('common.link_url')}</Label>
         <Input
           id="rte-link-url"
           value={href}
@@ -482,7 +483,7 @@ function LinkPopover({
                 setOpen(false)
               }}
             >
-              <Link2Off className="size-4" /> Remove
+              <Link2Off className="size-4" /> {t('common.remove')}
             </Button>
           ) : null}
           <Button
@@ -494,7 +495,7 @@ function LinkPopover({
               setOpen(false)
             }}
           >
-            Apply link
+            {t('common.apply_link')}
           </Button>
         </div>
       </PopoverContent>
@@ -543,8 +544,8 @@ function ImagePopover({
           size="icon"
           variant="ghost"
           className="size-8"
-          aria-label="Insert image"
-          title="Insert image"
+          aria-label={t('common.insert_image')}
+          title={t('common.insert_image')}
           disabled={disabled}
           onMouseDown={(e) => e.preventDefault()}
         >
@@ -552,18 +553,18 @@ function ImagePopover({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 space-y-2">
-        <Label htmlFor="rte-image-url">Image URL</Label>
+        <Label htmlFor="rte-image-url">{t('common.image_url')}</Label>
         <Input
           id="rte-image-url"
           value={src}
           placeholder="https://example.com/diagram.png"
           onChange={(e) => setSrc(e.target.value)}
         />
-        <Label htmlFor="rte-image-alt">Alt text</Label>
+        <Label htmlFor="rte-image-alt">{t('common.alt_text')}</Label>
         <Input
           id="rte-image-alt"
           value={alt}
-          placeholder="Describe the image"
+          placeholder={t('common.describe_the_image')}
           onChange={(e) => setAlt(e.target.value)}
         />
         <input
@@ -571,7 +572,7 @@ function ImagePopover({
           type="file"
           accept="image/*"
           className="sr-only"
-          aria-label="Image file"
+          aria-label={t('common.image_file')}
           onChange={(e) => {
             const file = e.target.files?.[0]
             e.target.value = ''
@@ -599,7 +600,7 @@ function ImagePopover({
             disabled={!src.trim() || uploading}
             onClick={() => insert(src.trim())}
           >
-            Insert
+            {t('common.insert')}
           </Button>
         </div>
       </PopoverContent>

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth'
+import { t } from '@/i18n'
 
 const schema = z.object({
   name: z.string().min(1, 'Your name is required'),
@@ -35,7 +36,7 @@ export function Component() {
       adoptAccessToken(token.access_token, token.expires_in)
       if (inviteToken) {
         await authApi.acceptInvite(inviteToken).catch(() => {
-          toast.error('Could not accept the invitation automatically')
+          toast.error(t('auth.could_not_accept_the_invitation_automatically'))
         })
       }
       const me = await authApi.me()
@@ -48,13 +49,13 @@ export function Component() {
 
   return (
     <AuthCard
-      title="Create your account"
+      title={t('auth.create_your_account')}
       subtitle={inviteToken ? 'Sign up to join your team' : 'Start your open-source support hub'}
       footer={
         <p>
           Already have an account?{' '}
           <Link className="text-brand underline-offset-4 hover:underline" to="/login">
-            Log in
+            {t('auth.log_in')}
           </Link>
         </p>
       }
@@ -62,17 +63,17 @@ export function Component() {
       <SocialLoginButtons next="/" inviteToken={inviteToken} />
       <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         <div className="grid gap-2">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" placeholder="Ada Lovelace" {...form.register('name')} />
+          <Label htmlFor="name">{t('common.name')}</Label>
+          <Input id="name" placeholder={t('auth.ada_lovelace')} {...form.register('name')} />
           <FieldError message={form.formState.errors.name?.message} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="you@company.com" {...form.register('email')} />
+          <Label htmlFor="email">{t('common.email')}</Label>
+          <Input id="email" type="email" placeholder={t('auth.you_company_com')} {...form.register('email')} />
           <FieldError message={form.formState.errors.email?.message} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t('auth.password')}</Label>
           <Input id="password" type="password" {...form.register('password')} />
           <FieldError message={form.formState.errors.password?.message} />
         </div>

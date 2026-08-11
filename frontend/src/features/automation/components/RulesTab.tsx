@@ -31,6 +31,7 @@ import { AUTOMATION_EVENTS } from '../constants'
 import { useAutomationRules, useDeleteRule, useReorderRules, useToggleRule } from '../hooks'
 import { describeCondition } from '../lib'
 import { RuleEditorDialog } from './RuleEditorDialog'
+import { t } from '@/i18n'
 
 function eventLabel(event: string): string {
   return AUTOMATION_EVENTS.find((e) => e.value === event)?.label ?? event
@@ -70,11 +71,11 @@ export function RulesTab() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Rules run top to bottom when their event fires.
+          {t('automation.rules_run_top_to_bottom_when')}
         </p>
         {canManage ? (
           <Button size="sm" onClick={openNew}>
-            <Plus className="size-4" /> <span data-tour="new-rule">New rule</span>
+            <Plus className="size-4" /> <span data-tour="new-rule">{t('automation.new_rule')}</span>
           </Button>
         ) : null}
       </div>
@@ -89,7 +90,7 @@ export function RulesTab() {
         <Card className="p-6 text-center text-sm text-muted-foreground">
           Could not load rules.{' '}
           <Button variant="link" className="px-1" onClick={() => rules.refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Card>
       ) : !rules.data || rules.data.length === 0 ? (
@@ -98,15 +99,15 @@ export function RulesTab() {
             <EmptyMedia variant="icon">
               <Workflow />
             </EmptyMedia>
-            <EmptyTitle>No automation rules yet</EmptyTitle>
+            <EmptyTitle>{t('automation.no_automation_rules_yet')}</EmptyTitle>
             <EmptyDescription>
-              Automate assignment, tagging, replies and more when events happen.
+              {t('automation.automate_assignment_tagging_replies_and_more')}
             </EmptyDescription>
           </EmptyHeader>
           {canManage ? (
             <EmptyContent>
               <Button onClick={openNew}>
-                <Plus className="size-4" /> Create your first rule
+                <Plus className="size-4" /> {t('automation.create_your_first_rule')}
               </Button>
             </EmptyContent>
           ) : null}
@@ -122,7 +123,7 @@ export function RulesTab() {
                       variant="ghost"
                       size="icon"
                       className="size-6"
-                      aria-label="Move up"
+                      aria-label={t('automation.move_up')}
                       disabled={index === 0 || reorder.isPending}
                       onClick={() => move(index, -1)}
                     >
@@ -132,7 +133,7 @@ export function RulesTab() {
                       variant="ghost"
                       size="icon"
                       className="size-6"
-                      aria-label="Move down"
+                      aria-label={t('automation.move_down')}
                       disabled={index === rules.data.length - 1 || reorder.isPending}
                       onClick={() => move(index, 1)}
                     >
@@ -145,7 +146,7 @@ export function RulesTab() {
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">{rule.name}</span>
                     <Badge variant="secondary">{eventLabel(rule.event)}</Badge>
-                    {!rule.enabled ? <Badge variant="outline">Off</Badge> : null}
+                    {!rule.enabled ? <Badge variant="outline">{t('common.off')}</Badge> : null}
                   </div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
                     {rule.conditions.length === 0
@@ -195,18 +196,18 @@ export function RulesTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              This rule will stop running. This action cannot be undone.
+              {t('automation.this_rule_will_stop_running_this')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) remove.mutate(deleting.id)
                 setDeleting(null)
               }}
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
