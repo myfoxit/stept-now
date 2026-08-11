@@ -38,9 +38,12 @@ types: ## Export OpenAPI schema and regenerate frontend API types
 
 # ---------- Verification ----------
 
-lint: ## Static checks only
+lint: i18n-check ## Static checks only
 	cd backend && uv run ruff check app tests && uv run ruff format --check app tests && uv run mypy app
 	pnpm -r --no-bail exec tsc --noEmit
+
+i18n-check: ## Catalog integrity: missing keys, plural forms, stray placeholders
+	node scripts/check-i18n.mjs
 
 test-backend: ## Backend tests (SQLite by default; pg tests auto-skip if unreachable)
 	cd backend && uv run pytest -q

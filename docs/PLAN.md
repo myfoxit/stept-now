@@ -386,6 +386,36 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     `@stept/js` **5**; `@stept/react` **4**; e2e **23** (2 new action journeys: confirm
     → handler runs in the host page → run resumes; decline → declined result, page
     untouched). `make verify` green end to end; docs-site builds; no alembic change.
+- [x] **W13 (i18n — 13 languages across the product)** — the repo had no i18n of
+  any kind before this: no library, no catalogs, no locale column, no
+  `Accept-Language`. Contract: `docs/I18N.md`. Session worktree:
+  `.claude/worktrees/…` (branch `feature/i18n`).
+  - **One catalog format across four runtimes** (backend, dashboard, widget,
+    extension): flat dotted keys, `{{name}}` interpolation, CLDR plural
+    siblings. No i18next — `Intl.PluralRules` gives the browsers correct
+    categories for free, and `app/core/i18n.py` implements the same rules by
+    hand for Python. `tParts` replaces `<Trans>`.
+  - **The widget follows the language the visitor writes in**, over their
+    browser header and over the host page's setting — the only signal that is
+    evidence about the person rather than the machine. `lockLocale` opts out.
+    Cost to the embed: +2.5 KB gzipped (catalogs are fetched assets; inlining
+    all 13 cost +18 KB and was reverted).
+  - **AI**: language detection (`app/services/language.py`, deterministic, not
+    an LLM call), a reply-language rule in the agent prompt, and a soft locale
+    boost in retrieval that never filters an English-only KB out of reach.
+  - **Help centre**: per-locale articles + `translation_key`, slug unique per
+    (workspace, locale), fallback per translation group rather than wholesale.
+    Migration `a3f7c21e9b04`.
+  - **Guard**: `make i18n-check` fails on missing keys, missing plural forms a
+    locale's own rules can produce, stray placeholders, and registry drift.
+  - **Coverage is measured, not assumed.** Backend and widget are complete in
+    all 13. The dashboard's 1,036 extracted keys are 17% translated (all shared
+    `common.*`, the auth flow, relative time); the rest falls back to English
+    key by key, and the floor in `scripts/check-i18n.mjs` is what stops it
+    regressing. Extension and landing are not localised yet.
+  - **Totals after W13:** backend 1714 (+8 skipped), frontend 498, widget 251.
+    `make verify` green.
+
 - [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
   `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
   untouched. Postgres containers used for migration validation may still be up on 54329

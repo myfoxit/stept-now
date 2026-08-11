@@ -23,11 +23,9 @@ SUPPORT_MESSAGES = {
     "tr": "Merhaba, hesabıma giriş yapamıyorum. Şifremi nasıl sıfırlayabilirim?",
     "ja": "こんにちは、アカウントにログインできません。"
     "パスワードをリセットするにはどうすればいいですか？",
-    "ko": "안녕하세요, 계정에 로그인할 수 없습니다. "
-    "비밀번호를 재설정하려면 어떻게 해야 하나요?",
+    "ko": "안녕하세요, 계정에 로그인할 수 없습니다. 비밀번호를 재설정하려면 어떻게 해야 하나요?",
     "zh-CN": "你好，我无法登录我的账户。请问怎样重置密码？",
-    "ar": "مرحبًا، لا أستطيع تسجيل الدخول إلى حسابي. "
-    "كيف يمكنني إعادة تعيين كلمة المرور؟",
+    "ar": "مرحبًا، لا أستطيع تسجيل الدخول إلى حسابي. كيف يمكنني إعادة تعيين كلمة المرور؟",
 }
 
 #: A second, structurally different message per language, so the tests are not
@@ -40,8 +38,7 @@ BILLING_MESSAGES = {
     "es": "Me han cobrado dos veces este mes y me gustaría un reembolso, gracias.",
     "pt-BR": "Fui cobrado duas vezes neste mês e gostaria de um reembolso, obrigado.",
     "it": "Mi hanno addebitato due volte questo mese e vorrei un rimborso, grazie.",
-    "nl": "Ik ben deze maand twee keer in rekening gebracht "
-    "en ik wil graag mijn geld terug.",
+    "nl": "Ik ben deze maand twee keer in rekening gebracht en ik wil graag mijn geld terug.",
     "pl": "W tym miesiącu obciążono mnie dwa razy i chcę zwrot pieniędzy.",
     "tr": "Bu ay benden iki kez ücret alındı ve para iadesi istiyorum.",
     "ja": "今月2回請求されました。返金をお願いできますか。",

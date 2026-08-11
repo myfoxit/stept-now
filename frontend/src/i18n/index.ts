@@ -27,8 +27,16 @@ export type Catalog = Record<string, string>
 
 const CATALOGS: Record<string, Catalog> = { en }
 
-/** Vite resolves this glob at build time, one chunk per locale. */
-const LOADERS = import.meta.glob<{ default: Catalog }>('./catalogs/*.json')
+/**
+ * Vite resolves this glob at build time, one chunk per locale.
+ *
+ * English is excluded by the negative pattern: it is statically imported above,
+ * and a module that is both static and dynamic cannot be code-split anyway —
+ * it is the synchronous fallback, so it has to be in the main chunk.
+ */
+const LOADERS = import.meta.glob<Catalog>(['./catalogs/*.json', '!./catalogs/en.json'], {
+  import: 'default',
+})
 
 let current: string = DEFAULT_LOCALE
 
@@ -98,8 +106,8 @@ export function ensureCatalog(locale: string): Promise<void> {
   if (!loader) return Promise.resolve()
 
   const request = loader()
-    .then((module) => {
-      CATALOGS[code] = module.default
+    .then((catalog) => {
+      CATALOGS[code] = catalog
       version += 1
     })
     .catch(() => {

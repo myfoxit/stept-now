@@ -27,12 +27,21 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Catalog sets to check: a label and the directory holding `<locale>.json`. */
+/**
+ * Catalog sets to check.
+ *
+ * `minCoverage` is the fraction of English keys each locale must define. It is
+ * 1 everywhere a catalog is small enough to keep complete, and lower for the
+ * dashboard, whose ~1,000 keys are being translated in waves. A gap there is
+ * not a bug — `t` falls back to English key by key — but it must be *measured*,
+ * because the failure mode of a partially translated app is that nobody notices
+ * which parts are missing. Raise the floor as waves land; never lower it.
+ */
 const CATALOG_SETS = [
-  { label: 'backend', dir: join(ROOT, 'backend/app/i18n') },
-  { label: 'widget', dir: join(ROOT, 'widget/public/i18n') },
-  { label: 'dashboard', dir: join(ROOT, 'frontend/src/i18n/catalogs') },
-  { label: 'extension', dir: join(ROOT, 'extension/src/i18n/catalogs') },
+  { label: 'backend', dir: join(ROOT, 'backend/app/i18n'), minCoverage: 1 },
+  { label: 'widget', dir: join(ROOT, 'widget/public/i18n'), minCoverage: 1 },
+  { label: 'dashboard', dir: join(ROOT, 'frontend/src/i18n/catalogs'), minCoverage: 0.16 },
+  { label: 'extension', dir: join(ROOT, 'extension/src/i18n/catalogs'), minCoverage: 1 },
 ]
 
 /** Files that each keep a copy of the locale registry. */
@@ -47,6 +56,8 @@ const PLURAL_CATEGORIES = new Set(['zero', 'one', 'two', 'few', 'many', 'other']
 
 const failures = []
 const fail = (message) => failures.push(message)
+/** [set, locale, coverage, missingCount] — printed as a table at the end. */
+const coverageRows = []
 
 /** Strip a trailing plural category so `csat.star_one` and `csat.star_few` agree. */
 function baseKey(key) {
@@ -75,7 +86,7 @@ function readCatalog(path) {
   return raw
 }
 
-function checkCatalogSet({ label, dir }) {
+function checkCatalogSet({ label, dir, minCoverage = 1 }) {
   if (!existsSync(dir)) {
     // A surface that has not been localised yet is not a failure; a surface
     // that is half-localised is, and that shows up as missing keys below.
@@ -120,14 +131,26 @@ function checkCatalogSet({ label, dir }) {
 
     const bases = new Set(Object.keys(catalog).map(baseKey))
 
-    for (const base of sourceBases) {
-      if (!bases.has(base)) fail(`${label}/${locale}: missing key "${base}"`)
+    const missing = [...sourceBases].filter((base) => !bases.has(base))
+    const coverage = 1 - missing.length / Math.max(sourceBases.size, 1)
+    if (locale !== SOURCE_LOCALE) {
+      coverageRows.push([label, locale, coverage, missing.length])
+      if (coverage < minCoverage) {
+        fail(
+          `${label}/${locale}: ${(coverage * 100).toFixed(1)}% translated, ` +
+            `below the ${(minCoverage * 100).toFixed(0)}% floor ` +
+            `(${missing.length} keys fall back to English, e.g. "${missing[0]}")`,
+        )
+      }
     }
     for (const base of bases) {
       if (!sourceBases.has(base)) fail(`${label}/${locale}: unknown key "${base}" (not in English)`)
     }
 
     if (locale !== SOURCE_LOCALE) {
+      // Plural completeness applies only to keys this locale actually defines:
+      // a key it has not translated yet falls back to English wholesale, forms
+      // and all, so demanding its plural forms would be nonsense.
       let categories
       try {
         categories = categoriesUsedBy(locale)
@@ -136,7 +159,7 @@ function checkCatalogSet({ label, dir }) {
         categories = new Set(['other'])
       }
       for (const base of pluralBases) {
-        if (!bases.has(base)) continue // already reported as missing
+        if (!bases.has(base)) continue // untranslated: falls back to English
         for (const category of categories) {
           if (catalog[`${base}_${category}`] === undefined) {
             fail(
@@ -195,6 +218,26 @@ function checkRegistryMirrors() {
 console.log('Checking i18n catalogs…')
 for (const set of CATALOG_SETS) checkCatalogSet(set)
 checkRegistryMirrors()
+
+if (coverageRows.length > 0) {
+  console.log('\nTranslation coverage')
+  const bySet = new Map()
+  for (const [set, locale, coverage, missing] of coverageRows) {
+    if (!bySet.has(set)) bySet.set(set, [])
+    bySet.get(set).push({ locale, coverage, missing })
+  }
+  for (const [set, rows] of bySet) {
+    const complete = rows.filter((row) => row.missing === 0).length
+    console.log(`  ${set}: ${complete}/${rows.length} locales complete`)
+    for (const row of rows.filter((entry) => entry.missing > 0)) {
+      const bar = '█'.repeat(Math.round(row.coverage * 20)).padEnd(20, '·')
+      console.log(
+        `    ${row.locale.padEnd(6)} ${bar} ${(row.coverage * 100).toFixed(0).padStart(3)}%` +
+          `  (${row.missing} keys fall back to English)`,
+      )
+    }
+  }
+}
 
 if (failures.length > 0) {
   console.error(`\n✗ ${failures.length} i18n problem(s):\n`)
