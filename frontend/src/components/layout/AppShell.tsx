@@ -4,7 +4,6 @@ import { StepMark } from '@/components/StepMark'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { CommandK } from '@/components/layout/CommandK'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { t } from '@/i18n'
 
 export function AppShell() {
   return (
@@ -20,8 +19,10 @@ export function AppShell() {
         */}
         <div className="flex items-center gap-2 border-b px-3 py-2 md:hidden">
           <SidebarTrigger />
-          <StepMark className="size-4 text-brand" />
-          <span className="text-sm font-semibold tracking-tight">{t('common.stept')}</span>
+          {/* size-5, not size-4: the mark's master geometry closes up below
+              20px (that is what assets/brand/stept-favicon.svg exists for). */}
+          <StepMark className="size-5" />
+          <span className="text-sm font-semibold tracking-tight">Stept</span>
         </div>
         <div className="min-h-0 flex-1">
           <Outlet />

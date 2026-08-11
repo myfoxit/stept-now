@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 
 import { StepMark } from '@/components/StepMark'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { t } from '@/i18n'
 
 export function AuthCard({
   title,
@@ -19,8 +18,10 @@ export function AuthCard({
     <div className="flex min-h-full items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <StepMark className="size-8 text-brand" title={t('common.stept')} />
-          <span className="text-xl font-semibold tracking-tight">{t('common.stept')}</span>
+          {/* The one place in the app the logo is the subject rather than
+              furniture, so it gets the split: ink bar + indigo leading bar. */}
+          <StepMark className="size-8" variant="split" title="Stept" />
+          <span className="text-xl font-semibold tracking-tight">Stept</span>
         </div>
         <Card>
           <CardHeader className="text-center">

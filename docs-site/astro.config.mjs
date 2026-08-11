@@ -18,7 +18,11 @@ export default defineConfig({
       description:
         'Documentation for Stept — the open-source Intercom + Fin alternative: shared inbox, AI agent, knowledge base, product tours.',
       // Same mark, palette and type as stepped.ai — see src/styles/stept.css.
-      logo: { src: './public/logo.svg', alt: 'Stept' },
+      // A light/dark pair rather than one file: the mark's indigo has to lift
+      // to #6D66F0 on near-black to hold contrast, which a CSS filter cannot do
+      // without dragging the ink bar with it. Both are generated from
+      // assets/brand/ by scripts/gen-brand-assets.mjs.
+      logo: { light: './public/logo.svg', dark: './public/logo-dark.svg', alt: 'Stept' },
       customCss: ['./src/styles/stept.css'],
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/myfoxit/stept-now' }],

@@ -40,19 +40,43 @@ export const STEP_ICONS: Record<TourStepType | string, typeof MousePointerClick>
   stop: Square,
 };
 
-/** The Stept mark — the same rounded square + S as the toolbar icon. */
-export function Logo({ size = 22 }: { size?: number }) {
+/** The Stept mark — two bars, the leading one stepped right and down. The
+ *  geometry lives in `assets/brand/`; this reproduces it, it does not redraw it.
+ *
+ *  `mono` (default) inherits `currentColor` — that is the panel header, where
+ *  the mark is chrome standing beside a word. `split` paints the leading bar
+ *  with `--accent`, which is already the brand indigo and already lifts in the
+ *  dark scheme; it is for the sign-in screen, the panel's front door.
+ *
+ *  Below 20px it swaps to the optically corrected small geometry — thicker
+ *  bars, wider gap — because the 24px master closes up at that size. */
+export function Logo({
+  size = 22,
+  variant = 'mono',
+}: {
+  size?: number;
+  variant?: 'mono' | 'split';
+}) {
+  const small = size < 20;
+  const lead = variant === 'split' ? 'var(--accent)' : 'currentColor';
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="0" y="0" width="32" height="32" rx="7" fill="currentColor" />
-      <path
-        d="M21.5 10.2a6 6 0 1 0-3.9 10.3 6 6 0 1 1-3.9 10.3"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="3"
-        strokeLinecap="round"
-        transform="translate(0,-4.5)"
-      />
+    <svg
+      width={size}
+      height={size}
+      viewBox={small ? '0 0 32 32' : '0 0 24 24'}
+      aria-hidden="true"
+    >
+      {small ? (
+        <>
+          <rect x="4" y="5" width="20" height="9" rx="3.8" fill="currentColor" />
+          <rect x="8" y="18" width="20" height="9" rx="3.8" fill={lead} />
+        </>
+      ) : (
+        <>
+          <rect x="3" y="3.5" width="15" height="7" rx="2.9" fill="currentColor" />
+          <rect x="6" y="13.5" width="15" height="7" rx="2.9" fill={lead} />
+        </>
+      )}
     </svg>
   );
 }

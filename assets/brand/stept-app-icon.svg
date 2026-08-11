@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Stept">
+  <title>Stept</title>
+  <!-- Maskable app icon / apple-touch-icon. Mark sits inside the 80% safe zone. -->
+  <rect width="512" height="512" rx="114" fill="#4F46E5"/>
+  <g transform="translate(112,112) scale(12)">
+    <rect x="4" y="5" width="20" height="9" rx="3.8" fill="#FFFFFF"/>
+    <rect x="8" y="18" width="20" height="9" rx="3.8" fill="#FFFFFF"/>
+  </g>
+</svg>
