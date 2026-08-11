@@ -19,7 +19,7 @@ from app.api.widget.deps import resolve_inbox
 from app.core.db import utcnow, uuid7
 from app.core.deps import Db
 from app.core.errors import BlockedContactError, ForbiddenError
-from app.core.i18n import workspace_locale
+from app.core.i18n import normalize_locale, workspace_locale
 from app.core.ratelimit import RateLimit
 from app.core.security import create_widget_token, verify_identity_hash
 from app.models.agent import Agent
@@ -47,6 +47,10 @@ class BootRequest(BaseModel):
     widget_key: str
     visitor_id: str | None = None
     identity: BootIdentity | None = None
+    #: The visitor's browser language (`navigator.language`). Weakest personal
+    #: locale signal: stamped on brand-new contacts only, overwritten by what
+    #: they actually write (`learn_contact_locale`).
+    locale: str | None = None
 
 
 class BootContactOut(BaseModel):
@@ -162,6 +166,14 @@ async def boot(body: BootRequest, session: Db) -> BootResponse | RequireIdentity
     contact.last_seen_at = now
     if contact.first_seen_at is None:
         contact.first_seen_at = now
+    if contact.locale is None:
+        # The browser's language is the weakest *personal* locale signal —
+        # it only fills the vacuum for brand-new visitors. The first real
+        # message they write overrides it via `learn_contact_locale`, and it
+        # must never be left empty: an empty locale plus an undetectable
+        # first message ("Yes, show me.") leaves the agent guessing from its
+        # persona's language instead of the visitor's.
+        contact.locale = normalize_locale(body.locale)
     await session.flush()
 
     return BootResponse(

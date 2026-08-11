@@ -77,12 +77,15 @@ async def boot(
     *,
     visitor_id: str | None = None,
     identity: dict | None = None,
+    locale: str | None = None,
 ) -> httpx.Response:
     body: dict[str, Any] = {"widget_key": widget_key}
     if visitor_id is not None:
         body["visitor_id"] = visitor_id
     if identity is not None:
         body["identity"] = identity
+    if locale is not None:
+        body["locale"] = locale
     return await client.post("/api/widget/boot", json=body)
 
 

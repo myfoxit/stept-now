@@ -99,11 +99,19 @@ def _script_language(text: str) -> str | None:
 #: a word shared by four of our languages earns nobody any points, so shared
 #: articles and copulas are largely left out in favour of ones that split them.
 _STOPWORDS: dict[str, frozenset[str]] = {
+    # Bare "i" collides with the Italian plural article; at the 1-letter weight
+    # (0.4) an Italian sentence still outscores it on its own signals, and "i"
+    # is the single most common word in first-person support questions.
+    # Deliberately absent despite being common English: "an"/"so" (German),
+    # "of" (Dutch "or"), "over" (Dutch), "on" is kept (French "on" is rarer in
+    # support text than English "on" and the weight is 0.4 either way).
     "en": frozenset(
         "the and is are you your what how can not have has with this that for "
         "was were they there their would could should about please thanks want "
         "need doesn't don't i'm it's my me our we do does did to in it at on am "
-        "when where why which will get got just still my account".split()
+        "when where why which will get got just still my account "
+        "i up set if but from out into who them than any some again help be "
+        "cannot can't won't isn't aren't".split()
     ),
     "de": frozenset(
         "der die das und ist sind ich nicht ein eine einen wie mit für auf sich "
@@ -167,6 +175,13 @@ _DIACRITICS: dict[str, tuple[frozenset[str], float]] = {
 #: Letter sequences that are near-signatures. Cheap to check, and they rescue
 #: the cases where a sentence happens to contain no function word we know.
 _NGRAMS: dict[str, tuple[tuple[str, ...], float]] = {
+    # English previously had no entry at all: with only short stopwords to go
+    # on (weighted 0.4–0.7 each), plain questions like "How do I set up an
+    # on-call rotation?" scored 1.5 < MIN_SCORE and fell through to the stored
+    # locale — which is empty for a fresh visitor. "n't" is uniquely English;
+    # the spaced wh-words and "ing " are word-final/initial so German
+    # "Ding"/"wichtig" and French "singe" cannot feed them.
+    "en": (("n't", "ing ", "how ", "what ", "the "), 0.5),
     "de": (("sch", "ung", "eit", "ich "), 0.6),
     "nl": (("ij", "aan", "zijn", "lijk"), 0.7),
     "pt-BR": (("ção", "ões", "nh"), 1.5),

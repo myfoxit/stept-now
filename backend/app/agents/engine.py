@@ -68,6 +68,7 @@ from app.core.queue import enqueue
 from app.core.scheduler import scheduled
 from app.models.agent import Agent
 from app.models.agent_run import AgentRun, AgentStep, ApprovalRequest
+from app.models.contact import Contact
 from app.models.conversation import Conversation
 from app.models.inbox import Inbox
 from app.models.message import Message
@@ -300,7 +301,9 @@ def _language_prompt(
     return (
         "Reply in the same language the customer writes in, matching their most "
         "recent message. Never answer in English just because these instructions "
-        "are in English."
+        "are in English — and never default to the language your persona or "
+        "system instructions happen to be written in: the customer's own words "
+        "are the only language signal that counts."
     )
 
 
@@ -629,6 +632,16 @@ async def execute_run(
         messages = list(initial_messages)
     else:
         reply_locale, reply_locale_source = _reply_language(conversation, trigger_text)
+        if reply_locale is None and conversation is not None and conversation.contact_id:
+            # Last resort before the language vacuum: the contact's stored
+            # locale (stamped from the browser at widget boot, overwritten by
+            # what they actually write). Without it, an undetectable first
+            # message leaves the model to guess — typically in the language
+            # the agent's persona happens to be written in.
+            contact = await session.get(Contact, conversation.contact_id)
+            if contact is not None and contact.locale:
+                reply_locale = normalize_locale(contact.locale)
+                reply_locale_source = "stored"
         messages = [
             ChatMessage.system(
                 compose_system_prompt(

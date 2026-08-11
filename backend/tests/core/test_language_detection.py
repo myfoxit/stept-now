@@ -157,3 +157,42 @@ class TestConversationLanguage:
             "Hallo, ich möchte mein monatliches Abonnement bitte kündigen.",
         ]
         assert detect_conversation_language(texts) == "de"
+
+
+# --- short, diacritic-free questions (2026-08-11 prod regression) --------------
+
+#: The class of message that broke in production: plain English carries no
+#: diacritics, and with no English n-grams configured, "How do I set up an
+#: on-call rotation?" scored below MIN_SCORE — the agent then answered a fresh
+#: English visitor in the language its persona was written in (German).
+SHORT_PLAIN_QUESTIONS = {
+    "en": "How do I set up an on-call rotation?",
+    "de": "Wie richte ich eine Rufbereitschaft ein?",
+    "es": "¿Dónde puedo configurar las alertas?",
+    "pl": "Jak skonfigurować alerty?",
+}
+
+
+@pytest.mark.parametrize(("expected", "text"), sorted(SHORT_PLAIN_QUESTIONS.items()))
+def test_detects_short_plain_questions(expected: str, text: str) -> None:
+    assert detect_language(text) == expected
+
+
+class TestEnglishEvidence:
+    def test_the_dogfood_sentences(self) -> None:
+        assert detect_language("How do I set up an on-call rotation?") == "en"
+        assert detect_language("What is the difference between a problem and an alert?") == "en"
+        assert detect_language("Show me that tour again.") == "en"
+        assert detect_language("i cant log in to my account") == "en"
+
+    def test_bare_i_does_not_hijack_italian(self) -> None:
+        # "i" is the Italian plural article; the 0.4 short-word weight must not
+        # let English steal an Italian sentence. (This sentence was undecided
+        # before the English boost — it: 0.7 vs es: 0.7 — and must not now
+        # resolve to English on the strength of one collided article.)
+        assert detect_language("Ho un problema con i pagamenti e vorrei un rimborso.") != "en"
+        italian = "Grazie mille, gli ordini sono arrivati e la fattura è corretta."
+        assert detect_language(italian) == "it"
+
+    def test_genuinely_short_stays_undecided(self) -> None:
+        assert detect_language("Yes, show me.") is None

@@ -93,3 +93,34 @@ async def test_boot_require_identity_with_identity(client: httpx.AsyncClient):
     response = await boot(client, setup.widget_key, identity=identity_payload("vip-1"))
     assert response.status_code == 200
     assert response.json()["token"]
+
+
+# --- browser-locale stamping (2026-08-11 dogfood: language vacuum) -------------
+
+
+async def test_boot_stamps_browser_locale_on_fresh_contacts(
+    client: httpx.AsyncClient, widget: WidgetSetup
+):
+    """A brand-new visitor's browser language fills the locale vacuum, so an
+    undetectable first message ("Yes, show me.") never leaves the agent
+    guessing from its persona's language."""
+    response = await boot(client, widget.widget_key, visitor_id="loc-en", locale="en-US")
+    assert response.status_code == 200
+    assert response.json()["contact"]["locale"] == "en"
+
+
+async def test_boot_never_overwrites_a_learned_locale(
+    client: httpx.AsyncClient, widget: WidgetSetup
+):
+    """What the visitor actually writes outranks what their browser claims —
+    a second boot with a different browser language must not clobber it."""
+    first = await boot(client, widget.widget_key, visitor_id="loc-keep", locale="de-DE")
+    assert first.json()["contact"]["locale"] == "de"
+    second = await boot(client, widget.widget_key, visitor_id="loc-keep", locale="fr-FR")
+    assert second.json()["contact"]["locale"] == "de"
+
+
+async def test_boot_ignores_junk_locales(client: httpx.AsyncClient, widget: WidgetSetup):
+    response = await boot(client, widget.widget_key, visitor_id="loc-junk", locale="xx-KLINGON")
+    assert response.status_code == 200
+    assert response.json()["contact"]["locale"] is None

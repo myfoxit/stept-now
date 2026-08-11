@@ -280,6 +280,9 @@ export class Controller {
         widget_key: this.params.workspaceKey,
         visitor_id: this.storedVisitorId(),
         identity: this.params.identity,
+        // Weakest language signal: fills the vacuum for brand-new visitors so
+        // the agent never has to guess before their first real message.
+        locale: navigator.language || undefined,
       })
       if (isRequireIdentity(result)) {
         this.set({ screen: { name: 'identity' } })

@@ -104,6 +104,7 @@ export class WidgetApi {
     widget_key: string
     visitor_id?: string | null
     identity?: Identity
+    locale?: string
   }): Promise<BootResult> {
     return request<BootResult>(this.base, '/api/widget/boot', {
       method: 'POST',

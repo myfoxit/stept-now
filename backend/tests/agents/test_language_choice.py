@@ -12,6 +12,7 @@ from __future__ import annotations
 from app.agents import engine
 from app.ai.local import MockChatProvider
 from app.core.db import session_scope
+from app.models.contact import Contact
 from app.models.conversation import Conversation
 from tests.agents.conftest import (
     conversation_with_message,
@@ -137,3 +138,51 @@ async def test_full_flow_still_produces_a_reply(actx):
     run_id = await run_now(actx, agent_id, conversation_id, trigger_message_id=message_id)
     assert (await get_run(run_id)).status == "completed"
     assert [m for m in await public_messages(conversation_id) if m.author_type == "agent"]
+
+
+async def _stamp_contact_locale(conversation_id: str, locale: str) -> None:
+    """What widget boot leaves behind for a brand-new visitor: the browser
+    language on the contact, with no conversation-level stamp yet."""
+    async with session_scope() as session:
+        conversation = await session.get(Conversation, conversation_id)
+        contact = await session.get(Contact, conversation.contact_id)
+        contact.locale = locale
+        await session.commit()
+
+
+async def test_undetectable_message_falls_back_to_contact_browser_locale(actx, monkeypatch):
+    """The 2026-08-11 prod vacuum: fresh visitor, undetectable first message,
+    no conversation locale. The contact's boot-stamped browser language must
+    fill the gap — not the language the agent's persona is written in."""
+    recorder = _RecordingProvider()
+
+    async def resolve(session, workspace_id, model_ref=None):
+        return recorder, "mock"
+
+    monkeypatch.setattr(engine, "resolve_chat", resolve)
+    agent_id = await make_agent(actx)
+    conversation_id, message_id = await conversation_with_message(actx, "Yes, show me.")
+    await _stamp_contact_locale(conversation_id, "en")
+    run_id = await run_now(actx, agent_id, conversation_id, trigger_message_id=message_id)
+
+    assert (await get_run(run_id)).status == "completed"
+    prompt = recorder.system_prompts[0]
+    assert "has been writing in English" in prompt
+
+
+async def test_total_language_vacuum_forbids_persona_language(actx, monkeypatch):
+    """No detection, no stored locale anywhere: the generic instruction must
+    explicitly rule out defaulting to the persona/system-prompt language."""
+    recorder = _RecordingProvider()
+
+    async def resolve(session, workspace_id, model_ref=None):
+        return recorder, "mock"
+
+    monkeypatch.setattr(engine, "resolve_chat", resolve)
+    agent_id = await make_agent(actx)
+    conversation_id, message_id = await conversation_with_message(actx, "Yes, show me.")
+    run_id = await run_now(actx, agent_id, conversation_id, trigger_message_id=message_id)
+
+    assert (await get_run(run_id)).status == "completed"
+    prompt = recorder.system_prompts[0]
+    assert "persona or system instructions" in prompt
