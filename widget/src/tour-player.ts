@@ -7,10 +7,14 @@
  * (see dom-target.ts) so a drifted selector self-heals instead of dead-ending.
  *
  * Everything the player learns is reported back through `onEvent`, including
- * `step_error` with a reason and `meta.healed` for self-heals. Progress is
- * persisted in sessionStorage so a reload (or a `navigate` action step) resumes
- * mid-tour WITHOUT re-emitting `started` — a duplicated start would silently
- * inflate every completion-rate denominator.
+ * `step_error` with a reason, `step_blocked` when the visitor is shown the
+ * explicit can't-find-it card, and `meta.healed` for self-heals. Progress is
+ * persisted in localStorage (24h TTL) so a reload, a cross-page step or a new
+ * tab resumes mid-tour WITHOUT re-emitting `started` — a duplicated start
+ * would silently inflate every completion-rate denominator. A step may carry a
+ * `url`: anchored steps navigate there before resolving (persisting progress
+ * first, flagged `navigating` so the next load auto-continues), and the last
+ * step's Done navigates there after completing.
  *
  * The positioning + eligibility math and the storage codec are exported as pure
  * functions so they can be unit-tested without a browser.
@@ -72,42 +76,94 @@ export function resolveAutoPlacement(
   return (Object.entries(space).sort((a, b) => b[1] - a[1])[0]?.[0] as Side) ?? 'bottom'
 }
 
-/** Absolute viewport coords for the tooltip, clamped so it never leaves the screen. */
+/** Do two viewport rects overlap? Touching edges do not count. */
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return (
+    a.left < b.left + b.width &&
+    b.left < a.left + a.width &&
+    a.top < b.top + b.height &&
+    b.top < a.top + a.height
+  )
+}
+
+/**
+ * Absolute viewport coords for the tooltip, clamped so it never leaves the
+ * screen. `avoid` rects are the widget's OWN surfaces (launcher, tour pill,
+ * open messenger panel): a placement that would hide the tooltip under them is
+ * traded for the first side that stays clear. When every side collides the
+ * requested side wins — a partially covered tooltip beats none at all.
+ */
 export function computeTooltipPosition(
   placement: Placement,
   target: Rect,
   tip: Size,
   vp: Viewport,
   gap = 12,
+  avoid: readonly Rect[] = [],
 ): { top: number; left: number; side: Side } {
   const requested: Placement = placement === 'center' ? 'auto' : placement
-  const side = requested === 'auto' ? resolveAutoPlacement(target, tip, vp, gap) : requested
-  let top = 0
-  let left = 0
-  const cx = target.left + target.width / 2
-  const cy = target.top + target.height / 2
-  switch (side) {
-    case 'bottom':
-      top = target.top + target.height + gap
-      left = cx - tip.width / 2
-      break
-    case 'top':
-      top = target.top - tip.height - gap
-      left = cx - tip.width / 2
-      break
-    case 'right':
-      left = target.left + target.width + gap
-      top = cy - tip.height / 2
-      break
-    case 'left':
-      left = target.left - tip.width - gap
-      top = cy - tip.height / 2
-      break
+  const first = requested === 'auto' ? resolveAutoPlacement(target, tip, vp, gap) : requested
+  const compute = (side: Side): { top: number; left: number; side: Side } => {
+    let top = 0
+    let left = 0
+    const cx = target.left + target.width / 2
+    const cy = target.top + target.height / 2
+    switch (side) {
+      case 'bottom':
+        top = target.top + target.height + gap
+        left = cx - tip.width / 2
+        break
+      case 'top':
+        top = target.top - tip.height - gap
+        left = cx - tip.width / 2
+        break
+      case 'right':
+        left = target.left + target.width + gap
+        top = cy - tip.height / 2
+        break
+      case 'left':
+        left = target.left - tip.width - gap
+        top = cy - tip.height / 2
+        break
+    }
+    const m = 8
+    left = Math.max(m, Math.min(left, vp.width - tip.width - m))
+    top = Math.max(m, Math.min(top, vp.height - tip.height - m))
+    return { top, left, side }
   }
-  const m = 8
-  left = Math.max(m, Math.min(left, vp.width - tip.width - m))
-  top = Math.max(m, Math.min(top, vp.height - tip.height - m))
-  return { top, left, side }
+  const chosen = compute(first)
+  if (!avoid.length) return chosen
+  const clear = (pos: { top: number; left: number }): boolean =>
+    !avoid.some((zone) =>
+      rectsIntersect({ top: pos.top, left: pos.left, width: tip.width, height: tip.height }, zone),
+    )
+  if (clear(chosen)) return chosen
+  for (const side of ['bottom', 'top', 'right', 'left'] as const) {
+    if (side === first) continue
+    const candidate = compute(side)
+    if (clear(candidate)) return candidate
+  }
+  return chosen
+}
+
+/**
+ * Is `url` (a path or an absolute URL) a different page from `currentHref`?
+ * Hash-only differences are the same page — navigating would reload into a
+ * loop, since the player checks this again after arriving. Unparseable input
+ * answers "same page" for the same reason.
+ */
+export function isDifferentPage(url: string, currentHref: string): boolean {
+  try {
+    const target = new URL(url, currentHref)
+    const current = new URL(currentHref)
+    return (
+      target.origin !== current.origin ||
+      target.pathname !== current.pathname ||
+      target.search !== current.search
+    )
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -133,17 +189,31 @@ export interface TourProgress {
   tourId: string
   stepIndex: number
   startedAt: number
+  /** Last write. A record older than {@link TOUR_PROGRESS_TTL_MS} is dead. */
+  updatedAt: number
+  /**
+   * Set just before the PLAYER navigates (a cross-page step, a driven navigate
+   * action). The next load auto-continues; without the flag — the visitor
+   * navigated or closed the tab themselves — the loader offers a resume pill
+   * instead of hijacking the page.
+   */
+  navigating?: boolean
 }
 
-/** sessionStorage key holding the in-flight tour position for one widget. */
+/** A half-finished tour stops offering to resume after a day. */
+export const TOUR_PROGRESS_TTL_MS = 24 * 60 * 60 * 1000
+
+/** localStorage key holding the in-flight tour position for one widget. */
 export function tourProgressKey(widgetKey: string): string {
   return `stept:tour-progress:${widgetKey}`
 }
 
-/** Read the persisted position; tolerant of junk, private mode and old shapes. */
+/** Read the persisted position; tolerant of junk, private mode and old shapes.
+ * Expired records read as null — yesterday's abandoned tour must not resurrect. */
 export function readTourProgress(
   storage: Pick<Storage, 'getItem'> | null,
   key: string,
+  now = Date.now(),
 ): TourProgress | null {
   try {
     const raw = storage?.getItem(key)
@@ -152,10 +222,15 @@ export function readTourProgress(
     if (!parsed || typeof parsed.tourId !== 'string' || typeof parsed.stepIndex !== 'number') {
       return null
     }
+    const startedAt = typeof parsed.startedAt === 'number' ? parsed.startedAt : now
+    const updatedAt = typeof parsed.updatedAt === 'number' ? parsed.updatedAt : startedAt
+    if (now - updatedAt > TOUR_PROGRESS_TTL_MS) return null
     return {
       tourId: parsed.tourId,
       stepIndex: Math.max(0, Math.floor(parsed.stepIndex)),
-      startedAt: typeof parsed.startedAt === 'number' ? parsed.startedAt : Date.now(),
+      startedAt,
+      updatedAt,
+      ...(parsed.navigating === true ? { navigating: true } : {}),
     }
   } catch {
     return null
@@ -298,22 +373,27 @@ export function performAction(
 
 export interface TourPlayerOptions {
   accent?: string
-  /** Reports started / step_viewed / completed / dismissed / step_error. */
+  /** Reports started / step_viewed / step_blocked / completed / dismissed / step_error. */
   onEvent?: (event: TourEventName, stepIndex: number | null, meta?: TourEventMeta) => void
   /** Injected for tests; defaults to the real globals. */
   doc?: Document
   win?: Window & typeof globalThis
   /** Widget API origin — root-relative step media resolves against it. */
   apiBase?: string
-  /** sessionStorage key for resume-after-reload (see {@link tourProgressKey}). */
+  /** localStorage key for resume-after-reload (see {@link tourProgressKey}). */
   progressKey?: string
   storage?: Storage | null
   /** Render a "Preview" badge and never persist progress. */
   preview?: boolean
-  /** How long an anchored step waits for its element before it is skipped. */
+  /** How long an anchored step waits for its element before it is blocked. */
   resolveTimeoutMs?: number
   /** Driven mode: highlight dwell before the action is performed. */
   actionDelayMs?: number
+  /**
+   * Viewport rects of the widget's own chrome (launcher, tour pill, open
+   * messenger panel). Tooltip placement treats them as exclusion zones.
+   */
+  getObstructions?: () => Rect[]
 }
 
 const DEFAULT_SETTINGS: TourSettings = {
@@ -332,12 +412,21 @@ const CSS = `
   outline:2px solid var(--stept-accent,#5b46e5);outline-offset:2px}
 .stept-tour-hole.stept-nodim{box-shadow:none}
 .stept-tour-hole[hidden]{display:none}
+/* Four transparent panels around the spotlight cutout. The dim is painted by
+   the hole's box-shadow; these only CATCH pointer events, so the page under the
+   backdrop is inert while the taught element itself stays clickable. */
+.stept-tour-blocker{position:fixed;z-index:2147483000;pointer-events:auto}
+.stept-tour-blocker[hidden]{display:none}
 .stept-tour-tip{position:fixed;z-index:2147483001;max-width:340px;width:calc(100vw - 32px);
   background:#fff;color:#0f172a;border-radius:12px;box-shadow:0 12px 40px rgba(15,23,42,.28);
   padding:16px 16px 12px;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  box-sizing:border-box}
+  box-sizing:border-box;outline:none}
 .stept-tour-tip[hidden]{display:none}
-.stept-tour-tip:focus{outline:2px solid var(--stept-accent,#5b46e5);outline-offset:2px}
+/* Programmatic focus (every step) stays quiet; only keyboard focus rings. */
+.stept-tour-tip:focus-visible{box-shadow:0 12px 40px rgba(15,23,42,.28),
+  0 0 0 2px var(--stept-accent,#5b46e5)}
+.stept-tour-btn:focus-visible,.stept-tour-close:focus-visible{
+  outline:2px solid var(--stept-accent,#5b46e5);outline-offset:2px;border-radius:8px}
 .stept-tour-tip.stept-centered{top:50%;left:50%;transform:translate(-50%,-50%);max-width:420px}
 .stept-tour-tip h4{margin:0 0 6px;font-size:15px;font-weight:600}
 .stept-tour-tip p{margin:0 0 8px;color:#334155}
@@ -354,6 +443,11 @@ const CSS = `
 .stept-tour-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .stept-tour-count{font-size:12px;color:#64748b}
 .stept-tour-hint{font-size:12px;color:#64748b;margin:0}
+.stept-tour-wait{display:flex;align-items:center;gap:8px;margin:0;color:#64748b;font-size:13px}
+.stept-tour-wait i{flex:none;width:12px;height:12px;border-radius:50%;
+  border:2px solid rgba(100,116,139,.3);border-top-color:var(--stept-accent,#5b46e5);
+  animation:stept-tour-spin .7s linear infinite}
+@keyframes stept-tour-spin{to{transform:rotate(360deg)}}
 .stept-tour-actions{display:flex;gap:8px}
 .stept-tour-bar{height:3px;border-radius:2px;background:rgba(100,116,139,.22);margin:0 0 10px;overflow:hidden}
 .stept-tour-bar i{display:block;height:100%;background:var(--stept-accent,#5b46e5);transition:width .2s ease}
@@ -413,7 +507,7 @@ const CSS = `
   .stept-tour-btn.ghost{color:#cbd5e1}
 }
 @media (prefers-reduced-motion:reduce){
-  .stept-tour-beacon,.stept-tour-acting{animation:none}
+  .stept-tour-beacon,.stept-tour-acting,.stept-tour-wait i{animation:none}
 }
 `
 
@@ -440,6 +534,8 @@ export class TourPlayer {
   private tip: HTMLElement | null = null
   private banner: HTMLElement | null = null
   private beacon: HTMLElement | null = null
+  /** Pointer-catching panels around the spotlight cutout (top/bottom/left/right). */
+  private blockers: HTMLElement[] = []
 
   private target: HTMLElement | null = null
   private acting: HTMLElement | null = null
@@ -451,6 +547,8 @@ export class TourPlayer {
   private reflow = (): void => this.schedulePosition()
   private onKeyDown = (event: KeyboardEvent): void => this.handleKey(event)
 
+  private getObstructions: (() => Rect[]) | null
+
   constructor(opts: TourPlayerOptions = {}) {
     this.doc = opts.doc ?? document
     this.win = opts.win ?? (this.doc.defaultView as Window & typeof globalThis) ?? window
@@ -458,10 +556,13 @@ export class TourPlayer {
     this.onEvent = opts.onEvent ?? (() => {})
     this.progressKey = opts.progressKey ?? 'stept:tour-progress'
     this.apiBase = opts.apiBase ?? ''
-    this.storage = opts.storage !== undefined ? opts.storage : safeSessionStorage(this.win)
+    // localStorage, not sessionStorage: progress must survive a cross-page
+    // step, a reload AND a new tab (where it becomes a resume offer).
+    this.storage = opts.storage !== undefined ? opts.storage : safeLocalStorage(this.win)
     this.preview = opts.preview ?? false
-    this.resolveTimeoutMs = opts.resolveTimeoutMs ?? 4000
+    this.resolveTimeoutMs = opts.resolveTimeoutMs ?? 3000
     this.actionDelayMs = opts.actionDelayMs ?? 600
+    this.getObstructions = opts.getObstructions ?? null
   }
 
   get active(): boolean {
@@ -507,6 +608,13 @@ export class TourPlayer {
 
   next(): void {
     if (!this.tour) return
+    const step = this.tour.steps[this.index]
+    if (step && this.index === this.tour.steps.length - 1) {
+      // Every way of leaving the last step (Done, arrow key, element click)
+      // funnels through here, so the step's destination url is always honoured.
+      this.completeFrom(step)
+      return
+    }
     this.goto(this.index + 1)
   }
 
@@ -540,6 +648,16 @@ export class TourPlayer {
     this.teardown()
   }
 
+  /** Finish from the last step, honouring its destination url (final CTA). */
+  private completeFrom(step: TourStep): void {
+    const url = (step.url ?? '').trim()
+    const navigate = Boolean(url) && !this.preview && isDifferentPage(url, this.win.location.href)
+    // Finish FIRST: progress is cleared before the navigation, so the
+    // destination page cannot resurrect the tour that was just completed.
+    this.finish('completed')
+    if (navigate) this.win.location.assign(url)
+  }
+
   private showStep(i: number): void {
     if (!this.tour) return
     const step = this.tour.steps[i]
@@ -550,32 +668,56 @@ export class TourPlayer {
     const token = ++this.runToken
     this.resetStep()
     this.index = i
-    this.persist(i)
 
     if ((step.type ?? 'tooltip') === 'wait') {
+      this.persist(i)
       this.emit('step_viewed', i)
       void this.runWaitStep(step, i, token)
       return
     }
 
     if (!stepNeedsTarget(step)) {
+      this.persist(i)
       this.present(step, i, null, false)
       return
     }
 
     const immediate = resolveStepTarget(step, this.doc)
     if (immediate.el) {
+      this.persist(i)
       this.present(step, i, immediate.el, immediate.healed)
       return
     }
-    if (immediate.reason === 'in_iframe' || this.resolveTimeoutMs <= 0) {
-      this.failStep(i, immediate.reason === 'in_iframe' ? 'in_iframe' : 'not_found')
+    // The anchor is not here. A step that names its page is navigated to —
+    // progress goes down FIRST (flagged `navigating`) so the next load
+    // auto-continues at this exact step instead of restarting the tour.
+    if (this.navigateToStep(step, i)) return
+    this.persist(i)
+    if (immediate.reason === 'in_iframe') {
+      // Cross-frame steps can never resolve in the top document — the old
+      // report-and-skip behaviour stays the honest one.
+      this.failStep(i, 'in_iframe')
       return
     }
+    if (this.resolveTimeoutMs <= 0) {
+      this.blockStep(step, i, 'not_found')
+      return
+    }
+    this.renderSearching(step, i)
     void this.awaitTarget(step, i, token)
   }
 
-  /** SPA render race: give the element a moment to appear before skipping. */
+  /** Cross-page step: persist, then leave. True when navigation started. */
+  private navigateToStep(step: TourStep, i: number): boolean {
+    const url = (step.url ?? '').trim()
+    if (!url || this.preview) return false
+    if (!isDifferentPage(url, this.win.location.href)) return false
+    this.persist(i, { navigating: true })
+    this.win.location.assign(url)
+    return true
+  }
+
+  /** SPA render race: give the element a moment to appear before blocking. */
   private async awaitTarget(step: TourStep, i: number, token: number): Promise<void> {
     const result = await waitForTarget(step, this.resolveTimeoutMs, {
       doc: this.doc,
@@ -583,7 +725,8 @@ export class TourPlayer {
     })
     if (token !== this.runToken || !this.tour) return
     if (!result.el) {
-      this.failStep(i, result.reason === 'in_iframe' ? 'in_iframe' : 'not_found')
+      if (result.reason === 'in_iframe') this.failStep(i, 'in_iframe')
+      else this.blockStep(step, i, result.reason ?? 'timeout')
       return
     }
     this.present(step, i, result.el, result.healed)
@@ -592,6 +735,16 @@ export class TourPlayer {
   private failStep(i: number, reason: StepErrorReason): void {
     this.emit('step_error', i, { reason })
     this.goto(i + 1)
+  }
+
+  /**
+   * The anchor is genuinely not on this page: say so ON the card and hand the
+   * choice to the visitor. Auto-skipping here is what made Next feel dead —
+   * the tour silently burned through its remaining steps.
+   */
+  private blockStep(step: TourStep, i: number, reason: StepErrorReason): void {
+    this.emit('step_blocked', i, { reason })
+    this.renderBlocked(step, i)
   }
 
   private present(step: TourStep, i: number, el: HTMLElement | null, healed: boolean): void {
@@ -627,6 +780,13 @@ export class TourPlayer {
     tip.innerHTML = ''
     tip.hidden = false
     tip.classList.toggle('stept-centered', centered)
+    if (centered) {
+      // Inline coords left over from an anchored step outrank the class
+      // (inline > class), which pinned the "centred" modal at the previous
+      // tooltip's corner. Centring must always drop them.
+      tip.style.top = ''
+      tip.style.left = ''
+    }
     tip.setAttribute('aria-modal', this.settings.backdrop && centered ? 'true' : 'false')
     if (this.banner) this.banner.hidden = true
     if (this.beacon) this.beacon.hidden = true
@@ -636,6 +796,8 @@ export class TourPlayer {
       this.hole.classList.toggle('stept-nodim', !this.settings.backdrop)
     }
     this.root?.classList.toggle('stept-veil', centered && this.settings.backdrop)
+    // Spotlight backdrop: block the page around the cutout, never the cutout.
+    this.setBlockers(Boolean(el) && this.settings.backdrop && !centered)
 
     if (this.preview) {
       const badge = el2(this.doc, 'span', 'stept-tour-badge')
@@ -663,11 +825,72 @@ export class TourPlayer {
     tip.appendChild(this.footer(step, i, guidedAction))
   }
 
+  /** Bare centred card shared by the searching and blocked states. */
+  private renderStateCard(step: TourStep, i: number): HTMLElement | null {
+    const tip = this.tip
+    if (!tip || !this.tour) return null
+    this.hideChrome()
+    tip.hidden = false
+    tip.innerHTML = ''
+    tip.classList.add('stept-centered')
+    tip.style.top = ''
+    tip.style.left = ''
+    tip.setAttribute('aria-modal', 'false')
+    if (this.settings.dismissable) tip.appendChild(this.closeButton())
+    const heading = el2(this.doc, 'h4')
+    heading.id = `stept-tour-title-${i}`
+    heading.textContent = step.title || defaultTitle(step, i)
+    tip.appendChild(heading)
+    tip.setAttribute('aria-labelledby', heading.id)
+    return tip
+  }
+
+  /** Subtle holding state while {@link awaitTarget} chases a hydrating anchor. */
+  private renderSearching(step: TourStep, i: number): void {
+    const tip = this.renderStateCard(step, i)
+    if (!tip) return
+    const wait = el2(this.doc, 'p', 'stept-tour-wait')
+    wait.appendChild(el2(this.doc, 'i'))
+    wait.appendChild(this.doc.createTextNode('Finding it on this page…'))
+    tip.appendChild(wait)
+  }
+
+  /** The explicit blocked card: never a dead Next, never a silent skip. */
+  private renderBlocked(step: TourStep, i: number): void {
+    const tip = this.renderStateCard(step, i)
+    if (!tip || !this.tour) return
+    const body = el2(this.doc, 'p')
+    body.textContent = "Can't find this element on this page"
+    tip.appendChild(body)
+    if (this.settings.show_progress) tip.appendChild(this.progressBar(i))
+
+    const foot = el2(this.doc, 'div', 'stept-tour-foot')
+    const left = el2(this.doc, 'span', 'stept-tour-count')
+    if (this.settings.show_progress) left.textContent = `${i + 1} of ${this.tour.steps.length}`
+    foot.appendChild(left)
+
+    const actions = el2(this.doc, 'div', 'stept-tour-actions')
+    const skip = el2(this.doc, 'button', 'stept-tour-btn ghost')
+    skip.textContent = 'Skip step'
+    skip.onclick = () => this.goto(i + 1)
+    actions.appendChild(skip)
+    // Always offered, even when `dismissable` is off — a blocked step with no
+    // way out would trap the visitor on a card about a missing element.
+    const end = el2(this.doc, 'button', 'stept-tour-btn primary')
+    end.textContent = 'End tour'
+    end.onclick = () => this.dismiss()
+    actions.appendChild(end)
+    foot.appendChild(actions)
+    tip.appendChild(foot)
+    this.focusTip()
+  }
+
   private renderHotspot(step: TourStep, i: number, el: HTMLElement | null): void {
     if (this.tip) this.tip.hidden = true
     if (this.banner) this.banner.hidden = true
     if (this.hole) this.hole.hidden = true
     this.root?.classList.remove('stept-veil')
+    this.setBlockers(false)
     const beacon = this.beacon
     if (!beacon) return
     beacon.hidden = false
@@ -689,6 +912,7 @@ export class TourPlayer {
     if (this.hole) this.hole.hidden = true
     // A banner is an announcement, never a modal: the page stays fully usable.
     this.root?.classList.remove('stept-veil')
+    this.setBlockers(false)
 
     const theme = this.tour.theme?.banner ?? {}
     const position = this.tour.theme?.position === 'top' ? 'top' : 'bottom'
@@ -806,9 +1030,10 @@ export class TourPlayer {
     const timer = this.win.setTimeout(() => {
       if (token !== this.runToken || !this.tour) return
       this.clearActing()
-      // A navigate action unloads the page: persist the NEXT step first so the
-      // reload resumes the tour instead of restarting (or dropping) it.
-      if (action.kind === 'navigate') this.persist(i + 1)
+      // A navigate action unloads the page: persist the NEXT step first —
+      // flagged `navigating`, so the reload auto-continues the tour instead of
+      // restarting (or merely offering) it.
+      if (action.kind === 'navigate') this.persist(i + 1, { navigating: true })
       let ok = false
       try {
         ok = performAction(action, el, this.win)
@@ -910,6 +1135,7 @@ export class TourPlayer {
     const total = this.tour?.steps.length ?? 1
     const isLast = i === total - 1
     const advance = step.advance?.on ?? 'button'
+    const clickAdvance = advance === 'element_click' || step.advance_on_click === true
     const foot = el2(this.doc, 'div', 'stept-tour-foot')
 
     const left = el2(this.doc, 'span', 'stept-tour-count')
@@ -923,16 +1149,17 @@ export class TourPlayer {
       back.onclick = () => this.back()
       actions.appendChild(back)
     }
-    // element_click / input / delay steps advance from the page itself; showing
-    // a Next button there would let the user skip the thing being taught.
-    const selfAdvancing = (guidedAction || advance !== 'button') && !isLast
+    // element_click / advance_on_click / input / delay steps advance from the
+    // page itself; showing a Next button there would let the user skip the
+    // thing being taught.
+    const selfAdvancing = (guidedAction || clickAdvance || advance !== 'button') && !isLast
     if (selfAdvancing) {
       const hint = el2(this.doc, 'p', 'stept-tour-hint')
       hint.textContent = guidedAction
         ? actionHint(step)
         : advance === 'input'
           ? t('tour.fill_field')
-          : advance === 'delay'
+          : advance === 'delay' && !clickAdvance
             ? 'Continuing…'
             : t('tour.click_target_continue')
       actions.appendChild(hint)
@@ -949,7 +1176,10 @@ export class TourPlayer {
   private bindAdvance(step: TourStep, el: HTMLElement | null): void {
     const advance = step.advance ?? { on: 'button' as const }
     const guidedAction = (step.type ?? 'tooltip') === 'action' && this.settings.mode !== 'driven'
-    const mode = guidedAction ? 'element_click' : advance.on
+    // `advance_on_click` is the recorder's per-step opt-in for interact-to-
+    // advance; the cutout is click-through, so the host handler fires too.
+    const mode =
+      guidedAction || step.advance_on_click === true ? 'element_click' : advance.on
 
     if (mode === 'element_click' && el) {
       const handler = (): void => this.next()
@@ -980,7 +1210,10 @@ export class TourPlayer {
   private handleKey(event: KeyboardEvent): void {
     if (!this.tour) return
     if (event.key === 'Escape' && this.settings.dismissable) {
+      // Fully consumed: the host app must not ALSO close its own dialog on the
+      // Escape that dismissed the tour (we listen in the capture phase).
       event.preventDefault()
+      event.stopPropagation()
       this.dismiss()
       return
     }
@@ -1011,6 +1244,11 @@ export class TourPlayer {
     if (this.beacon) this.beacon.hidden = true
     if (this.hole) this.hole.hidden = true
     this.root?.classList.remove('stept-veil')
+    this.setBlockers(false)
+  }
+
+  private setBlockers(active: boolean): void {
+    for (const blocker of this.blockers) blocker.hidden = !active
   }
 
   // --- geometry ------------------------------------------------------------
@@ -1055,6 +1293,14 @@ export class TourPlayer {
         width: `${r.width + pad * 2}px`,
         height: `${r.height + pad * 2}px`,
       })
+      if (this.blockers.length && !this.blockers[0]!.hidden) {
+        this.positionBlockers({
+          top: r.top - pad,
+          left: r.left - pad,
+          width: r.width + pad * 2,
+          height: r.height + pad * 2,
+        })
+      }
     }
     if (el && this.beacon && !this.beacon.hidden) {
       const r = el.getBoundingClientRect()
@@ -1077,9 +1323,41 @@ export class TourPlayer {
       { top: r.top, left: r.left, width: r.width, height: r.height },
       { width: tipRect.width || 320, height: tipRect.height || 150 },
       vp,
+      12,
+      // The widget's own chrome (launcher, pill, open panel) must not cover
+      // the tooltip it is pointing with.
+      this.getObstructions?.() ?? [],
     )
     tip.style.top = `${pos.top}px`
     tip.style.left = `${pos.left}px`
+  }
+
+  /**
+   * Fit the four pointer-catching panels around the spotlight cutout. Their
+   * union is exactly the viewport minus the cutout, so the taught element is
+   * the one place the backdrop lets a click through.
+   */
+  private positionBlockers(cut: Rect): void {
+    const vw = this.win.innerWidth
+    const vh = this.win.innerHeight
+    const x0 = Math.max(0, Math.min(vw, cut.left))
+    const x1 = Math.max(x0, Math.min(vw, cut.left + cut.width))
+    const y0 = Math.max(0, Math.min(vh, cut.top))
+    const y1 = Math.max(y0, Math.min(vh, cut.top + cut.height))
+    const place = (index: number, top: number, left: number, width: number, height: number): void => {
+      const blocker = this.blockers[index]
+      if (!blocker) return
+      Object.assign(blocker.style, {
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${Math.max(0, width)}px`,
+        height: `${Math.max(0, height)}px`,
+      })
+    }
+    place(0, 0, 0, vw, y0) // above
+    place(1, y1, 0, vw, vh - y1) // below
+    place(2, y0, 0, x0, y1 - y0) // left of
+    place(3, y0, x1, vw - x1, y1 - y0) // right of
   }
 
   // --- plumbing ------------------------------------------------------------
@@ -1093,12 +1371,16 @@ export class TourPlayer {
     this.onEvent(event, stepIndex, meta)
   }
 
-  private persist(index: number): void {
+  private persist(index: number, extra: { navigating?: boolean } = {}): void {
     if (this.preview || !this.tour) return
     writeTourProgress(this.storage, this.progressKey, {
       tourId: this.tour.id,
       stepIndex: index,
       startedAt: this.startedAt,
+      updatedAt: Date.now(),
+      // Only ever written truthy: a plain persist CONSUMES the flag, so a
+      // resumed tour goes back to offering (not hijacking) on the next load.
+      ...(extra.navigating ? { navigating: true } : {}),
     })
   }
 
@@ -1136,17 +1418,27 @@ export class TourPlayer {
     beacon.hidden = true
     beacon.style.setProperty('--stept-accent', this.accent)
 
+    const blockers: HTMLElement[] = []
+    for (let i = 0; i < 4; i++) {
+      const blocker = el2(this.doc, 'div', 'stept-tour-blocker')
+      blocker.hidden = true
+      blocker.setAttribute('aria-hidden', 'true')
+      blockers.push(blocker)
+    }
+
     // Siblings on <body> (not children of the pointer-events:none root) so they
     // stay clickable.
     this.doc.body.appendChild(root)
     this.doc.body.appendChild(tip)
     this.doc.body.appendChild(banner)
     this.doc.body.appendChild(beacon)
+    for (const blocker of blockers) this.doc.body.appendChild(blocker)
     this.root = root
     this.hole = hole
     this.tip = tip
     this.banner = banner
     this.beacon = beacon
+    this.blockers = blockers
   }
 
   private clearActing(): void {
@@ -1178,6 +1470,8 @@ export class TourPlayer {
     this.tip?.remove()
     this.banner?.remove()
     this.beacon?.remove()
+    for (const blocker of this.blockers) blocker.remove()
+    this.blockers = []
     this.root = this.hole = this.tip = this.banner = this.beacon = null
     this.tour = null
     this.index = 0
@@ -1219,9 +1513,9 @@ function actionHint(step: TourStep): string {
     : t('tour.click_target_continue')
 }
 
-function safeSessionStorage(win: Window): Storage | null {
+function safeLocalStorage(win: Window): Storage | null {
   try {
-    return win.sessionStorage ?? null
+    return win.localStorage ?? null
   } catch {
     return null
   }
