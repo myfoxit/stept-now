@@ -14,7 +14,8 @@ timestamps, not counters.
 
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Select, func, or_, select
@@ -27,6 +28,7 @@ from app.core.errors import BlockedContactError, NotFoundError, ValidationFailur
 from app.core.events import Actor, Event, EventNames, emit
 from app.core.pagination import clamp_limit, decode_cursor, encode_cursor
 from app.core.queue import enqueue
+from app.core.scheduler import scheduled
 from app.models.agent import Agent
 from app.models.contact import Contact
 from app.models.conversation import (
@@ -66,6 +68,15 @@ _ASSIGNABLE_ROLES = ("owner", "admin", "agent")
 
 PREVIEW_LENGTH = 140
 
+#: Auto-title: subject derived from the first visitor message, truncated at a
+#: word boundary. Widget conversations otherwise sit in the inbox as "(no
+#: subject)" rows nobody can tell apart.
+SUBJECT_MAX_CHARS = 64
+
+#: AI-owned ("pending") conversations idle this long get auto-resolved; a
+#: visitor reply reopens them to the bound agent (see `add_message`).
+AUTO_RESOLVE_IDLE_HOURS = 24
+
 
 class _Unset:
     """Sentinel distinguishing 'not provided' from an explicit None."""
@@ -76,6 +87,22 @@ class _Unset:
 
 _UNSET = _Unset()
 UNSET = _UNSET  # public alias for callers of assign()
+
+_MARKDOWN_NOISE_RE = re.compile(r"[#*_`>\[\]()|~]+")
+
+
+def derive_subject(content: str) -> str | None:
+    """A short subject from a visitor message: first line, markdown stripped,
+    truncated at a word boundary. None when nothing legible remains."""
+    first_line = next((line for line in content.splitlines() if line.strip()), "")
+    cleaned = " ".join(_MARKDOWN_NOISE_RE.sub(" ", first_line).split()).strip()
+    if not cleaned:
+        return None
+    if len(cleaned) <= SUBJECT_MAX_CHARS:
+        return cleaned
+    truncated = cleaned[:SUBJECT_MAX_CHARS]
+    head, _, _tail = truncated.rpartition(" ")
+    return f"{head or truncated}…"
 
 
 # ---------------------------------------------------------------------------
@@ -597,6 +624,10 @@ async def add_message(
     # Tracker columns (see module docstring).
     previous_status = conversation.status
     if is_public and direction == MessageDirection.IN:
+        if conversation.subject is None and author_type == AuthorType.CONTACT:
+            # Auto-title from the first visitor message (email threads arrive
+            # with a real subject and never hit this).
+            conversation.subject = derive_subject(content)
         if conversation.waiting_since is None:
             conversation.waiting_since = now
         if conversation.status in (ConversationStatus.RESOLVED, ConversationStatus.SNOOZED):
@@ -769,6 +800,10 @@ async def update_status(
     if status == ConversationStatus.RESOLVED:
         conversation.resolved_at = utcnow()
         conversation.waiting_since = None  # resolve clears the needs-response queue
+        if conversation.ai_agent_id and not conversation.csat_requested:
+            # Resolving an agent-handled thread triggers the existing CSAT flow
+            # (widget Csat component keys off this flag) — exactly once.
+            conversation.csat_requested = True
     await session.flush()
     if status != previous_status:
         label = actor.label or "System"
@@ -976,6 +1011,53 @@ async def mark_read(session: AsyncSession, conversation: Conversation) -> Conver
     conversation.agent_last_seen_at = utcnow()
     await session.flush()
     return conversation
+
+
+# ---------------------------------------------------------------------------
+# hygiene: auto-resolve idle AI conversations
+# ---------------------------------------------------------------------------
+
+
+async def auto_resolve_idle(
+    session: AsyncSession, *, now: datetime | None = None
+) -> list[Conversation]:
+    """Resolve AI-owned ("pending") conversations idle past the window.
+
+    Agent-only threads otherwise pile up as forever-pending: nobody is waiting,
+    but nothing closes them either. Resolution goes through `update_status`, so
+    it carries the activity line, the status event/broadcast, and the CSAT
+    trigger. A visitor reply reopens the thread straight back to the bound
+    agent (see `add_message`'s resolved→pending rule).
+
+    Human-owned ("open") and snoozed conversations are untouched — idleness on
+    a human queue is a human decision.
+    """
+    cutoff = (now or utcnow()) - timedelta(hours=AUTO_RESOLVE_IDLE_HOURS)
+    idle = (
+        (
+            await session.execute(
+                select(Conversation).where(
+                    Conversation.status == ConversationStatus.PENDING,
+                    Conversation.ai_agent_id.is_not(None),
+                    Conversation.last_activity_at <= cutoff,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    actor = Actor(type="system", label="Auto-resolve")
+    for conversation in idle:
+        await update_status(session, conversation, ConversationStatus.RESOLVED.value, actor=actor)
+    return list(idle)
+
+
+@scheduled("conversation_auto_resolve", every_seconds=300)
+async def _auto_resolve_job() -> None:
+    from app.core.db import session_scope
+
+    async with session_scope() as session:
+        await auto_resolve_idle(session)
 
 
 # ---------------------------------------------------------------------------
