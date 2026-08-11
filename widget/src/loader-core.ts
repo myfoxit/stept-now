@@ -10,7 +10,7 @@
  *    The loader wires these to timers/fetch; everything here is pure.
  */
 
-import type { Campaign, SteptSettings } from './types'
+import type { Campaign, SteptSettings, TourAutostartPolicy } from './types'
 
 export interface SteptCommandHandlers {
   boot: (settings?: SteptSettings) => void
@@ -96,6 +96,16 @@ export function installStept(
     dispatch(command as string, ...args)
   }
   return dispatch
+}
+
+/**
+ * Boot-config `tour_autostart_policy`: what a backend-pushed (offered) tour is
+ * allowed to do. Explicit starts — `Stept('startTour')`, the messenger,
+ * previews, resume — are commands and bypass the policy entirely. Anything
+ * unrecognised is `ask`, the least intrusive default.
+ */
+export function normalizeAutostartPolicy(raw: unknown): TourAutostartPolicy {
+  return raw === 'auto' || raw === 'never' ? raw : 'ask'
 }
 
 // --- proactive campaigns: pure decision logic --------------------------------

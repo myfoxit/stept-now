@@ -19,8 +19,19 @@ export const MSG = {
   OPEN: 'stept:open',
   /** both ways: close the messenger panel. */
   CLOSE: 'stept:close',
-  /** app -> loader: start a product tour in the host DOM. */
+  /** app -> loader: start a product tour in the host DOM (payload `{tourId}`). */
   TOUR_START: 'stept:tour:start',
+  /**
+   * app -> loader: resume a tour whose saved progress the loader announced
+   * (payload `{tourId}`). Playback continues at the persisted step.
+   */
+  TOUR_RESUME: 'stept:tour:resume',
+  /**
+   * loader -> app: the tour lifecycle changed (payload `{status, tourId, step,
+   * total, title}`, status `started|completed|dismissed|blocked`). The app
+   * collapses to its pill state on `started` and restores itself on the rest.
+   */
+  TOUR_STATE: 'stept:tour:state',
   /** loader -> app: a tour lifecycle event happened (mirrors backend telemetry). */
   TOUR_EVENT: 'stept:tour:event',
   /**
