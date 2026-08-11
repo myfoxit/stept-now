@@ -113,6 +113,12 @@ export interface WidgetMessage {
   attachments: Array<Record<string, unknown>>
   created_at: string
   meta: { citations?: Citation[] }
+  /**
+   * Language the server now believes this visitor writes in. Present only on
+   * the response to an outbound send. The widget switches its whole interface
+   * to match — see `i18n/resolve.ts`.
+   */
+  detected_locale?: string | null
 }
 
 export interface CursorPage<T> {

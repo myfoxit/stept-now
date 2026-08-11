@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.widget.deps import WidgetAuth
 from app.core.deps import Db
+from app.core.i18n import normalize_locale
 from app.models.article import Article
 from app.models.knowledge import Document
 from app.rag.retrieval import search_chunks
@@ -48,7 +49,7 @@ def _snippet(content: str, title: str) -> str:
 
 
 async def _search_articles(
-    session: AsyncSession, workspace_id: str, query: str
+    session: AsyncSession, workspace_id: str, query: str, locale: str | None = None
 ) -> list[ArticleSearchResult]:
     source = await get_or_create_articles_source(session, workspace_id)
     chunks = await search_chunks(
@@ -58,6 +59,7 @@ async def _search_articles(
         k=SEARCH_DEPTH,
         source_ids=[source.id],
         expand_neighbors=False,
+        locale=locale,
     )
     await record_search(
         session,
@@ -98,12 +100,21 @@ async def _search_articles(
 
 
 @router.get("/articles", response_model=WidgetArticlesResponse)
-async def articles(principal: WidgetAuth, session: Db, query: str = "") -> WidgetArticlesResponse:
+async def articles(
+    principal: WidgetAuth, session: Db, query: str = "", locale: str = ""
+) -> WidgetArticlesResponse:
+    # An explicit `?locale=` is the visitor using the help center's own language
+    # switcher; otherwise serve the language we have learned they write in.
+    reader_locale = normalize_locale(locale) or principal.contact.locale
     if query.strip():
         return WidgetArticlesResponse(
-            results=await _search_articles(session, principal.workspace.id, query.strip())
+            results=await _search_articles(
+                session, principal.workspace.id, query.strip(), reader_locale
+            )
         )
-    home = await articles_service.get_portal_home(session, principal.workspace.slug)
+    home = await articles_service.get_portal_home(
+        session, principal.workspace.slug, locale=reader_locale
+    )
     return WidgetArticlesResponse(collections=home.collections)
 
 

@@ -37,6 +37,7 @@ from app.agents import client_actions, page_tools
 from app.agents.guides import search_guides
 from app.ai.base import ToolSpec
 from app.core.events import Actor
+from app.core.i18n import normalize_locale
 from app.core.net import UnsafeUrlError, assert_public_url
 from app.core.security import decrypt_secret
 from app.models.agent import Agent, CustomAction
@@ -152,6 +153,13 @@ def _retrieval_settings(agent: Agent) -> tuple[int, list[str] | None]:
     return int(k), source_ids
 
 
+def _conversation_locale(conversation: Conversation | None) -> str | None:
+    """Language stamped on the thread by `app.services.language`, if any."""
+    if conversation is None or not isinstance(conversation.attributes, dict):
+        return None
+    return normalize_locale(conversation.attributes.get("locale"))
+
+
 # --- builtin executors ------------------------------------------------------
 
 
@@ -172,6 +180,9 @@ async def _exec_search_knowledge(ctx: ToolContext, tool_input: dict[str, Any]) -
         source_ids=source_ids,
         rerank=True,
         history=history,
+        # Prefer help-center material in the language this person writes in;
+        # a soft boost, so an English-only KB still answers them.
+        locale=_conversation_locale(ctx.conversation),
     )
     await record_search(
         ctx.session,

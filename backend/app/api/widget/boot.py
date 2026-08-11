@@ -19,6 +19,7 @@ from app.api.widget.deps import resolve_inbox
 from app.core.db import utcnow, uuid7
 from app.core.deps import Db
 from app.core.errors import BlockedContactError, ForbiddenError
+from app.core.i18n import workspace_locale
 from app.core.ratelimit import RateLimit
 from app.core.security import create_widget_token, verify_identity_hash
 from app.models.article import Article
@@ -47,6 +48,10 @@ class BootContactOut(BaseModel):
     id: str
     name: str
     email: str | None = None
+    #: Language this contact writes in, learned from previous messages. The
+    #: widget prefers it over the browser's Accept-Language, so a returning
+    #: visitor gets their language back before they type anything.
+    locale: str | None = None
 
 
 class BootWorkspaceOut(BaseModel):
@@ -131,9 +136,13 @@ async def boot(body: BootRequest, session: Db) -> BootResponse | RequireIdentity
     return BootResponse(
         token=create_widget_token(workspace.id, contact.id),
         visitor_id=body.visitor_id or source_id,
-        contact=BootContactOut(id=contact.id, name=contact.name, email=contact.email),
+        contact=BootContactOut(
+            id=contact.id, name=contact.name, email=contact.email, locale=contact.locale
+        ),
         workspace=BootWorkspaceOut(name=workspace.name, logo_url=workspace.logo_url),
-        config=dict(inbox.config),
+        # The workspace default is the widget's weakest locale signal — used
+        # only when we know nothing about this particular visitor.
+        config={**inbox.config, "default_locale": workspace_locale(workspace.settings)},
         conversations=await conversation_summaries(
             session, workspace.id, inbox.id, contact.id, limit=10
         ),

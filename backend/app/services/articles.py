@@ -5,6 +5,7 @@ published help content is immediately searchable and citable by AI agents."""
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import utcnow, uuid7
 from app.core.errors import ConflictError, NotFoundError
 from app.core.events import Actor
-from app.core.i18n import DEFAULT_LOCALE
+from app.core.i18n import DEFAULT_LOCALE, workspace_locale
 from app.models.article import Article, ArticleCollection
 from app.models.knowledge import Chunk, Document
 from app.models.workspace import Workspace
@@ -201,6 +202,28 @@ async def delete_collection(
     )
 
 
+def _pick_locale_variants[T: (Article, ArticleCollection)](
+    rows: Sequence[T], locale: str | None, default_locale: str
+) -> list[T]:
+    """One row per translation group: the reader's language, else the fallback.
+
+    Preference order within a group is reader's locale → workspace default →
+    English → whatever exists, so a group always yields exactly one row and the
+    help center never shows the same article twice in two languages.
+    """
+    groups: dict[str, list[T]] = {}
+    for row in rows:
+        groups.setdefault(row.translation_key, []).append(row)
+
+    preference = [code for code in (locale, default_locale, DEFAULT_LOCALE) if code]
+    picked: list[T] = []
+    for variants in groups.values():
+        by_locale = {variant.locale: variant for variant in variants}
+        chosen = next((by_locale[code] for code in preference if code in by_locale), variants[0])
+        picked.append(chosen)
+    return picked
+
+
 # ---------------------------------------------------------------------------
 # articles
 # ---------------------------------------------------------------------------
@@ -351,7 +374,7 @@ async def _sync_published_article(session: AsyncSession, article: Article) -> Do
             uri=uri,
             mime="text/markdown",
             status="processing",
-            meta={"article_id": article.id},
+            meta={"article_id": article.id, "locale": article.locale},
         )
         session.add(document)
         await session.flush()
@@ -360,6 +383,7 @@ async def _sync_published_article(session: AsyncSession, article: Article) -> Do
         document.uri = uri
         document.status = "processing"
         document.error = None
+        document.meta = {**document.meta, "locale": article.locale}
     await ingest_document(session, document, article.body)
     return document
 
@@ -443,9 +467,19 @@ async def _workspace_by_slug(session: AsyncSession, workspace_slug: str) -> Work
     return workspace
 
 
-async def get_portal_home(session: AsyncSession, workspace_slug: str) -> PortalHomeOut:
+async def get_portal_home(
+    session: AsyncSession, workspace_slug: str, *, locale: str | None = None
+) -> PortalHomeOut:
+    """The help-center index, in the reader's language where one exists.
+
+    Falls back per translation group rather than wholesale: a workspace that has
+    translated three of its forty articles shows those three in German and the
+    rest in its default language, instead of showing a near-empty German help
+    center or ignoring the translations it does have.
+    """
     workspace = await _workspace_by_slug(session, workspace_slug)
-    published = (
+    default_locale = workspace_locale(workspace.settings) or DEFAULT_LOCALE
+    all_published = (
         (
             await session.execute(
                 select(Article)
@@ -456,6 +490,7 @@ async def get_portal_home(session: AsyncSession, workspace_slug: str) -> PortalH
         .scalars()
         .all()
     )
+    published = _pick_locale_variants(all_published, locale, default_locale)
     by_collection: dict[str | None, list[PortalArticleRef]] = {}
     for article in published:
         by_collection.setdefault(article.collection_id, []).append(
@@ -463,7 +498,8 @@ async def get_portal_home(session: AsyncSession, workspace_slug: str) -> PortalH
         )
 
     collections_out: list[PortalCollectionOut] = []
-    for collection in await list_collections(session, workspace.id):
+    all_collections = await list_collections(session, workspace.id)
+    for collection in _pick_locale_variants(all_collections, locale, default_locale):
         articles = by_collection.pop(collection.id, [])
         if articles:
             collections_out.append(

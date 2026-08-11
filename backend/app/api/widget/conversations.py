@@ -35,6 +35,7 @@ from app.models.message import AuthorType, Message, MessageDirection, MessageVis
 from app.realtime.manager import broadcast, conversation_topic
 from app.schemas.messages import AttachmentRef
 from app.services import conversations as conversations_service
+from app.services import language
 
 router = APIRouter()
 
@@ -66,6 +67,10 @@ class WidgetMessageOut(BaseModel):
     attachments: list[dict[str, Any]]
     created_at: datetime
     meta: dict[str, Any]
+    #: Language we now believe this visitor writes in, once we are confident.
+    #: The widget switches its whole interface to match — see
+    #: `widget/src/i18n/resolve.ts`. Null while the evidence is still thin.
+    detected_locale: str | None = None
 
 
 class WidgetMessageCreate(BaseModel):
@@ -164,7 +169,7 @@ async def conversation_summaries(
     return [await _summary(session, conversation) for conversation in conversations]
 
 
-def _message_out(message: Message) -> WidgetMessageOut:
+def _message_out(message: Message, *, detected_locale: str | None = None) -> WidgetMessageOut:
     citations = message.meta.get("citations") if isinstance(message.meta, dict) else None
     return WidgetMessageOut(
         id=message.id,
@@ -175,6 +180,7 @@ def _message_out(message: Message) -> WidgetMessageOut:
         attachments=list(message.attachments),
         created_at=message.created_at,
         meta={"citations": citations} if citations else {},
+        detected_locale=detected_locale,
     )
 
 
@@ -260,6 +266,7 @@ async def _ingest_visitor_message(
         actor=actor,
         deliver=False,
     )
+    await language.learn_contact_locale(session, principal.contact, conversation=conversation)
     return conversation, message
 
 
@@ -347,7 +354,10 @@ async def create_message(
         actor=actor,
         deliver=False,
     )
-    return _message_out(message)
+    detected = await language.learn_contact_locale(
+        session, principal.contact, conversation=conversation
+    )
+    return _message_out(message, detected_locale=detected)
 
 
 @router.post("/conversations/{conversation_id}/read", response_model=ConversationSummary)

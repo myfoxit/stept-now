@@ -631,6 +631,8 @@ export class Controller {
           this.actionDefs ?? undefined,
         )) as UiMessage
         this.replaceTemp(temp.id, real)
+        // If this message revealed which language they write in, follow it.
+        this.adoptDetectedLocale(real.detected_locale)
       }
     } catch {
       this.markFailed(temp.id)

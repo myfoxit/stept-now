@@ -32,6 +32,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import and_, bindparam, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,6 +57,11 @@ BM25_WEIGHT = 0.35
 BM25_K1, BM25_B = 1.5, 0.75
 #: Multiplier for a chunk whose document TITLE matches the question.
 TITLE_MATCH_BOOST = 1.25
+#: How much a document in the reader's own language is preferred. Deliberately
+#: mild: enough to win a tie between an article and its translation, not enough
+#: to bury a much better answer that happens to be in another language.
+LOCALE_MATCH_BOOST = 1.4
+LOCALE_MISMATCH_PENALTY = 0.85
 #: With ``rerank=True``, the LLM selection pass only engages when the widened
 #: fused candidate set is LARGER than this. Reordering ≤5 candidates cannot
 #: change an answer meaningfully and would spend an LLM call per message.
@@ -91,6 +97,7 @@ async def search_chunks(
     rerank: bool = False,
     expand_query: bool = True,
     history: list[str] | None = None,
+    locale: str | None = None,
 ) -> list[RetrievedChunk]:
     """Workspace-scoped hybrid search returning the top-k fused chunks.
 
@@ -151,7 +158,7 @@ async def search_chunks(
 
     rows = await _load_candidates(session, workspace_id, list(fused))
     source_boosts = await _source_boosts(session, workspace_id)
-    bm25 = _bm25_scores(primary, [chunk for chunk, _title, _updated, _source in rows])
+    bm25 = _bm25_scores(primary, [chunk for chunk, _t, _u, _s, _m in rows])
     now = utcnow()
     scored = [
         (
@@ -159,11 +166,12 @@ async def search_chunks(
             * _recency_boost(document_updated_at, now)
             * source_boosts.get(document_source_id, 1.0)
             * (1.0 + BM25_WEIGHT * bm25.get(chunk.id, 0.0))
-            * (TITLE_MATCH_BOOST if chunk.id in title_ids else 1.0),
+            * (TITLE_MATCH_BOOST if chunk.id in title_ids else 1.0)
+            * _locale_boost(document_meta, locale),
             chunk,
             document_title,
         )
-        for chunk, document_title, document_updated_at, document_source_id in rows
+        for chunk, document_title, document_updated_at, document_source_id, document_meta in rows
     ]
     scored.sort(key=lambda item: (-item[0], item[1].document_id, item[1].ord))
     from app.rag.rerank import RERANK_CANDIDATES, rerank_results
@@ -420,9 +428,9 @@ def _bm25_scores(query: str, chunks: list[Chunk]) -> dict[str, float]:
 
 async def _load_candidates(
     session: AsyncSession, workspace_id: str, chunk_ids: list[str]
-) -> list[tuple[Chunk, str, datetime, str]]:
+) -> list[tuple[Chunk, str, datetime, str, dict[str, Any]]]:
     rows = await session.execute(
-        select(Chunk, Document.title, Document.updated_at, Document.source_id)
+        select(Chunk, Document.title, Document.updated_at, Document.source_id, Document.meta)
         .join(Document, Document.id == Chunk.document_id)
         .where(
             Chunk.workspace_id == workspace_id,
@@ -432,6 +440,26 @@ async def _load_candidates(
         )
     )
     return [tuple(row) for row in rows.all()]  # type: ignore[misc]
+
+
+def _locale_boost(document_meta: dict[str, Any] | None, locale: str | None) -> float:
+    """Prefer material written in the reader's language — softly.
+
+    A boost, never a filter. Most workspaces have an English-only knowledge base
+    and German customers; excluding non-matching documents would answer "I don't
+    know" to a question the KB answers perfectly well, just in another language.
+    So a same-language article outranks its English twin, and an English article
+    still wins over nothing.
+
+    Documents with no locale (crawled pages, uploads) are untouched at 1.0, so a
+    workspace that never translates anything sees no change in ranking at all.
+    """
+    if not locale or not document_meta:
+        return 1.0
+    document_locale = document_meta.get("locale")
+    if not document_locale:
+        return 1.0
+    return LOCALE_MATCH_BOOST if document_locale == locale else LOCALE_MISMATCH_PENALTY
 
 
 def _recency_boost(updated_at: datetime | None, now: datetime) -> float:

@@ -62,6 +62,7 @@ from app.ai.registry import resolve_chat
 from app.core.db import utcnow, uuid7
 from app.core.errors import ConflictError
 from app.core.events import Actor, Event, EventNames, emit, on
+from app.core.i18n import LOCALES, normalize_locale
 from app.core.permissions import Perm, resolve_permissions
 from app.core.queue import enqueue
 from app.core.scheduler import scheduled
@@ -199,6 +200,7 @@ def compose_system_prompt(
     *,
     conversation: Conversation | None = None,
     plan: tool_registry.ToolPlan | None = None,
+    reply_locale: str | None = None,
 ) -> str:
     settings = agent.settings if isinstance(agent.settings, dict) else {}
     parts: list[str] = []
@@ -222,8 +224,49 @@ def compose_system_prompt(
             "Only state facts you can cite from a knowledge-base source; if you cannot, "
             "hand off to a human instead of guessing."
         )
+    parts.append(_language_prompt(settings, reply_locale))
     parts.extend(_page_control_prompt(conversation, plan))
     return "\n\n".join(parts)
+
+
+def _conversation_locale(conversation: Conversation | None) -> str | None:
+    """Language stamped on the thread by `app.services.language`, if any."""
+    if conversation is None or not isinstance(conversation.attributes, dict):
+        return None
+    return normalize_locale(conversation.attributes.get("locale"))
+
+
+def _language_prompt(settings: dict[str, Any], reply_locale: str | None) -> str:
+    """Tell the model which language to answer in.
+
+    The default is deliberately a *rule* rather than a language: models mirror
+    the customer's language reliably on their own, and naming a language we
+    detected would override that with a guess. `reply_locale` is passed only as
+    a hint for the ambiguous opening message, and even then the model is told to
+    follow the customer if they switch.
+
+    A workspace that must answer in one fixed language — a regulated market, a
+    team that only reads Japanese — sets `settings.reply_language`.
+    """
+    configured = normalize_locale(settings.get("reply_language"))
+    if configured:
+        name = LOCALES[configured].english_name
+        return (
+            f"Always reply in {name}, whatever language the customer writes in. "
+            f"If they write in another language, still answer in {name}."
+        )
+    if reply_locale and reply_locale in LOCALES:
+        name = LOCALES[reply_locale].english_name
+        return (
+            f"This customer has been writing in {name}, so reply in {name}. "
+            "If they switch languages, follow them — always match the language "
+            "of their most recent message."
+        )
+    return (
+        "Reply in the same language the customer writes in, matching their most "
+        "recent message. Never answer in English just because these instructions "
+        "are in English."
+    )
 
 
 def _page_control_prompt(
@@ -433,7 +476,13 @@ async def execute_run(
     else:
         messages = [
             ChatMessage.system(
-                compose_system_prompt(agent, workspace_name, conversation=conversation, plan=plan)
+                compose_system_prompt(
+                    agent,
+                    workspace_name,
+                    conversation=conversation,
+                    plan=plan,
+                    reply_locale=_conversation_locale(conversation),
+                )
             )
         ]
         messages.extend(await build_history(session, conversation))
@@ -590,7 +639,11 @@ async def run_sandbox(
     messages: list[ChatMessage] = [
         ChatMessage.system(
             compose_system_prompt(
-                agent, workspace_name, conversation=conversation, plan=sandbox_plan
+                agent,
+                workspace_name,
+                conversation=conversation,
+                plan=sandbox_plan,
+                reply_locale=_conversation_locale(conversation),
             )
         )
     ]

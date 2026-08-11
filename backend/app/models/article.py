@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import GUID, Base, PortableJSON, UTCDateTime
+from app.core.db import GUID, Base, PortableJSON, UTCDateTime, uuid7
 from app.models.base import TimestampMixin, WorkspaceScopedMixin, pk
 
 
@@ -29,7 +29,9 @@ class ArticleCollection(TimestampMixin, WorkspaceScopedMixin, Base):
     # Language this collection is written in (`app.core.i18n` codes).
     locale: Mapped[str] = mapped_column(String(12), default="en", nullable=False, index=True)
     # Groups the same collection across locales. See `Article.translation_key`.
-    translation_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    translation_key: Mapped[str] = mapped_column(
+        String(40), default=uuid7, nullable=False, index=True
+    )
 
 
 class Article(TimestampMixin, WorkspaceScopedMixin, Base):
@@ -51,10 +53,14 @@ class Article(TimestampMixin, WorkspaceScopedMixin, Base):
     id: Mapped[str] = pk()
     # Language this article is written in (`app.core.i18n` codes).
     locale: Mapped[str] = mapped_column(String(12), default="en", nullable=False, index=True)
-    # Shared id for "the same article in other languages". Defaults to the
-    # article's own id, so every article starts as a group of one and gaining a
-    # translation never has to rewrite the original's identity or URL.
-    translation_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    # Shared id for "the same article in other languages". A new article gets a
+    # fresh key, so it starts as a group of one and gaining a translation never
+    # rewrites the original's identity or URL. Defaulted at the column rather
+    # than only in the service, so constructing an Article directly — seeds,
+    # fixtures, tests — cannot produce a row with no translation group.
+    translation_key: Mapped[str] = mapped_column(
+        String(40), default=uuid7, nullable=False, index=True
+    )
     collection_id: Mapped[str | None] = mapped_column(
         GUID, ForeignKey("article_collections.id", ondelete="SET NULL"), index=True
     )
