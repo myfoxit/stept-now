@@ -67,14 +67,32 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Runs before the slow steps: a missing translation key is a one-second
+      # answer, and it is the only check here that no test can substitute for.
+      # Translations arrive from people who cannot run the app in their language,
+      # so this has to run on CI and not just in `make lint`.
+      - name: Catalog integrity (i18n)
+        run: node scripts/check-i18n.mjs
       - name: Type-check + unit tests + build (all packages)
         run: |
           pnpm --filter @stept/frontend exec tsc --noEmit
           pnpm --filter @stept/frontend test -- --run
           pnpm --filter @stept/widget test -- --run
+          pnpm --filter @stept/extension test -- --run
+          pnpm --filter @stept/dom-capture test -- --run
           pnpm --filter @stept/js test -- --run
           pnpm --filter @stept/react test -- --run
           pnpm -r build
+      # The landing is outside the pnpm workspace (own lockfile), so `pnpm -r`
+      # never touches it. Production is protected either way — deploy builds it
+      # as a Docker image and a failure there blocks the release — but nothing on
+      # a PR would notice a broken marketing site, and it now carries real logic:
+      # per-locale routes generated from the catalogs.
+      - name: Build the landing site
+        working-directory: landing
+        run: |
+          pnpm install --ignore-workspace --frozen-lockfile
+          pnpm build
 
   e2e:
     name: End-to-end (Playwright)

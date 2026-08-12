@@ -83,11 +83,18 @@ jobs:
           STEPT_TEST_PG_URL: postgresql+asyncpg://stept:stept@localhost:54329/stept_test
         run: uv run pytest -q
 
+      # Cheap, and the only gate that catches a locale whose catalog went stale —
+      # no test asserts on translation completeness.
+      - name: Catalog integrity (i18n)
+        run: node scripts/check-i18n.mjs
+
       - name: Frontend types, tests, builds
         run: |
           pnpm --filter @stept/frontend exec tsc --noEmit
           pnpm --filter @stept/frontend test -- --run
           pnpm --filter @stept/widget test -- --run
+          pnpm --filter @stept/extension test -- --run
+          pnpm --filter @stept/dom-capture test -- --run
           pnpm --filter @stept/js test -- --run
           pnpm --filter @stept/react test -- --run
           pnpm -r build
