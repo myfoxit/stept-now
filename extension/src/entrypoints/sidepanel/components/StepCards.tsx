@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { screenshotUrl } from '../../../api/client';
+import { t } from '../../../i18n';
 import type { TourStep } from '../../../types';
 import { STEP_ICONS } from '../lib';
 
@@ -33,7 +34,7 @@ export function Shot({
   const vw = bbox?.viewport?.w ?? 1280;
   const vh = bbox?.viewport?.h ?? 800;
   return (
-    <a className="shot" href={url} target="_blank" rel="noreferrer" title="Open full screenshot">
+    <a className="shot" href={url} target="_blank" rel="noreferrer" title={t('steps.open_screenshot')}>
       <img src={url} alt="" onError={() => setFailed(true)} />
       {bbox && (
         <span
@@ -130,15 +131,15 @@ export function StepRow({
         )}
         <div className="step-actions">
           {editing ? (
-            <button className="icon-btn" aria-label="Confirm rename" onClick={commit}>
+            <button className="icon-btn" aria-label={t('steps.confirm_rename')} onClick={commit}>
               <Check size={13} />
             </button>
           ) : (
             <>
               <button
                 className="icon-btn"
-                aria-label="Move step up"
-                title="Move up"
+                aria-label={t('steps.move_up_aria')}
+                title={t('steps.move_up')}
                 disabled={isFirst}
                 onClick={() => onMove(-1)}
               >
@@ -146,8 +147,8 @@ export function StepRow({
               </button>
               <button
                 className="icon-btn"
-                aria-label="Move step down"
-                title="Move down"
+                aria-label={t('steps.move_down_aria')}
+                title={t('steps.move_down')}
                 disabled={isLast}
                 onClick={() => onMove(1)}
               >
@@ -155,8 +156,8 @@ export function StepRow({
               </button>
               <button
                 className="icon-btn"
-                aria-label="Rename step"
-                title="Rename"
+                aria-label={t('steps.rename_aria')}
+                title={t('steps.rename')}
                 onClick={() => {
                   setDraft(step.title);
                   setEditing(true);
@@ -164,7 +165,12 @@ export function StepRow({
               >
                 <Pencil size={12} />
               </button>
-              <button className="icon-btn danger" aria-label="Delete step" title="Delete" onClick={onDelete}>
+              <button
+                className="icon-btn danger"
+                aria-label={t('steps.delete_aria')}
+                title={t('steps.delete')}
+                onClick={onDelete}
+              >
                 <Trash2 size={13} />
               </button>
             </>
@@ -177,11 +183,11 @@ export function StepRow({
           <span className="type-chip">
             <Icon size={11} /> {step.type}
           </span>
-          <span className="chip" title={`Advances on ${step.advance.on}`}>
+          <span className="chip" title={t('steps.advances_on', { event: step.advance.on })}>
             {step.advance.on.replace('_', ' ')}
           </span>
-          {masked && <span className="chip">private</span>}
-          {step.target?.frame?.length ? <span className="chip">iframe</span> : null}
+          {masked && <span className="chip">{t('steps.private')}</span>}
+          {step.target?.frame?.length ? <span className="chip">{t('steps.iframe')}</span> : null}
         </div>
 
         {warning && (
@@ -193,14 +199,18 @@ export function StepRow({
         <Shot step={step} apiBase={apiBase} workspaceId={workspaceId} />
 
         <button className="link-btn" onClick={() => setBodyOpen((v) => !v)}>
-          {bodyOpen ? 'Hide description' : step.body ? 'Edit description' : 'Add description'}
+          {bodyOpen
+            ? t('steps.hide_description')
+            : step.body
+              ? t('steps.edit_description')
+              : t('steps.add_description')}
         </button>
         {bodyOpen && (
           <textarea
             className="step-body-input"
             value={step.body}
             rows={3}
-            placeholder="Markdown shown under the step title in the tour"
+            placeholder={t('steps.body_placeholder')}
             onChange={(e) => onBody(e.target.value)}
           />
         )}

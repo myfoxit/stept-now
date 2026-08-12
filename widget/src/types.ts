@@ -31,7 +31,7 @@ export interface SteptSettings {
    */
   aiAllowedOrigins?: string[]
   /**
-   * Interface language for the widget (`'de'`, `'pt-BR'`, …). Optional: with no
+   * Interface language for the widget (`'de'`, `'fr'`, …). Optional: with no
    * setting the widget follows the visitor's browser, and then switches to
    * whatever language they actually write in.
    */

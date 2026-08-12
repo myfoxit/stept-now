@@ -1,0 +1,18 @@
+{
+  "appName": {
+    "message": "Stept Recorder",
+    "description": "Extension name in chrome://extensions and the Web Store. Deliberately identical in every locale: it is the product's name, not a phrase."
+  },
+  "appDescription": {
+    "message": "Record, edit, preview and drive Stept product tours.",
+    "description": "Web Store description. Chrome truncates past 132 characters."
+  },
+  "actionTitle": {
+    "message": "Stept — record a tour",
+    "description": "Toolbar button tooltip."
+  },
+  "commandToggleRecording": {
+    "message": "Start or stop recording a Stept tour",
+    "description": "Shown in chrome://extensions/shortcuts next to the key binding."
+  }
+}

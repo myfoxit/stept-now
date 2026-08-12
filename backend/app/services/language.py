@@ -1,4 +1,4 @@
-"""Detecting which of our thirteen languages a piece of text is written in.
+"""Detecting which of our shipped languages a piece of text is written in.
 
 **Why this is not an LLM call.** The model already writes its reply in the
 customer's language without being told which one that is — that is what models
@@ -24,6 +24,12 @@ Deliberately conservative. `detect_language` returns None unless the winner
 clears an absolute score *and* beats the runner-up, because "hi" and "ok, thanks"
 are not evidence of anything, and silently deciding a visitor is Dutch on the
 strength of the word "is" is worse than not deciding at all.
+
+The tables deliberately cover more languages than we ship. A language we can
+recognise but not render (Dutch, Polish, Japanese, …) still earns its keep as a
+*distractor*: Dutch text wins the Dutch score and comes back None, instead of
+scraping past the threshold as German. The filter against `SUPPORTED_LOCALES`
+happens once, at the end — everything upstream is pure recognition.
 """
 
 from __future__ import annotations
@@ -253,7 +259,9 @@ def detect_language(text: str | None) -> str | None:
 
     by_script = _script_language(prose)
     if by_script is not None:
-        return by_script
+        # A script we recognise but do not ship (Japanese, Arabic, …) must not
+        # fall through to Latin scoring — that could only misattribute it.
+        return by_script if by_script in SUPPORTED_LOCALES else None
 
     if len(letters) < MIN_CHARS:
         return None

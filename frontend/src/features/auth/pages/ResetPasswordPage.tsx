@@ -25,7 +25,7 @@ export function Component() {
       toast.success(t('auth.password_updated_log_in_with_your'))
       navigate('/login', { replace: true })
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : 'Reset failed')
+      toast.error(error instanceof ApiError ? error.message : t('auth.reset_failed'))
     } finally {
       setSubmitting(false)
     }
@@ -46,7 +46,7 @@ export function Component() {
           />
         </div>
         <Button type="submit" disabled={submitting || password.length < 8 || !token}>
-          {submitting ? 'Updating…' : 'Update password'}
+          {submitting ? t('auth.updating') : t('auth.update_password')}
         </Button>
       </form>
     </AuthCard>

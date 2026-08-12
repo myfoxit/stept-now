@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "Stept Recorder"
+  },
+  "appDescription": {
+    "message": "Enregistrez, modifiez, prévisualisez et exécutez automatiquement vos visites guidées Stept."
+  },
+  "actionTitle": {
+    "message": "Stept – enregistrer une visite"
+  },
+  "commandToggleRecording": {
+    "message": "Démarrer ou arrêter l’enregistrement d’une visite Stept"
+  }
+}

@@ -1,4 +1,5 @@
 import type { Target } from '@stept/dom-capture';
+import { t } from '../i18n';
 import { looksLikeSecret } from '../secret-redaction';
 import { wildcardMatch } from '../url-pattern';
 import type { PanelStepRef, TourStep } from '../types';
@@ -111,7 +112,7 @@ export function buildGuidePayload(
     index,
     total,
     tourName,
-    instruction: step.title || `Step ${index + 1}`,
+    instruction: step.title || t('guide_core.step_number', { number: index + 1 }),
     body: step.body || undefined,
     waitsForAction: spec.on !== 'manual',
     spec,
@@ -129,13 +130,15 @@ export function buildGuidePayload(
       const templated = hasTemplate(value);
       const secret = looksLikeSecret(value);
       payload.detail = secret
-        ? 'Enter your own value here — it was kept private in the recording.'
+        ? t('guide_core.secret_detail')
         : templated
-          ? `Enter your ${templateKey(value)}, then press Enter or click away.`
-          : 'Press Enter or click away when you are done typing.';
+          ? t('guide_core.template_detail', { name: templateKey(value) })
+          : t('guide_core.typing_detail');
       if (!secret && !templated && value) payload.value = value;
     } else if (step.action.kind === 'navigate') {
-      payload.detail = step.action.url ? `This takes you to ${step.action.url}.` : undefined;
+      payload.detail = step.action.url
+        ? t('guide_core.navigate_detail', { url: step.action.url })
+        : undefined;
     }
     return payload;
   }
@@ -143,16 +146,14 @@ export function buildGuidePayload(
   switch (step.type) {
     case 'wait':
       payload.detail =
-        step.wait?.for === 'url'
-          ? 'The page needs to load here — this continues on its own.'
-          : 'Waiting for the page to be ready.';
+        step.wait?.for === 'url' ? t('guide_core.wait_url_detail') : t('guide_core.wait_detail');
       break;
     case 'modal':
     case 'banner':
       payload.detail = payload.detail ?? undefined;
       break;
     default:
-      if (spec.on === 'input') payload.detail = 'Press Enter or click away when you are done.';
+      if (spec.on === 'input') payload.detail = t('guide_core.input_detail');
       break;
   }
   return payload;

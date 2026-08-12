@@ -176,8 +176,7 @@ export function IntegrationCard({ provider }: { provider: IntegrationProvider })
               Disconnect “{disconnecting?.account_label ?? provider.name}”?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Channels and knowledge sources using this connection stop syncing until you
-              reconnect. Access is revoked at {provider.name} where supported.
+              {t('settings.channels_and_knowledge_sources_using_this', { provider: provider.name })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

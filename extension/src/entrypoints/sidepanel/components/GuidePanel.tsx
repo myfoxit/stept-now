@@ -9,6 +9,7 @@ import {
   Square,
   TriangleAlert,
 } from 'lucide-react';
+import { t } from '../../../i18n';
 import type { GuideState } from '../../../types';
 import { sendBg, STEP_ICONS } from '../lib';
 
@@ -36,10 +37,13 @@ export function GuidePanel({ guide }: { guide: GuideState }) {
           </span>
           <span className="run-sub">
             {guide.status === 'completed'
-              ? 'All steps done'
+              ? t('guide.all_steps_done')
               : guide.status === 'error'
-                ? 'Guide interrupted'
-                : `Step ${Math.min(guide.index + 1, guide.total)} of ${guide.total} — follow the highlight on the page`}
+                ? t('guide.interrupted')
+                : t('guide.step_progress', {
+                    current: Math.min(guide.index + 1, guide.total),
+                    total: guide.total,
+                  })}
           </span>
         </span>
       </div>
@@ -57,12 +61,12 @@ export function GuidePanel({ guide }: { guide: GuideState }) {
       {guide.status === 'completed' && (
         <div className="banner ok" role="status">
           <span className="banner-title">
-            <PartyPopper size={13} /> Guide finished
+            <PartyPopper size={13} /> {t('guide.finished')}
           </span>
-          <span className="banner-body">You walked through all {guide.total} steps.</span>
+          <span className="banner-body">{t('guide.walked_through', { count: guide.total })}</span>
           <span className="banner-actions">
             <button className="btn primary" onClick={() => void sendBg({ type: 'guide-stop' })}>
-              Done
+              {t('guide.done')}
             </button>
           </span>
         </div>
@@ -70,10 +74,10 @@ export function GuidePanel({ guide }: { guide: GuideState }) {
 
       {guide.status === 'error' && (
         <div className="banner danger" role="alert">
-          <span className="banner-body">{guide.error ?? 'The guide could not continue.'}</span>
+          <span className="banner-body">{guide.error ?? t('guide.could_not_continue')}</span>
           <span className="banner-actions">
             <button className="btn" onClick={() => void sendBg({ type: 'guide-stop' })}>
-              Close
+              {t('guide.close')}
             </button>
           </span>
         </div>
@@ -82,15 +86,12 @@ export function GuidePanel({ guide }: { guide: GuideState }) {
       {active && guide.stuck && (
         <div className="banner warn" role="alert">
           <span className="banner-title">
-            <TriangleAlert size={13} /> Element not found
+            <TriangleAlert size={13} /> {t('guide.element_not_found')}
           </span>
-          <span className="banner-body">
-            The page may have changed since this was recorded. Do the step by hand, or skip it — it
-            keeps looking in the background.
-          </span>
+          <span className="banner-body">{t('guide.element_not_found_body')}</span>
           <span className="banner-actions">
             <button className="btn" onClick={() => void sendBg({ type: 'guide-nav', dir: 1 })}>
-              Skip step
+              {t('guide.skip_step')}
             </button>
           </span>
         </div>
@@ -120,14 +121,14 @@ export function GuidePanel({ guide }: { guide: GuideState }) {
       {active && (
         <div className="run-controls">
           <button className="btn" disabled={guide.index === 0} onClick={() => void sendBg({ type: 'guide-nav', dir: -1 })}>
-            <ChevronLeft size={13} /> Back
+            <ChevronLeft size={13} /> {t('guide.back')}
           </button>
           <button className="btn" onClick={() => void sendBg({ type: 'guide-nav', dir: 1 })}>
-            Skip <ChevronRight size={13} />
+            {t('guide.skip')} <ChevronRight size={13} />
           </button>
           <span className="spacer" />
           <button className="btn danger-outline" onClick={() => void sendBg({ type: 'guide-stop' })}>
-            <Square size={11} fill="currentColor" /> Stop
+            <Square size={11} fill="currentColor" /> {t('guide.stop')}
           </button>
         </div>
       )}

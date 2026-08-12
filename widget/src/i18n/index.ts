@@ -8,8 +8,8 @@
  * categories for free, so the widget matches the backend's hand-written rules
  * without shipping a rules table.
  *
- * **Only English is bundled.** Inlining all thirteen catalogs cost +18 KB
- * gzipped on both the app and the loader — paid by every visitor, in twelve
+ * **Only English is bundled.** Inlining every catalog cost +18 KB
+ * gzipped on both the app and the loader — paid by every visitor, in four
  * languages they cannot read. Instead the other locales are static assets under
  * `/widget-assets/i18n/`, fetched once when they are actually needed (~1 KB
  * gzipped each). English is inlined so the first paint, the loading screen, and

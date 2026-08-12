@@ -1,0 +1,117 @@
+---
+/**
+ * The privacy policy page, parameterized by locale — `/privacy` renders it in
+ * English, `/de/privacy` etc. render the same component. Body copy with
+ * inline links/emphasis lives in the catalog as HTML strings (`set:html`).
+ */
+import Layout from '../layouts/Layout.astro'
+import Wordmark from './Wordmark.astro'
+import LangSwitcher from './LangSwitcher.astro'
+import { t, localePath, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+}
+const { locale } = Astro.props
+const year = new Date().getFullYear()
+---
+
+<Layout
+  locale={locale}
+  title={t(locale, 'privacy.meta.title')}
+  description={t(locale, 'privacy.meta.description')}
+>
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href={localePath(locale, '/')} aria-label={t(locale, 'nav.home_aria')}><Wordmark /></a>
+      <a class="btn btn-ghost btn-sm" href={localePath(locale, '/')}>{t(locale, 'privacy.back')}</a>
+    </div>
+  </header>
+  <main class="container legal">
+    <h1>{t(locale, 'privacy.title')}</h1>
+    <p class="muted">{t(locale, 'privacy.updated')}</p>
+
+    <h2>{t(locale, 'privacy.who.title')}</h2>
+    <p set:html={t(locale, 'privacy.who.body')} />
+
+    <h2>{t(locale, 'privacy.selfhosted.title')}</h2>
+    <p set:html={t(locale, 'privacy.selfhosted.body')} />
+
+    <h2>{t(locale, 'privacy.store.title')}</h2>
+    <ul>
+      <li set:html={t(locale, 'privacy.store.account')} />
+      <li set:html={t(locale, 'privacy.store.workspace')} />
+      <li set:html={t(locale, 'privacy.store.credentials')} />
+      <li set:html={t(locale, 'privacy.store.logs')} />
+    </ul>
+
+    <h2>{t(locale, 'privacy.where.title')}</h2>
+    <p set:html={t(locale, 'privacy.where.body')} />
+
+    <h2>{t(locale, 'privacy.ai.title')}</h2>
+    <p set:html={t(locale, 'privacy.ai.body')} />
+
+    <h2>{t(locale, 'privacy.rights.title')}</h2>
+    <p set:html={t(locale, 'privacy.rights.body')} />
+
+    <h2>{t(locale, 'privacy.subprocessors.title')}</h2>
+    <p set:html={t(locale, 'privacy.subprocessors.body')} />
+  </main>
+  <footer class="footer">
+    <div class="container footer-base">
+      <span>{t(locale, 'footer.copyright', { year })}</span>
+      <LangSwitcher locale={locale} />
+      <a href={localePath(locale, '/')}>stepped.ai</a>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  .nav {
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 4rem;
+  }
+  .legal {
+    max-width: 760px;
+    padding-block: 3rem 5rem;
+  }
+  .legal h1 {
+    font-size: 2.2rem;
+  }
+  .legal h2 {
+    font-size: 1.25rem;
+    margin-top: 2.25rem;
+  }
+  .legal p,
+  .legal li {
+    color: var(--muted-foreground);
+    margin-top: 0.75rem;
+    line-height: 1.65;
+  }
+  .legal ul {
+    padding-left: 1.25rem;
+  }
+  .legal a,
+  .legal :global(a) {
+    color: var(--primary);
+    text-decoration: underline;
+  }
+  .muted {
+    font-size: 0.9rem;
+  }
+  .footer {
+    border-top: 1px solid var(--border);
+    padding-block: 1.5rem;
+  }
+  .footer-base {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+  }
+</style>

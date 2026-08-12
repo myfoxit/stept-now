@@ -33,7 +33,7 @@ import { useAgents } from '@/features/ai/hooks'
 import type { Inbox, InboxUpdate } from '../api'
 import { useUpdateInbox } from '../hooks'
 import { EmailInboxWizard } from './EmailInboxWizard'
-import { t } from '@/i18n'
+import { t, tParts } from '@/i18n'
 
 /** Radix Select forbids an empty-string item value, so "none" needs a sentinel. */
 const NO_AGENT = '__none__'
@@ -233,6 +233,13 @@ export function InboxConfigDialog({
     inbox.has_secrets || spec.secrets.every((f) => !f.required || (secretValues[f.key] ?? '').trim() !== '')
   const canSave = requiredConfigOk && requiredSecretsOk
 
+  // Split around the channel name so the translation, not this JSX, decides
+  // where the capitalised channel sits in the sentence.
+  const [beforeChannel, afterChannel] = tParts(
+    'settings.connection_settings_for_this_channel',
+    'channel'
+  )
+
   async function save() {
     if (!inbox || !spec) return
     const config: Record<string, unknown> = { ...(inbox.config as Record<string, unknown>) }
@@ -267,10 +274,11 @@ export function InboxConfigDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Configure “{inbox.name}”</DialogTitle>
+          <DialogTitle>{t('settings.configure_name', { name: inbox.name })}</DialogTitle>
           <DialogDescription>
-            {t('settings.connection_settings_for_this')} <span className="capitalize">{inbox.channel_type}</span>{' '}
-            channel. Secrets are stored encrypted and never shown again.
+            {beforeChannel}
+            <span className="capitalize">{inbox.channel_type}</span>
+            {afterChannel}
           </DialogDescription>
         </DialogHeader>
 

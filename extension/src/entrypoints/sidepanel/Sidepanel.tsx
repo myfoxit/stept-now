@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { compile } from '../../compiler';
+import { t, tParts } from '../../i18n';
 import type { BgToPanel, SimpleResult } from '../../messages';
 import { emptyPanelState, type PanelState } from '../../types';
 import { DrivePanel } from './components/DrivePanel';
@@ -47,9 +48,9 @@ class PanelErrorBoundary extends Component<{ children: ReactNode }, { failed: bo
       <div className="panel">
         <div className="empty crash">
           <TriangleAlert size={20} />
-          Something went wrong rendering the panel.
+          {t('sidepanel.crash')}
           <button className="btn" onClick={() => location.reload()}>
-            <RefreshCw size={13} /> Reload panel
+            <RefreshCw size={13} /> {t('sidepanel.reload_panel')}
           </button>
         </div>
       </div>
@@ -115,6 +116,11 @@ function PanelBody() {
 
   const reviewing = !state.recording && steps.length > 0;
   const busyRunning = !!state.guide || !!state.drive;
+  // "{{count}} steps" with the number lifted out, so it can render bold while
+  // the words (and their order) stay the translator's.
+  const [stepCountPre, stepCountPost] = tParts('sidepanel.step_count', 'count', {
+    count: steps.length,
+  });
 
   return (
     <div className="panel">
@@ -125,13 +131,14 @@ function PanelBody() {
         <div className="head-actions">
           {state.recording && (
             <span className={`status-pill ${state.paused ? 'paused' : 'rec'}`}>
-              <Circle size={9} fill="currentColor" /> {state.paused ? 'Paused' : 'Recording'}
+              <Circle size={9} fill="currentColor" />{' '}
+              {state.paused ? t('sidepanel.paused') : t('sidepanel.recording')}
             </span>
           )}
           <button
             className="icon-btn"
-            title="Settings"
-            aria-label="Open settings"
+            title={t('sidepanel.settings')}
+            aria-label={t('sidepanel.open_settings')}
             onClick={() => setDrawerOpen(true)}
           >
             <Settings size={15} />
@@ -143,8 +150,12 @@ function PanelBody() {
         <div className="banner danger" role="alert">
           <span className="banner-body">{error ?? state.auth.error}</span>
           <span className="banner-actions">
-            <button className="btn ghost" aria-label="Dismiss error" onClick={() => setError(null)}>
-              <X size={13} /> Dismiss
+            <button
+              className="btn ghost"
+              aria-label={t('sidepanel.dismiss_error')}
+              onClick={() => setError(null)}
+            >
+              <X size={13} /> {t('sidepanel.dismiss')}
             </button>
           </span>
         </div>
@@ -161,7 +172,9 @@ function PanelBody() {
           {state.recording && (
             <div className="stat-row">
               <span className="stat">
-                <b>{steps.length}</b> step{steps.length === 1 ? '' : 's'}
+                {stepCountPre}
+                <b>{steps.length}</b>
+                {stepCountPost}
               </span>
               <span className="stat">
                 <Timer size={12} /> {fmtElapsed(now - (state.startedAt ?? now))}
@@ -178,7 +191,7 @@ function PanelBody() {
                 void sendBg({ type: 'start-recording' });
               }}
             >
-              <Circle size={14} fill="currentColor" /> Start recording
+              <Circle size={14} fill="currentColor" /> {t('sidepanel.start_recording')}
             </button>
           ) : (
             <div className="row">
@@ -187,10 +200,10 @@ function PanelBody() {
                 onClick={() => void sendBg({ type: 'pause-recording', paused: !state.paused })}
               >
                 {state.paused ? <Play size={14} /> : <Pause size={14} />}
-                {state.paused ? 'Resume' : 'Pause'}
+                {state.paused ? t('sidepanel.resume') : t('sidepanel.pause')}
               </button>
               <button className="btn danger" onClick={() => void sendBg({ type: 'stop-recording' })}>
-                <Square size={13} fill="currentColor" /> Stop
+                <Square size={13} fill="currentColor" /> {t('sidepanel.stop')}
               </button>
             </div>
           )}
@@ -202,8 +215,7 @@ function PanelBody() {
               {steps.length === 0 && state.recording && (
                 <div className="empty">
                   <MousePointerClick size={20} />
-                  Interact with the page — every click and keystroke becomes a step here. Rename,
-                  reorder or delete them as you go.
+                  {t('sidepanel.record_empty')}
                 </div>
               )}
               {steps.map((step, i) => (
@@ -242,7 +254,7 @@ function PanelBody() {
                 }}
               />
               <button className="btn ghost" onClick={() => void sendBg({ type: 'discard-recording' })}>
-                <Trash2 size={13} /> Discard recording
+                <Trash2 size={13} /> {t('sidepanel.discard_recording')}
               </button>
             </>
           )}

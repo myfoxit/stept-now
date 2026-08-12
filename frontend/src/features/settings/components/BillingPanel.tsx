@@ -80,8 +80,9 @@ function UsageMeter({ billing }: { billing: Billing }) {
       <Card className="p-4">
         <p className="text-sm font-medium">{t('settings.ai_usage')}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {billing.ai_runs_this_period} AI runs this month — no runs are included on the Free plan.
-          Upgrade to add a monthly allowance.
+          {/* `count`, not `runs`: `t` keys plural selection on that name, and a
+              free-plan workspace really does pass through exactly one run. */}
+          {t('settings.ai_runs_this_month_no_runs', { count: billing.ai_runs_this_period })}
         </p>
       </Card>
     )

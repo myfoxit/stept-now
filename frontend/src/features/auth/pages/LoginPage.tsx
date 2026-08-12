@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle } from 'lucide-react'
+import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -16,27 +17,33 @@ import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth'
 import { t } from '@/i18n'
 
-const schema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(1, 'Password is required'),
-})
+// Built during render, not once at import: a module constant would freeze the
+// English messages before the user's language is known.
+function makeSchema() {
+  return z.object({
+    email: z.string().email(t('auth.enter_a_valid_email')),
+    password: z.string().min(1, t('auth.password_is_required')),
+  })
+}
 
-type FormValues = z.infer<typeof schema>
+type FormValues = z.infer<ReturnType<typeof makeSchema>>
 
 /** Codes the social-login callback can bounce back with (?error=…). */
-const OAUTH_ERRORS: Record<string, string> = {
-  oauth_denied: 'Sign-in was cancelled at the provider. You can try again.',
-  email_unverified:
-    "Your email address isn't verified with that provider. Verify it there first, or sign up with email and password.",
-  oauth_failed: "Social sign-in didn't complete. Try again, or log in with your password.",
+const OAUTH_ERROR_KEYS: Record<string, string> = {
+  oauth_denied: 'auth.sign_in_was_cancelled_at_the',
+  email_unverified: 'auth.your_email_address_isn_t_verified',
+  oauth_failed: 'auth.social_sign_in_didn_t_complete',
 }
 
 export function Component() {
   const navigate = useNavigate()
   const location = useLocation() as { state?: { from?: string } }
   const [params] = useSearchParams()
-  const oauthError = params.get('error') ? OAUTH_ERRORS[params.get('error') as string] : undefined
+  const oauthErrorKey = params.get('error')
+    ? OAUTH_ERROR_KEYS[params.get('error') as string]
+    : undefined
   const { setSession } = useAuthStore()
+  const schema = useMemo(makeSchema, [])
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   async function onSubmit(values: FormValues) {
@@ -47,27 +54,27 @@ export function Component() {
       setSession(me.user, me.memberships)
       navigate(location.state?.from ?? '/', { replace: true })
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : 'Login failed')
+      toast.error(error instanceof ApiError ? error.message : t('auth.login_failed'))
     }
   }
 
   return (
     <AuthCard
       title={t('auth.welcome_back')}
-      subtitle="Log in to your Stept workspace"
+      subtitle={t('auth.log_in_to_your_stept_workspace')}
       footer={
         <p>
-          No account?{' '}
+          {t('auth.no_account')}{' '}
           <Link className="text-brand underline-offset-4 hover:underline" to="/signup">
             {t('auth.sign_up')}
           </Link>
         </p>
       }
     >
-      {oauthError ? (
+      {oauthErrorKey ? (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle />
-          <AlertDescription>{oauthError}</AlertDescription>
+          <AlertDescription>{t(oauthErrorKey)}</AlertDescription>
         </Alert>
       ) : null}
       <SocialLoginButtons next="/" />
@@ -91,7 +98,7 @@ export function Component() {
           <FieldError message={form.formState.errors.password?.message} />
         </div>
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Logging in…' : 'Log in'}
+          {form.formState.isSubmitting ? t('auth.logging_in') : t('auth.log_in')}
         </Button>
       </form>
     </AuthCard>

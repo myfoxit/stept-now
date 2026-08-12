@@ -1,16 +1,23 @@
 ---
 import '../styles/global.css'
+import { t, locales, localeMeta, localePath, stripLocale, defaultLocale, type Locale } from '../i18n'
 
 interface Props {
+  locale?: Locale
   title?: string
   description?: string
 }
+const { locale = defaultLocale } = Astro.props
 const {
-  title = 'Stept — the open-source Intercom + Fin alternative',
-  description = 'Shared inbox, an AI agent that resolves on your own knowledge base, help center, product tours and automation. Self-host it free, or let us run it.',
+  title = t(locale, 'meta.title'),
+  description = t(locale, 'meta.description'),
 } = Astro.props
 const canonical = new URL(Astro.url.pathname, Astro.site)
 const ogImage = new URL('/og.png', Astro.site)
+
+// The locale-free path of the current page ('/', '/privacy'), for hreflang
+// alternates: every language version of a page links every other one.
+const { path: basePath } = stripLocale(Astro.url.pathname)
 
 // Stept's own widget, on Stept's own landing (dogfooding). The agent behind it
 // answers from the same docs this site links to.
@@ -19,13 +26,23 @@ const APP_ORIGIN = 'https://app.stepped.ai'
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={localeMeta[locale].htmlLang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {
+      locales.map((l) => (
+        <link
+          rel="alternate"
+          hreflang={localeMeta[l].htmlLang}
+          href={new URL(localePath(l, basePath), Astro.site)}
+        />
+      ))
+    }
+    <link rel="alternate" hreflang="x-default" href={new URL(localePath(defaultLocale, basePath), Astro.site)} />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
 

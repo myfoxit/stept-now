@@ -1,0 +1,46 @@
+---
+/**
+ * The five language versions of the current page, as quiet footer links.
+ * Sits inside `.footer-base`, so it inherits that row's muted colour and
+ * size; the active language simply reads in the foreground colour.
+ */
+import { locales, localeMeta, localePath, stripLocale, t, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+}
+const { locale } = Astro.props
+const { path } = stripLocale(Astro.url.pathname)
+---
+
+<nav class="lang" aria-label={t(locale, 'footer.language_aria')}>
+  {
+    locales.map((l) => (
+      <a
+        href={localePath(l, path)}
+        hreflang={localeMeta[l].htmlLang}
+        lang={localeMeta[l].htmlLang}
+        aria-current={l === locale ? 'page' : undefined}
+      >
+        {localeMeta[l].nativeName}
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  .lang {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.85rem;
+  }
+  .lang a {
+    color: var(--muted-foreground);
+  }
+  .lang a:hover {
+    color: var(--foreground);
+  }
+  .lang a[aria-current='page'] {
+    color: var(--foreground);
+  }
+</style>

@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -15,19 +16,24 @@ import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth'
 import { t } from '@/i18n'
 
-const schema = z.object({
-  name: z.string().min(1, 'Your name is required'),
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(8, 'At least 8 characters'),
-})
+// Built during render, not once at import: a module constant would freeze the
+// English messages before the user's language is known.
+function makeSchema() {
+  return z.object({
+    name: z.string().min(1, t('auth.your_name_is_required')),
+    email: z.string().email(t('auth.enter_a_valid_email')),
+    password: z.string().min(8, t('auth.at_least_8_characters')),
+  })
+}
 
-type FormValues = z.infer<typeof schema>
+type FormValues = z.infer<ReturnType<typeof makeSchema>>
 
 export function Component() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const inviteToken = params.get('invite')
   const { setSession } = useAuthStore()
+  const schema = useMemo(makeSchema, [])
   const form = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   async function onSubmit(values: FormValues) {
@@ -43,17 +49,21 @@ export function Component() {
       setSession(me.user, me.memberships)
       navigate(me.memberships.length > 0 ? '/' : '/onboarding', { replace: true })
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : 'Signup failed')
+      toast.error(error instanceof ApiError ? error.message : t('auth.signup_failed'))
     }
   }
 
   return (
     <AuthCard
       title={t('auth.create_your_account')}
-      subtitle={inviteToken ? 'Sign up to join your team' : 'Start your open-source support hub'}
+      subtitle={
+        inviteToken
+          ? t('auth.sign_up_to_join_your_team')
+          : t('auth.start_your_open_source_support_hub')
+      }
       footer={
         <p>
-          Already have an account?{' '}
+          {t('auth.already_have_an_account')}{' '}
           <Link className="text-brand underline-offset-4 hover:underline" to="/login">
             {t('auth.log_in')}
           </Link>
@@ -78,7 +88,7 @@ export function Component() {
           <FieldError message={form.formState.errors.password?.message} />
         </div>
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Creating account…' : 'Create account'}
+          {form.formState.isSubmitting ? t('auth.creating_account') : t('auth.create_account')}
         </Button>
       </form>
     </AuthCard>

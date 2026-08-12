@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "Stept Recorder"
+  },
+  "appDescription": {
+    "message": "Grabe, edite, previsualice y ejecute automáticamente sus tours de producto de Stept."
+  },
+  "actionTitle": {
+    "message": "Stept: grabar un tour"
+  },
+  "commandToggleRecording": {
+    "message": "Iniciar o detener la grabación de un tour de Stept"
+  }
+}

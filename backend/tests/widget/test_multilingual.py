@@ -55,13 +55,30 @@ class TestLearningFromWhatTheVisitorWrites:
         token = await _boot_token(client, widget, "v-returning")
         await client.post(
             "/api/widget/conversations",
-            json={"message": TURKISH},
+            json={"message": GERMAN},
             headers=auth_headers(token),
         )
         # Booting again is what happens when they come back tomorrow: the widget
-        # must render in Turkish before they type anything at all.
+        # must render in German before they type anything at all.
         again = await boot(client, widget.widget_key, visitor_id="v-returning")
-        assert again.json()["contact"]["locale"] == "tr"
+        assert again.json()["contact"]["locale"] == "de"
+
+    async def test_a_language_we_recognise_but_do_not_render_is_not_stored(
+        self, client: httpx.AsyncClient, widget: WidgetSetup
+    ):
+        # Turkish is in the detector's tables but is not a shipped interface
+        # locale. Storing "tr" would promise a Turkish widget we cannot render, so
+        # the contact keeps no locale and the chrome stays English. The *reply*
+        # still comes back in Turkish — the model mirrors what it is sent, which is
+        # why recognising more languages than we render is worth the table.
+        token = await _boot_token(client, widget, "v-turkish")
+        await client.post(
+            "/api/widget/conversations",
+            json={"message": TURKISH},
+            headers=auth_headers(token),
+        )
+        again = await boot(client, widget.widget_key, visitor_id="v-turkish")
+        assert again.json()["contact"]["locale"] is None
 
     async def test_a_short_ack_does_not_clear_a_known_locale(
         self, client: httpx.AsyncClient, widget: WidgetSetup
@@ -237,8 +254,20 @@ class TestReplyLanguagePrompt:
         assert "Always reply in Japanese" in prompt
         assert "German" not in prompt
 
+    def test_a_configured_language_need_not_be_one_we_render(self) -> None:
+        # The interface ships five languages; the agent can write any language we
+        # can name. These two are deliberately outside the shipped set — resolving
+        # the setting through the *interface* locale list discarded it silently,
+        # leaving a workspace that asked for Japanese getting whatever the
+        # customer wrote.
+        assert "Always reply in Japanese" in _language_prompt({"reply_language": "ja"}, None)
+        assert "Always reply in Turkish" in _language_prompt({"reply_language": "tr"}, None)
+
     def test_a_configured_language_is_normalised(self) -> None:
-        assert "Portuguese (Brazil)" in _language_prompt({"reply_language": "pt"}, None)
+        assert "Portuguese" in _language_prompt({"reply_language": "pt"}, None)
+        assert "Portuguese (Brazil)" in _language_prompt({"reply_language": "pt-BR"}, None)
+        # A region with no name of its own falls back to the base language.
+        assert "German" in _language_prompt({"reply_language": "de-AT"}, None)
 
     def test_an_unknown_configured_language_falls_back_to_mirroring(self) -> None:
         prompt = _language_prompt({"reply_language": "klingon"}, None)

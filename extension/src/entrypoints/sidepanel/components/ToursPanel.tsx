@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Bot, Pencil, Play, RefreshCw, Route } from 'lucide-react';
+import { t } from '../../../i18n';
 import type { SimpleResult } from '../../../messages';
 import type { PanelState } from '../../../types';
 import { sendBg, timeAgo } from '../lib';
@@ -19,11 +20,13 @@ export function ToursPanel({ state, onError }: { state: PanelState; onError: (m:
   return (
     <div className="tours">
       <div className="tours-head">
-        <span className="section-title">Tours in {state.auth.workspaceName || 'this workspace'}</span>
+        <span className="section-title">
+          {t('tours.title', { workspace: state.auth.workspaceName || t('tours.this_workspace') })}
+        </span>
         <button
           className="icon-btn"
-          aria-label="Refresh tours"
-          title="Refresh"
+          aria-label={t('tours.refresh_aria')}
+          title={t('tours.refresh')}
           onClick={() => void sendBg({ type: 'refresh-tours' })}
         >
           <RefreshCw size={13} className={state.toursLoading ? 'spin' : undefined} />
@@ -33,7 +36,7 @@ export function ToursPanel({ state, onError }: { state: PanelState; onError: (m:
       {state.tours.length === 0 && !state.toursLoading && (
         <div className="empty">
           <Route size={20} />
-          No tours yet. Record one — it saves here as a draft.
+          {t('tours.empty')}
         </div>
       )}
 
@@ -45,15 +48,15 @@ export function ToursPanel({ state, onError }: { state: PanelState; onError: (m:
                 {tour.name}
               </span>
               <span className="tour-meta">
-                <span className={`dot ${tour.status}`} /> {tour.status} · {tour.steps_count} step
-                {tour.steps_count === 1 ? '' : 's'} · {timeAgo(tour.updated_at)}
+                <span className={`dot ${tour.status}`} /> {tour.status} ·{' '}
+                {t('tours.step_count', { count: tour.steps_count })} · {timeAgo(tour.updated_at)}
               </span>
             </div>
             <div className="tour-actions">
               <button
                 className="icon-btn"
-                aria-label={`Edit steps of ${tour.name}`}
-                title="Edit steps here"
+                aria-label={t('tours.edit_aria', { name: tour.name })}
+                title={t('tours.edit_title')}
                 disabled={busy === tour.id}
                 onClick={() => void run(tour.id, { type: 'pull-tour', tourId: tour.id })}
               >
@@ -61,8 +64,8 @@ export function ToursPanel({ state, onError }: { state: PanelState; onError: (m:
               </button>
               <button
                 className="icon-btn"
-                aria-label={`Walk through ${tour.name}`}
-                title="Guide me through it"
+                aria-label={t('tours.walk_aria', { name: tour.name })}
+                title={t('tours.walk_title')}
                 disabled={busy === tour.id || tour.steps_count === 0}
                 onClick={() => void run(tour.id, { type: 'guide-start', tourId: tour.id })}
               >
@@ -70,8 +73,8 @@ export function ToursPanel({ state, onError }: { state: PanelState; onError: (m:
               </button>
               <button
                 className="icon-btn accent"
-                aria-label={`Drive ${tour.name}`}
-                title="Do it for me (drive mode)"
+                aria-label={t('tours.drive_aria', { name: tour.name })}
+                title={t('tours.drive_title')}
                 disabled={busy === tour.id || tour.steps_count === 0}
                 onClick={() => void run(tour.id, { type: 'drive-start', tourId: tour.id })}
               >

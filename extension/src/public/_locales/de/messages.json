@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "Stept Recorder"
+  },
+  "appDescription": {
+    "message": "Stept-Produkttouren aufnehmen, bearbeiten, in der Vorschau prüfen und automatisch ausführen."
+  },
+  "actionTitle": {
+    "message": "Stept – Tour aufnehmen"
+  },
+  "commandToggleRecording": {
+    "message": "Aufnahme einer Stept-Tour starten oder beenden"
+  }
+}

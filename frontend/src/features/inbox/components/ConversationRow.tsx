@@ -34,7 +34,8 @@ export function ConversationRow({
       )}
     >
       {selectable ? (
-        // Outside the row button: a checkbox nested in a <button> {t('inbox.is_invalid_markup_and_swallows_the')}
+        // Outside the row button: a checkbox nested in a `<button>` is invalid
+        // markup and swallows the click.
         <label className="flex cursor-pointer items-start px-2 pt-4">
           <input
             type="checkbox"

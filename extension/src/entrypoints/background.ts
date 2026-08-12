@@ -13,6 +13,7 @@ import { CaptureHold } from '../capture-hold';
 import { compile } from '../compiler';
 import { DriveRunner, type DriveDecision } from '../driver/runner';
 import { buildGuidePayload, panelSteps, urlEffectMatches } from '../guide/guide-core';
+import { t } from '../i18n';
 import type {
   BgToGuideContent,
   BgToPanel,
@@ -146,7 +147,7 @@ export default defineBackground(() => {
       state.drive = {
         ...state.drive,
         status: 'error',
-        error: 'The run was interrupted.',
+        error: t('bg.run_interrupted'),
         awaitingDecision: false,
       };
     } else if (state.drive?.awaitingDecision) {
@@ -199,7 +200,7 @@ export default defineBackground(() => {
       void refreshTours();
     } catch (err) {
       if (err instanceof ApiError && err.unauthorized) {
-        await signOut('Your Stept session expired — sign in again to keep recording.');
+        await signOut(t('bg.session_expired_recording'));
         return;
       }
       // merely offline: stay signed in, the next real call re-validates
@@ -229,7 +230,7 @@ export default defineBackground(() => {
     } catch (err) {
       if (err instanceof ConflictError) throw err;
       if (err instanceof ApiError && err.unauthorized) {
-        await signOut('Your Stept session expired — sign in again to keep recording.');
+        await signOut(t('bg.session_expired_recording'));
         return null;
       }
       fail(err instanceof Error ? err.message : String(err));
@@ -566,11 +567,11 @@ export default defineBackground(() => {
       void persist();
     }
     if (state.guide?.tabId === tabId && state.guide.status === 'active') {
-      state.guide = { ...state.guide, status: 'error', error: 'The guided tab was closed.' };
+      state.guide = { ...state.guide, status: 'error', error: t('bg.guided_tab_closed') };
       refreshBadge();
       void persist();
     }
-    if (state.drive?.tabId === tabId) stopDrive('The tab being driven was closed.');
+    if (state.drive?.tabId === tabId) stopDrive(t('bg.driven_tab_closed'));
   });
 
   // ---- message routing ---------------------------------------------------
@@ -748,7 +749,7 @@ export default defineBackground(() => {
         if (remoteDrive || state.remoteDrive) {
           sendResponse({
             ok: false,
-            error: 'An AI client is driving this browser right now — close that remote session first.',
+            error: t('bg.remote_driving'),
           });
           return false;
         }
@@ -805,9 +806,7 @@ export default defineBackground(() => {
         return {
           ok: false,
           error:
-            outcome.workspaces.length === 0
-              ? 'This account is not a member of any workspace yet.'
-              : 'None of your workspaces grant the "tours:manage" permission.',
+            outcome.workspaces.length === 0 ? t('bg.no_workspace') : t('bg.no_permission'),
         };
       }
       pendingLogin = { apiBase, accessToken: outcome.accessToken, userName: outcome.userName };
@@ -820,7 +819,7 @@ export default defineBackground(() => {
     } catch (err) {
       const message =
         err instanceof ApiError && err.status === 401
-          ? 'Wrong email or password.'
+          ? t('bg.wrong_credentials')
           : err instanceof Error
             ? err.message
             : String(err);
@@ -830,7 +829,7 @@ export default defineBackground(() => {
 
   /** Mint the long-lived extension token, then DROP the access token. */
   async function chooseWorkspace(workspaceId: string, workspaceName?: string): Promise<SimpleResult> {
-    if (!pendingLogin) return { ok: false, error: 'Sign in again — the login session expired.' };
+    if (!pendingLogin) return { ok: false, error: t('bg.login_expired') };
     const { apiBase, accessToken, userName } = pendingLogin;
     try {
       const token = await mintExtensionToken(apiBase, accessToken, workspaceId);
@@ -890,7 +889,7 @@ export default defineBackground(() => {
       session = previous;
       return {
         ok: false,
-        error: err instanceof ApiError && err.unauthorized ? 'That token is not valid for this Stept instance.' : String(err),
+        error: err instanceof ApiError && err.unauthorized ? t('bg.token_invalid') : String(err),
       };
     }
   }
@@ -908,15 +907,15 @@ export default defineBackground(() => {
   }
 
   async function saveTour(name: string, urlPattern?: string): Promise<SimpleResult> {
-    if (!session) return { ok: false, error: 'Sign in first.' };
-    if (state.saving) return { ok: false, error: 'A save is already in progress.' };
+    if (!session) return { ok: false, error: t('bg.sign_in_first') };
+    if (state.saving) return { ok: false, error: t('bg.save_in_progress') };
     const compiled = compileCurrent();
-    if (!compiled.steps.length) return { ok: false, error: 'Nothing recorded yet.' };
+    if (!compiled.steps.length) return { ok: false, error: t('bg.nothing_recorded') };
     state.saving = true;
     await persist();
     try {
       const tour = await guarded(() => api.createTour(name, compiled.steps, urlPattern));
-      if (!tour) return { ok: false, error: 'Save failed.' };
+      if (!tour) return { ok: false, error: t('bg.save_failed') };
       Object.assign(state, {
         recording: false,
         events: [],
@@ -944,7 +943,7 @@ export default defineBackground(() => {
 
   async function pullTour(tourId: string): Promise<SimpleResult> {
     const tour = await guarded(() => api.getTour(tourId));
-    if (!tour) return { ok: false, error: 'Could not load that tour.' };
+    if (!tour) return { ok: false, error: t('bg.tour_load_failed') };
     state.editing = {
       tourId: tour.id,
       name: tour.name,
@@ -959,7 +958,7 @@ export default defineBackground(() => {
 
   async function pushTour(): Promise<SimpleResult> {
     const editing = state.editing;
-    if (!editing) return { ok: false, error: 'Nothing to push.' };
+    if (!editing) return { ok: false, error: t('bg.nothing_to_push') };
     state.saving = true;
     await persist();
     try {
@@ -977,12 +976,12 @@ export default defineBackground(() => {
         state.editing = { ...editing, conflict: true };
         return {
           ok: false,
-          error: 'This tour changed in the dashboard while you were editing. Reload it to keep those changes.',
+          error: t('bg.push_conflict'),
         };
       }
       if (err instanceof ApiError && err.unauthorized) {
-        await signOut('Your Stept session expired — sign in again to keep editing.');
-        return { ok: false, error: 'Signed out.' };
+        await signOut(t('bg.session_expired_editing'));
+        return { ok: false, error: t('bg.signed_out') };
       }
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     } finally {
@@ -994,14 +993,14 @@ export default defineBackground(() => {
   // ---- guide mode --------------------------------------------------------
 
   async function startGuide(tourId: string): Promise<SimpleResult> {
-    if (state.recording) return { ok: false, error: 'Stop the recording before starting a guide.' };
+    if (state.recording) return { ok: false, error: t('bg.stop_recording_guide') };
     stopDrive();
     if (state.guide) await stopGuide();
     const tour = await guarded(() => api.getTour(tourId));
-    if (!tour) return { ok: false, error: 'Could not load that tour.' };
-    if (!tour.steps.length) return { ok: false, error: 'This tour has no steps yet.' };
+    if (!tour) return { ok: false, error: t('bg.tour_load_failed') };
+    if (!tour.steps.length) return { ok: false, error: t('bg.tour_no_steps') };
     const tabId = await activeTab();
-    if (tabId == null) return { ok: false, error: 'No tab to run the guide in.' };
+    if (tabId == null) return { ok: false, error: t('bg.no_guide_tab') };
 
     guideSteps = tour.steps;
     guideAwaitingNav = null;
@@ -1068,7 +1067,7 @@ export default defineBackground(() => {
         .then(() => true)
         .catch(() => false);
       if (!ok) {
-        state.guide = { ...guide, status: 'error', error: 'The guided tab was closed.' };
+        state.guide = { ...guide, status: 'error', error: t('bg.guided_tab_closed') };
         guideAwaitingNav = null;
         await persist();
       }
@@ -1155,14 +1154,14 @@ export default defineBackground(() => {
     targetTabId?: number,
     onDone?: (status: 'completed' | 'failed' | 'cancelled', error?: string) => void,
   ): Promise<SimpleResult> {
-    if (state.recording) return { ok: false, error: 'Stop the recording before driving a tour.' };
+    if (state.recording) return { ok: false, error: t('bg.stop_recording_drive') };
     if (state.guide) await stopGuide();
     stopDrive();
     const tour = await guarded(() => api.getTour(tourId));
-    if (!tour) return { ok: false, error: 'Could not load that tour.' };
-    if (!tour.steps.length) return { ok: false, error: 'This tour has no steps yet.' };
+    if (!tour) return { ok: false, error: t('bg.tour_load_failed') };
+    if (!tour.steps.length) return { ok: false, error: t('bg.tour_no_steps') };
     const tabId = targetTabId ?? (await activeTab());
-    if (tabId == null) return { ok: false, error: 'No tab to drive.' };
+    if (tabId == null) return { ok: false, error: t('bg.no_drive_tab') };
 
     driveSteps = tour.steps;
     state.drive = {

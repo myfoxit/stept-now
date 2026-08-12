@@ -1,4 +1,5 @@
 import { buildTarget, simpleProjection } from '@stept/dom-capture';
+import { t } from '../i18n';
 import type { ContentToBg } from '../messages';
 
 /** Selector picker: hover to highlight, click to capture.
@@ -57,7 +58,7 @@ export default defineContentScript({
       `;
       const tip = document.createElement('div');
       tip.className = 'tip';
-      tip.textContent = 'Click an element to capture its selector · Esc to cancel';
+      tip.textContent = t('picker.tip');
       box = document.createElement('div');
       box.className = 'box';
       label = document.createElement('div');

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, RefreshCw, TriangleAlert, UploadCloud } from 'lucide-react';
+import { t } from '../../../i18n';
 import type { SimpleResult } from '../../../messages';
 import type { EditingTour, PanelState } from '../../../types';
 import { sendBg } from '../lib';
@@ -29,37 +30,38 @@ export function EditPanel({
   return (
     <div className="edit-panel">
       <div className="edit-head">
-        <button className="icon-btn" aria-label="Back to tours" onClick={() => void sendBg({ type: 'close-editing' })}>
+        <button
+          className="icon-btn"
+          aria-label={t('edit.back_to_tours')}
+          onClick={() => void sendBg({ type: 'close-editing' })}
+        >
           <ArrowLeft size={15} />
         </button>
         <span className="edit-title truncate" title={editing.name}>
           {editing.name}
         </span>
-        <span className="chip">v{editing.baseVersion}</span>
+        <span className="chip">{t('edit.version', { version: editing.baseVersion })}</span>
       </div>
 
       {editing.conflict && (
         <div className="banner warn" role="alert">
           <span className="banner-title">
-            <TriangleAlert size={13} /> Changed in the dashboard
+            <TriangleAlert size={13} /> {t('edit.conflict_title')}
           </span>
-          <span className="banner-body">
-            Someone edited this tour while you had it open, so your push was rejected. Reload it to
-            pick up their version — your local changes here will be replaced.
-          </span>
+          <span className="banner-body">{t('edit.conflict_body')}</span>
           <span className="banner-actions">
             <button
               className="btn"
               onClick={() => void sendBg({ type: 'pull-tour', tourId: editing.tourId })}
             >
-              <RefreshCw size={13} /> Reload tour
+              <RefreshCw size={13} /> {t('edit.reload_tour')}
             </button>
           </span>
         </div>
       )}
 
       <div className="step-list">
-        {editing.steps.length === 0 && <div className="empty">This tour has no steps.</div>}
+        {editing.steps.length === 0 && <div className="empty">{t('edit.no_steps')}</div>}
         {editing.steps.map((step, i) => (
           <StepRow
             key={step.id}
@@ -79,7 +81,7 @@ export function EditPanel({
 
       <button className="btn primary big" disabled={pushing} aria-busy={pushing} onClick={() => void push()}>
         {pushing ? <RefreshCw size={14} className="spin" /> : <UploadCloud size={14} />}
-        {pushing ? 'Pushing…' : 'Push changes to Stept'}
+        {pushing ? t('edit.pushing') : t('edit.push_changes')}
       </button>
     </div>
   );

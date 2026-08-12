@@ -16,15 +16,7 @@ export const LOCALES: readonly LocaleInfo[] = [
   { code: 'de', nativeName: 'Deutsch', englishName: 'German', dir: 'ltr' },
   { code: 'fr', nativeName: 'Français', englishName: 'French', dir: 'ltr' },
   { code: 'es', nativeName: 'Español', englishName: 'Spanish', dir: 'ltr' },
-  { code: 'pt-BR', nativeName: 'Português (Brasil)', englishName: 'Portuguese (Brazil)', dir: 'ltr' },
   { code: 'it', nativeName: 'Italiano', englishName: 'Italian', dir: 'ltr' },
-  { code: 'nl', nativeName: 'Nederlands', englishName: 'Dutch', dir: 'ltr' },
-  { code: 'pl', nativeName: 'Polski', englishName: 'Polish', dir: 'ltr' },
-  { code: 'tr', nativeName: 'Türkçe', englishName: 'Turkish', dir: 'ltr' },
-  { code: 'ja', nativeName: '日本語', englishName: 'Japanese', dir: 'ltr' },
-  { code: 'ko', nativeName: '한국어', englishName: 'Korean', dir: 'ltr' },
-  { code: 'zh-CN', nativeName: '简体中文', englishName: 'Chinese (Simplified)', dir: 'ltr' },
-  { code: 'ar', nativeName: 'العربية', englishName: 'Arabic', dir: 'rtl' },
 ] as const
 
 export type Locale = (typeof LOCALES)[number]['code']
@@ -33,16 +25,12 @@ export const DEFAULT_LOCALE = 'en'
 
 export const SUPPORTED_LOCALES: readonly string[] = LOCALES.map((l) => l.code)
 
-/** Tags whose base language alone would resolve wrongly or not at all. */
-const ALIASES: Record<string, string> = {
-  pt: 'pt-BR',
-  zh: 'zh-CN',
-  'zh-hans': 'zh-CN',
-  'zh-hant': 'zh-CN',
-  'zh-tw': 'zh-CN',
-  'zh-hk': 'zh-CN',
-  'zh-sg': 'zh-CN',
-}
+/**
+ * Tags whose base language alone would resolve wrongly or not at all.
+ * Empty since the shipped set shrank to five base-language locales; the
+ * mechanism stays for the day a regional locale (pt-BR, zh-CN, …) returns.
+ */
+const ALIASES: Record<string, string> = {}
 
 /**
  * Canonicalise a BCP-47 tag to a shipped locale, or null.

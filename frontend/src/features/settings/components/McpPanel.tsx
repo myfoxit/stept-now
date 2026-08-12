@@ -76,9 +76,7 @@ export function McpPanel() {
   return (
     <div className="grid gap-4">
       <p className="text-sm text-muted-foreground">
-        Connect Claude, Cursor or any MCP client to this workspace. Clients search your knowledge,
-        conversations and tours with an API key; every tool call respects the key&rsquo;s scopes and
-        is audited.
+        {t('settings.connect_claude_cursor_or_any_mcp')}
       </p>
 
       {/* Endpoint */}

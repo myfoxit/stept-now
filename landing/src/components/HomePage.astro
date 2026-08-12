@@ -1,0 +1,1239 @@
+---
+/**
+ * The full landing page, parameterized by locale. `/` renders it in English
+ * and `/de/`, `/fr/`, `/es/`, `/it/` render the same component — one source
+ * of truth for markup and styles, with every user-facing string pulled from
+ * `src/i18n/` catalogs (missing keys fall back to English).
+ */
+import Layout from '../layouts/Layout.astro'
+import Wordmark from './Wordmark.astro'
+import Icon from './Icon.astro'
+import BrandIcon from './BrandIcon.astro'
+import Shot from './Shot.astro'
+import LangSwitcher from './LangSwitcher.astro'
+import { t, localePath, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+}
+const { locale } = Astro.props
+
+const APP = 'https://app.stepped.ai'
+const GITHUB = 'https://github.com/myfoxit/stept-now'
+const DOCS = 'https://docs.stepped.ai'
+
+const channels = [
+  { brand: 'gmail', label: t(locale, 'integrations.email') },
+  { brand: 'slack', label: 'Slack' },
+  { brand: 'telegram', label: 'Telegram' },
+  { brand: 'whatsapp', label: 'WhatsApp' },
+  { brand: 'messenger', label: 'Messenger' },
+  { brand: 'instagram', label: 'Instagram' },
+  { brand: 'line', label: 'LINE' },
+] as const
+
+const sources = [
+  { brand: 'notion', label: 'Notion' },
+  { brand: 'confluence', label: 'Confluence' },
+  { brand: 'drive', label: 'Google Drive' },
+  { brand: 'zendesk', label: 'Zendesk' },
+  { brand: 'github', label: 'GitHub' },
+  { brand: 'microsoft', label: 'Microsoft 365' },
+] as const
+
+const models = [
+  { brand: 'anthropic', label: 'Anthropic' },
+  { brand: 'google', label: 'Google' },
+  { brand: 'ollama', label: 'Ollama' },
+  { brand: 'claude', label: 'Claude (MCP)' },
+  { brand: 'cursor', label: 'Cursor (MCP)' },
+] as const
+
+const features = [
+  {
+    icon: 'inbox',
+    title: t(locale, 'features.inbox.title'),
+    body: t(locale, 'features.inbox.body'),
+  },
+  {
+    icon: 'book',
+    title: t(locale, 'features.knowledge.title'),
+    body: t(locale, 'features.knowledge.body'),
+  },
+  {
+    icon: 'route',
+    title: t(locale, 'features.automation.title'),
+    body: t(locale, 'features.automation.body'),
+  },
+  {
+    icon: 'shield',
+    title: t(locale, 'features.teams.title'),
+    body: t(locale, 'features.teams.body'),
+  },
+]
+
+const plans = [
+  {
+    name: t(locale, 'pricing.selfhosted.name'),
+    price: t(locale, 'pricing.selfhosted.price'),
+    unit: t(locale, 'pricing.selfhosted.unit'),
+    highlight: false,
+    cta: {
+      label: t(locale, 'pricing.selfhosted.cta'),
+      href: `${DOCS}/getting-started/self-hosting/`,
+    },
+    tagline: t(locale, 'pricing.selfhosted.tagline'),
+    features: [1, 2, 3, 4, 5].map((i) => t(locale, `pricing.selfhosted.f${i}`)),
+  },
+  {
+    name: t(locale, 'pricing.cloud.name'),
+    price: t(locale, 'pricing.cloud.price'),
+    unit: t(locale, 'pricing.per_seat_month'),
+    highlight: true,
+    cta: { label: t(locale, 'cta.start_free'), href: `${APP}/signup` },
+    tagline: t(locale, 'pricing.cloud.tagline'),
+    features: [1, 2, 3, 4, 5].map((i) => t(locale, `pricing.cloud.f${i}`)),
+  },
+  {
+    name: t(locale, 'pricing.business.name'),
+    price: t(locale, 'pricing.business.price'),
+    unit: t(locale, 'pricing.per_seat_month'),
+    highlight: false,
+    cta: { label: t(locale, 'pricing.business.cta'), href: 'mailto:hello@stepped.ai' },
+    tagline: t(locale, 'pricing.business.tagline'),
+    features: [1, 2, 3, 4, 5].map((i) => t(locale, `pricing.business.f${i}`)),
+  },
+]
+
+const faqs = ['open_source', 'models', 'resolution', 'actions', 'data', 'migrate'].map((k) => ({
+  q: t(locale, `faq.${k}.q`),
+  a: t(locale, `faq.${k}.a`),
+}))
+
+const year = new Date().getFullYear()
+---
+
+<Layout locale={locale}>
+  <a href="#main" class="skip">{t(locale, 'nav.skip')}</a>
+
+  <!-- ===== nav ===== -->
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href={localePath(locale, '/')} aria-label={t(locale, 'nav.home_aria')}><Wordmark /></a>
+      <nav class="nav-links" aria-label={t(locale, 'nav.primary_aria')}>
+        <a href="#product">{t(locale, 'nav.product')}</a>
+        <a href="#agent">{t(locale, 'nav.agent')}</a>
+        <a href="#integrations">{t(locale, 'nav.integrations')}</a>
+        <a href="#pricing">{t(locale, 'nav.pricing')}</a>
+        <a href={DOCS}>{t(locale, 'nav.docs')}</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="nav-icon" href={GITHUB} aria-label={t(locale, 'nav.github_aria')}>
+          <BrandIcon name="github" size={18} />
+        </a>
+        <a class="btn btn-ghost btn-sm nav-signin" href={`${APP}/login`}>{t(locale, 'nav.signin')}</a>
+        <a class="btn btn-primary btn-sm" href={`${APP}/signup`}>{t(locale, 'cta.start_free')}</a>
+        <details class="nav-menu">
+          <summary aria-label={t(locale, 'nav.open_menu_aria')}>
+            <span class="nav-burger" aria-hidden="true"><i></i><i></i><i></i></span>
+          </summary>
+          <nav class="nav-menu-panel" aria-label={t(locale, 'nav.mobile_aria')}>
+            <a href="#product">{t(locale, 'nav.product')}</a>
+            <a href="#agent">{t(locale, 'nav.agent')}</a>
+            <a href="#integrations">{t(locale, 'nav.integrations')}</a>
+            <a href="#pricing">{t(locale, 'nav.pricing')}</a>
+            <a href={DOCS}>{t(locale, 'nav.docs')}</a>
+            <a href={GITHUB}>{t(locale, 'nav.github')}</a>
+            <a href={`${APP}/login`}>{t(locale, 'nav.signin')}</a>
+          </nav>
+        </details>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ===== hero ===== -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-copy">
+          <a class="badge" href="#agent">
+            <span class="badge-dot"></span>
+            {t(locale, 'hero.badge')}
+            <Icon name="arrow" size={13} />
+          </a>
+          <h1>{t(locale, 'hero.title')}</h1>
+          <p class="lead hero-lead" set:html={t(locale, 'hero.lead')} />
+          <div class="hero-actions">
+            <a class="btn btn-primary" href={`${APP}/signup`}>
+              {t(locale, 'cta.start_free')} <Icon name="arrow" size={17} />
+            </a>
+            <a class="btn btn-ghost" href={DOCS}>{t(locale, 'hero.docs')}</a>
+          </div>
+          <p class="hero-note">
+            {t(locale, 'hero.note')}
+          </p>
+        </div>
+
+        <div class="hero-shot">
+          <Shot
+            src="/shots/inbox.png"
+            alt={t(locale, 'hero.shot_alt')}
+            url="app.stepped.ai/inbox"
+            priority
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== logo strip ===== -->
+    <section class="strip">
+      <div class="container">
+        <p class="strip-label">{t(locale, 'strip.label')}</p>
+        <div class="strip-logos">
+          {
+            [...channels, ...sources, ...models].map((item) => (
+              <span class="logo" title={item.label}>
+                <BrandIcon name={item.brand} size={22} />
+              </span>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== the differentiator ===== -->
+    <section class="section" id="agent">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow eyebrow-accent">
+            <Icon name="sparkles" size={14} /> {t(locale, 'agent.eyebrow')}
+          </span>
+          <h2>{t(locale, 'agent.title')}</h2>
+          <p class="lead">
+            {t(locale, 'agent.lead')}
+          </p>
+        </div>
+
+        <div class="split">
+          <div class="split-copy">
+            <div class="stack">
+              <article class="point">
+                <span class="point-ico"><Icon name="map" size={18} /></span>
+                <div>
+                  <h3>{t(locale, 'agent.shows.title')}</h3>
+                  <p>
+                    {t(locale, 'agent.shows.body')}
+                  </p>
+                </div>
+              </article>
+              <article class="point">
+                <span class="point-ico"><Icon name="zap" size={18} /></span>
+                <div>
+                  <h3>{t(locale, 'agent.acts.title')}</h3>
+                  <p>
+                    {t(locale, 'agent.acts.body')}
+                  </p>
+                </div>
+              </article>
+              <article class="point">
+                <span class="point-ico"><Icon name="plug" size={18} /></span>
+                <div>
+                  <h3>{t(locale, 'agent.mcp.title')}</h3>
+                  <p>
+                    {t(locale, 'agent.mcp.body')}
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+          <div class="split-shot">
+            <Shot
+              src="/shots/agent-trace.png"
+              alt={t(locale, 'agent.shot_alt')}
+              url="app.stepped.ai/ai/runs"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== product ===== -->
+    <section class="section section-alt" id="product">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">{t(locale, 'product.eyebrow')}</span>
+          <h2>{t(locale, 'product.title')}</h2>
+          <p class="lead">
+            {t(locale, 'product.lead')}
+          </p>
+        </div>
+
+        <div class="bento">
+          <div class="bento-wide card">
+            <div class="bento-copy">
+              <h3>{t(locale, 'product.builder.title')}</h3>
+              <p>
+                {t(locale, 'product.builder.body')}
+              </p>
+            </div>
+            <div class="bento-shot">
+              <Shot
+                src="/shots/agent-builder.png"
+                alt={t(locale, 'product.builder.shot_alt')}
+                url="app.stepped.ai/ai/agents"
+              />
+            </div>
+          </div>
+
+          <div class="bento-half card">
+            <div class="bento-copy">
+              <h3>{t(locale, 'product.knowledge.title')}</h3>
+              <p>
+                {t(locale, 'product.knowledge.body')}
+              </p>
+            </div>
+            <div class="bento-shot bento-shot-crop">
+              <Shot
+                src="/shots/knowledge.png"
+                alt={t(locale, 'product.knowledge.shot_alt')}
+                url="app.stepped.ai/knowledge"
+              />
+            </div>
+          </div>
+
+          <div class="bento-half card">
+            <div class="bento-copy">
+              <h3>{t(locale, 'product.tours.title')}</h3>
+              <p>
+                {t(locale, 'product.tours.body')}
+              </p>
+            </div>
+            <div class="bento-shot bento-shot-crop">
+              <Shot
+                src="/shots/tours.png"
+                alt={t(locale, 'product.tours.shot_alt')}
+                url="app.stepped.ai/tours"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          {
+            features.map((f) => (
+              <article class="feature">
+                <span class="feature-ico">
+                  <Icon name={f.icon} size={19} />
+                </span>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== self-host band ===== -->
+    <section class="section">
+      <div class="container">
+        <div class="band">
+          <div class="band-copy">
+            <span class="eyebrow">{t(locale, 'band.eyebrow')}</span>
+            <h2>{t(locale, 'band.title')}</h2>
+            <p class="lead">
+              {t(locale, 'band.lead')}
+            </p>
+            <pre class="install"><code><span class="c">$</span> git clone https://github.com/myfoxit/stept-now stept
+<span class="c">$</span> cd stept && make setup && make dev</code></pre>
+            <div class="hero-actions">
+              <a class="btn btn-ghost" href={`${DOCS}/getting-started/self-hosting/`}>
+                {t(locale, 'band.guide')} <Icon name="arrow" size={17} />
+              </a>
+            </div>
+          </div>
+          <ul class="band-list">
+            <li><Icon name="check" size={17} /> {t(locale, 'band.item1')}</li>
+            <li><Icon name="check" size={17} /> {t(locale, 'band.item2')}</li>
+            <li><Icon name="check" size={17} /> {t(locale, 'band.item3')}</li>
+            <li><Icon name="check" size={17} /> {t(locale, 'band.item4')}</li>
+            <li><Icon name="check" size={17} /> {t(locale, 'band.item5')}</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== integrations ===== -->
+    <section class="section section-alt" id="integrations">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">{t(locale, 'integrations.eyebrow')}</span>
+          <h2>{t(locale, 'integrations.title')}</h2>
+        </div>
+        <div class="integ-cols">
+          <div class="integ-col">
+            <h3 class="integ-h">{t(locale, 'integrations.channels')}</h3>
+            <ul>
+              {
+                channels.map((c) => (
+                  <li>
+                    <span class="integ-logo">
+                      <BrandIcon name={c.brand} size={18} color />
+                    </span>
+                    {c.label}
+                  </li>
+                ))
+              }
+              <li><span class="integ-logo integ-generic"><Icon name="messages" size={16} /></span>{t(locale, 'integrations.widget_api')}</li>
+            </ul>
+          </div>
+          <div class="integ-col">
+            <h3 class="integ-h">{t(locale, 'integrations.knowledge')}</h3>
+            <ul>
+              {
+                sources.map((s) => (
+                  <li>
+                    <span class="integ-logo">
+                      <BrandIcon name={s.brand} size={18} color />
+                    </span>
+                    {s.label}
+                  </li>
+                ))
+              }
+              <li><span class="integ-logo integ-generic"><Icon name="book" size={16} /></span>{t(locale, 'integrations.crawl_files')}</li>
+            </ul>
+          </div>
+          <div class="integ-col">
+            <h3 class="integ-h">{t(locale, 'integrations.models')}</h3>
+            <ul>
+              {
+                models.map((m) => (
+                  <li>
+                    <span class="integ-logo">
+                      <BrandIcon name={m.brand} size={18} color />
+                    </span>
+                    {m.label}
+                  </li>
+                ))
+              }
+              <li><span class="integ-logo integ-generic"><Icon name="sparkles" size={16} /></span>{t(locale, 'integrations.openai_compatible')}</li>
+            </ul>
+          </div>
+          <div class="integ-col">
+            <h3 class="integ-h">{t(locale, 'integrations.email_delivery')}</h3>
+            <ul>
+              <li><span class="integ-logo"><BrandIcon name="amazon" size={18} color /></span>Amazon SES</li>
+              <li><span class="integ-logo"><BrandIcon name="resend" size={18} color /></span>Resend</li>
+              <li><span class="integ-logo"><BrandIcon name="mailgun" size={18} color /></span>Mailgun</li>
+              <li><span class="integ-logo integ-generic"><Icon name="inbox" size={16} /></span>Postmark</li>
+              <li><span class="integ-logo integ-generic"><Icon name="inbox" size={16} /></span>SendGrid</li>
+              <li><span class="integ-logo integ-generic"><Icon name="inbox" size={16} /></span>{t(locale, 'integrations.plain_smtp')}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== pricing ===== -->
+    <section class="section" id="pricing">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">{t(locale, 'pricing.eyebrow')}</span>
+          <h2>{t(locale, 'pricing.title')}</h2>
+          <p class="notice">
+            <span class="badge-dot"></span> {t(locale, 'pricing.notice')}
+          </p>
+        </div>
+        <div class="price-grid">
+          {
+            plans.map((p) => (
+              <article class:list={['plan card', { featured: p.highlight }]}>
+                {p.highlight && <span class="plan-badge">{t(locale, 'pricing.most_popular')}</span>}
+                <h3 class="plan-name">{p.name}</h3>
+                <div class="plan-price">
+                  <span class="amount">{p.price}</span>
+                  <span class="unit">{p.unit}</span>
+                </div>
+                <p class="plan-tagline">{p.tagline}</p>
+                <a
+                  class:list={['btn', p.highlight ? 'btn-primary' : 'btn-ghost', 'plan-cta']}
+                  href={p.cta.href}
+                >
+                  {p.cta.label}
+                </a>
+                <ul class="plan-features">
+                  {p.features.map((f) => (
+                    <li>
+                      <Icon name="check" size={15} /> {f}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))
+          }
+        </div>
+        <p class="price-foot" set:html={t(locale, 'pricing.foot')} />
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section section-alt" id="faq">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">{t(locale, 'faq.eyebrow')}</span>
+          <h2>{t(locale, 'faq.title')}</h2>
+        </div>
+        <div class="faq-list">
+          {
+            faqs.map((f) => (
+              <details class="faq">
+                <summary>{f.q}</summary>
+                <p>{f.a}</p>
+              </details>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== final CTA ===== -->
+    <section class="section">
+      <div class="container">
+        <div class="cta">
+          <h2>{t(locale, 'cta.title')}</h2>
+          <p class="lead">{t(locale, 'cta.lead')}</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href={`${APP}/signup`}>
+              {t(locale, 'cta.start_free')} <Icon name="arrow" size={17} />
+            </a>
+            <a class="btn btn-ghost" href={GITHUB}>
+              <BrandIcon name="github" size={17} /> {t(locale, 'cta.star')}
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== footer ===== -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <Wordmark size="sm" variant="mono" />
+        <p>{t(locale, 'footer.tagline')}</p>
+      </div>
+      <nav class="footer-col" aria-label={t(locale, 'nav.product')}>
+        <span class="footer-h">{t(locale, 'nav.product')}</span>
+        <a href="#product">{t(locale, 'footer.features')}</a>
+        <a href="#agent">{t(locale, 'nav.agent')}</a>
+        <a href="#integrations">{t(locale, 'nav.integrations')}</a>
+        <a href="#pricing">{t(locale, 'nav.pricing')}</a>
+      </nav>
+      <nav class="footer-col" aria-label={t(locale, 'footer.resources')}>
+        <span class="footer-h">{t(locale, 'footer.resources')}</span>
+        <a href={DOCS}>{t(locale, 'footer.documentation')}</a>
+        <a href={`${DOCS}/getting-started/self-hosting/`}>{t(locale, 'footer.selfhosting')}</a>
+        <a href={`${DOCS}/integrations/mcp/`}>{t(locale, 'footer.mcp')}</a>
+        <a href={GITHUB}>{t(locale, 'nav.github')}</a>
+      </nav>
+      <nav class="footer-col" aria-label={t(locale, 'footer.company')}>
+        <span class="footer-h">{t(locale, 'footer.company')}</span>
+        <a href={`${APP}/login`}>{t(locale, 'nav.signin')}</a>
+        <a href="mailto:hello@stepped.ai">{t(locale, 'footer.contact')}</a>
+        <a href={localePath(locale, '/privacy')}>{t(locale, 'footer.privacy')}</a>
+      </nav>
+    </div>
+    <div class="container footer-base">
+      <span>{t(locale, 'footer.copyright', { year })}</span>
+      <LangSwitcher locale={locale} />
+      <span>{t(locale, 'footer.open_source')}</span>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  .skip {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--action);
+    color: var(--action-foreground);
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius);
+    z-index: 100;
+  }
+  .skip:focus {
+    left: 1rem;
+    top: 1rem;
+  }
+
+  /* ---- nav ---- */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--background) 80%, transparent);
+    backdrop-filter: saturate(1.6) blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 3.75rem;
+    gap: 1rem;
+  }
+  .nav-links {
+    display: none;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+  .nav-links a:hover {
+    color: var(--foreground);
+  }
+  .nav-cta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .nav-icon {
+    display: none;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius);
+    color: var(--muted-foreground);
+  }
+  .nav-icon:hover {
+    color: var(--foreground);
+    background: var(--muted);
+  }
+  .nav-signin {
+    display: none;
+  }
+  @media (min-width: 900px) {
+    .nav-links,
+    .nav-signin {
+      display: flex;
+    }
+    .nav-icon {
+      display: grid;
+    }
+  }
+
+  /* ---- mobile menu (no JS) ---- */
+  .nav-menu {
+    position: relative;
+  }
+  .nav-menu summary {
+    list-style: none;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    cursor: pointer;
+    background: var(--background);
+  }
+  .nav-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .nav-burger {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-burger i {
+    width: 0.9rem;
+    height: 1.5px;
+    border-radius: 2px;
+    background: var(--foreground);
+  }
+  .nav-menu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    min-width: 12rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.5rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+  }
+  .nav-menu-panel a {
+    padding: 0.5rem 0.75rem;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.9rem;
+  }
+  .nav-menu-panel a:hover {
+    background: var(--muted);
+  }
+  @media (min-width: 900px) {
+    .nav-menu {
+      display: none;
+    }
+  }
+
+  /* ---- hero ---- */
+  .hero {
+    position: relative;
+    padding-block: clamp(3.5rem, 8vw, 6rem) clamp(2.5rem, 5vw, 4rem);
+    overflow: hidden;
+    text-align: center;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: -40% 20% auto 20%;
+    height: 60%;
+    background: radial-gradient(50% 50% at 50% 50%, var(--primary-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-copy {
+    position: relative;
+    max-width: 46rem;
+    margin-inline: auto;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem 0.3rem 0.7rem;
+    transition: border-color 0.15s ease;
+  }
+  .badge:hover {
+    border-color: var(--border-strong);
+    color: var(--foreground);
+  }
+  .badge-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: var(--primary);
+    flex: none;
+  }
+  .hero h1 {
+    font-size: clamp(2.5rem, 6.2vw, 4rem);
+    margin-top: 1.5rem;
+  }
+  .hero-lead {
+    margin: 1.25rem auto 0;
+    max-width: 44rem;
+    text-wrap: pretty;
+  }
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+    justify-content: center;
+  }
+  .hero-note {
+    margin-top: 1rem;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+  }
+  .hero-shot {
+    position: relative;
+    margin-top: clamp(2.5rem, 6vw, 4rem);
+  }
+
+  /* ---- logo strip ---- */
+  .strip {
+    padding-block: 2.5rem;
+    border-block: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .strip-label {
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    margin-bottom: 1.25rem;
+  }
+  .strip-logos {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 1.75rem;
+    color: var(--muted-foreground);
+  }
+  .logo {
+    display: grid;
+    place-items: center;
+    opacity: 0.65;
+    transition:
+      opacity 0.15s ease,
+      color 0.15s ease;
+  }
+  .logo:hover {
+    opacity: 1;
+    color: var(--foreground);
+  }
+
+  /* ---- section furniture ---- */
+  .section-alt {
+    background: var(--surface);
+    border-block: 1px solid var(--border);
+  }
+  .section-head {
+    max-width: 44rem;
+    margin-bottom: 3rem;
+  }
+  .section-head h2 {
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    margin-top: 0.85rem;
+  }
+  .section-head .lead {
+    margin-top: 1rem;
+    max-width: 52ch;
+  }
+
+  /* ---- split (agent) ---- */
+  .split {
+    display: grid;
+    gap: clamp(2rem, 5vw, 3.5rem);
+    align-items: center;
+  }
+  @media (min-width: 1000px) {
+    .split {
+      grid-template-columns: 0.85fr 1.15fr;
+    }
+  }
+  .stack {
+    display: grid;
+    gap: 1.75rem;
+  }
+  .point {
+    display: flex;
+    gap: 0.9rem;
+  }
+  .point-ico {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: none;
+    border-radius: var(--radius);
+    background: var(--primary-soft);
+    color: var(--primary);
+    border: 1px solid var(--primary-ring);
+  }
+  .point h3 {
+    font-size: 1.0625rem;
+    letter-spacing: -0.02em;
+  }
+  .point p {
+    margin-top: 0.35rem;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+  }
+
+  /* ---- bento ---- */
+  .bento {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  @media (min-width: 900px) {
+    .bento {
+      grid-template-columns: 1fr 1fr;
+    }
+    .bento-wide {
+      grid-column: span 2;
+    }
+  }
+  .bento-wide,
+  .bento-half {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .bento-copy {
+    padding: 1.75rem 1.75rem 0;
+  }
+  .bento-copy h3 {
+    font-size: 1.1875rem;
+  }
+  .bento-copy p {
+    margin-top: 0.5rem;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+    max-width: 52ch;
+  }
+  .bento-shot {
+    padding: 1.5rem 1.75rem 0;
+    margin-top: auto;
+  }
+  /* Crop tall shots so the two half-cards stay the same height. */
+  .bento-shot-crop :global(.shot) {
+    max-height: 15rem;
+    overflow: hidden;
+  }
+
+  /* ---- feature grid ---- */
+  .feature-grid {
+    display: grid;
+    gap: 1.75rem 2.5rem;
+    grid-template-columns: 1fr;
+    margin-top: 3rem;
+  }
+  @media (min-width: 700px) {
+    .feature-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (min-width: 1000px) {
+    .feature-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .feature-ico {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius);
+    background: var(--background);
+    border: 1px solid var(--border);
+    color: var(--foreground);
+    margin-bottom: 0.9rem;
+  }
+  .feature h3 {
+    font-size: 1rem;
+  }
+  .feature p {
+    margin-top: 0.4rem;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+
+  /* ---- self-host band ---- */
+  .band {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+  @media (min-width: 900px) {
+    .band {
+      grid-template-columns: 1.35fr 1fr;
+    }
+  }
+  .band-copy h2 {
+    font-size: clamp(1.8rem, 3.6vw, 2.4rem);
+    margin-top: 0.85rem;
+  }
+  .band-copy .lead {
+    margin-top: 1rem;
+  }
+  .install {
+    margin-top: 1.5rem;
+    padding: 1rem 1.15rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.8;
+  }
+  .install code {
+    white-space: pre;
+    color: var(--foreground);
+  }
+  .install .c {
+    color: var(--muted-foreground);
+    user-select: none;
+  }
+  .band-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.9rem;
+  }
+  .band-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+  .band-list :global(svg) {
+    color: var(--primary);
+    flex: none;
+    margin-top: 0.2rem;
+  }
+
+  /* ---- integrations ---- */
+  .integ-cols {
+    display: grid;
+    gap: 2.5rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .integ-cols {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (min-width: 1000px) {
+    .integ-cols {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .integ-h {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+  .integ-col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.85rem;
+  }
+  .integ-col li {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+  .integ-logo {
+    display: grid;
+    place-items: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    flex: none;
+    border-radius: 0.5rem;
+    background: var(--background);
+    border: 1px solid var(--border);
+  }
+  .integ-generic {
+    color: var(--muted-foreground);
+  }
+
+  /* ---- pricing ---- */
+  .notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--muted-foreground);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+  }
+  .price-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .price-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .plan {
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .plan.featured {
+    border-color: var(--foreground);
+    box-shadow: var(--shadow-md);
+  }
+  .plan-badge {
+    position: absolute;
+    top: -0.6875rem;
+    right: 1.25rem;
+    background: var(--action);
+    color: var(--action-foreground);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+  }
+  .plan-name {
+    font-size: 1rem;
+  }
+  .plan-price {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  .plan-price .amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+  }
+  .plan-price .unit {
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+  }
+  .plan-tagline {
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+  .plan-cta {
+    width: 100%;
+    margin-top: 1.35rem;
+  }
+  .plan-features {
+    list-style: none;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.7rem;
+  }
+  .plan-features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+  }
+  .plan-features :global(svg) {
+    color: var(--primary);
+    flex: none;
+    margin-top: 0.28rem;
+  }
+  .price-foot {
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    max-width: 62ch;
+    margin: 2.5rem auto 0;
+  }
+  .price-foot strong,
+  .price-foot :global(strong) {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+
+  /* ---- FAQ ---- */
+  .faq-list {
+    display: grid;
+    gap: 0;
+    max-width: 46rem;
+    border-top: 1px solid var(--border);
+  }
+  .faq {
+    border-bottom: 1px solid var(--border);
+  }
+  .faq summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 1.25rem 0;
+    font-weight: 600;
+    font-size: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary::after {
+    content: '+';
+    color: var(--muted-foreground);
+    font-size: 1.25rem;
+    line-height: 1;
+    flex: none;
+  }
+  .faq[open] summary::after {
+    content: '–';
+  }
+  .faq p {
+    padding: 0 0 1.35rem;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+    max-width: 68ch;
+  }
+
+  /* ---- final CTA ---- */
+  .cta {
+    text-align: center;
+    padding: clamp(3rem, 7vw, 4.5rem) 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) + 0.5rem);
+    background:
+      radial-gradient(60% 120% at 50% 0%, var(--primary-soft), transparent 70%), var(--surface);
+  }
+  .cta h2 {
+    font-size: clamp(2rem, 4.4vw, 2.75rem);
+  }
+  .cta .lead {
+    margin: 1rem auto 0;
+  }
+
+  /* ---- footer ---- */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding-block: 3.5rem 2rem;
+  }
+  .footer-inner {
+    display: grid;
+    gap: 2.5rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 720px) {
+    .footer-inner {
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+    }
+  }
+  .footer-brand p {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    margin-top: 0.75rem;
+    max-width: 28ch;
+  }
+  .footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+  }
+  .footer-col a:hover {
+    color: var(--foreground);
+  }
+  .footer-h {
+    color: var(--foreground);
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+  .footer-base {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+  }
+</style>

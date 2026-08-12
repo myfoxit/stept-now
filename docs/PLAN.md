@@ -462,6 +462,69 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     **498**, widget **326**, extension **233**; ruff/mypy/tsc clean; all builds green;
     alembic heads still **one** (no new migrations — JSON-attribute state only).
 
+- [x] **i18n completion wave (2026-08-12, dated — finishes what W13 started)** — W13 shipped
+  *thirteen* languages whose catalogs were mostly empty: backend and widget complete, the
+  dashboard 17% translated, the extension and the marketing site not localised at all. Thirteen
+  half-languages is worse than five whole ones — it puts a language picker in front of someone
+  and then hands them an English screen. Contract: `docs/I18N.md` (rewritten). Session worktree
+  `.claude/worktrees/i18n-five-complete`.
+  - **Cut thirteen locales to five, then finished them.** Dropped pt-BR, nl, pl, tr, ja, ko,
+    zh-CN and ar; kept **en, de, fr, es, it** and took every surface to 100%. The coverage floor
+    in `scripts/check-i18n.mjs` went from `dashboard: 0.16` to **1 for every set** — a gap is no
+    longer measured, it fails the build. Removing a locale is now a documented, legitimate move.
+  - **Two surfaces localised from scratch.** The **extension** got its own runtime
+    (`extension/src/i18n/`, same catalog format as the other three) wired through all 15 side
+    panel/content-script/service-worker files — 205 keys, 201 static `t()` call sites plus
+    dynamic `` t(`drive.status_${status}`) ``. The **landing** got build-time i18n: English at
+    `/`, the rest under `/de/ /fr/ /es/ /it/`, one shared `HomePage.astro` per route, a footer
+    `LangSwitcher`, `hreflang` + `x-default` alternates, and every locale route in the sitemap.
+  - **The extension manifest, too.** Chrome reads the extension's name, description, toolbar
+    tooltip and shortcut label *before any of our code runs*, via `_locales/<lang>/messages.json`
+    and `__MSG_` placeholders — a separate mechanism from `src/i18n/`, and a harsher one: a key
+    missing from the `default_locale` catalog makes Chrome refuse to load the extension. Now
+    covered by the guard as a build failure rather than a coverage percentage.
+  - **A silently-discarded setting, fixed.** `agent.settings.reply_language` was resolved through
+    `normalize_locale`, which only knows locales we *render* — so cutting the locale set made a
+    workspace that had configured Japanese replies fall back to mirroring the customer, with no
+    error. Reply language and interface language are different questions: it now resolves through
+    `reply_language_name` (~60 languages by name, `pt-BR` → Portuguese (Brazil), `de-AT` → German,
+    unnameable → mirror the customer). Same doctrine as the detector, which deliberately
+    recognises more languages than it renders so Dutch text scores as Dutch and returns None
+    instead of scraping past the threshold as German.
+  - **Guard made correct, not just stricter.** It read any key ending in a CLDR category as a
+    plural, so `ai.create_one` — the slug for the button "Create one" — forced every translator to
+    invent an `_other` twin (de and it had satisfied it by duplicating the string). A base is now
+    plural only if English spells it with **two or more** categories; the three bogus twins are
+    gone. It also polices the landing's locale list, so a locale can no longer exist in the
+    product without a marketing page.
+  - **Extraction defects the coverage number could not see.** Three *spliced fragments* — a
+    translated fragment concatenated with hardcoded English (`{t('…connection_settings_for_this')}
+    <span>{channel}</span> channel. Secrets are stored encrypted…`) — read as 100% covered while
+    rendering half-English with English word order frozen in; now whole sentences via `tParts`.
+    One codemod had rewritten the inside of a `//` comment, leaving a catalog key nothing renders.
+    The **auth flow is now fully extracted** (subtitles, submit-button states, zod messages, OAuth
+    failures, toast fallbacks — 44 new keys), and zod schemas moved off module scope, since a
+    module-level `t()` freezes whichever language loaded first.
+  - **Register consistency.** Spanish was split: the shipped widget/backend/auth strings used
+    **tú** while every newly-written surface came back **usted**. Standardised on tú (~150 strings
+    edited across five files). German is Sie, French vouvoiement, Italian tu — each verified
+    against its own shipped catalog rather than assumed.
+  - **One real plural, while the machinery was fresh.** `settings.ai_runs_this_month_no_runs`
+    rendered "1 AI runs" — English had the defect too — because `t` keys plural selection on
+    `vars.count` and the call site passed `runs`. Now `_one`/`_other` in all five locales with the
+    call site passing `count`; a free-plan workspace really does pass through exactly one run.
+  - **Deliberately deferred, measured not hand-waved:** ~60 ternary label pairs plus a handful of
+    hardcoded props across 44 `.tsx` files remain unextracted — the codemod always skipped strings
+    assembled inside a JSX expression. That is an *extraction* gap, not a translation gap: every
+    key English defines exists in all five languages, and the 100% floor keeps it that way.
+  - **Measured on the merged tree:** backend **1796** passed (+8 pg-skipped), frontend **502**,
+    widget **327**, extension **246**, dom-capture **107**, `@stept/js` **5**, `@stept/react`
+    **4**; ruff + ruff-format + mypy clean, tsc clean on all four TS packages, `pnpm -r build` and
+    the landing build green, `make i18n-check` green (backend 21 keys, widget 124, dashboard
+    1,076, extension 205, landing 157 — 4/4 locales complete on every set, plus 4 `__MSG_` keys
+    across 5 manifest catalogs). Alembic heads still **one** — no migration; the shipped locale set
+    is code, not data.
+
 - [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
   `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
   untouched. Postgres containers used for migration validation may still be up on 54329

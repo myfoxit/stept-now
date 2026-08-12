@@ -17,21 +17,21 @@ class TestNormalizeLocale:
             ("EN", "en"),
             ("de-DE", "de"),
             ("de_AT", "de"),  # underscore separator, region stripped
-            ("pt", "pt-BR"),  # we ship only pt-BR
-            ("pt-BR", "pt-BR"),
-            ("pt-br", "pt-BR"),
-            ("pt-PT", "pt-BR"),  # region falls back to the shipped Portuguese
-            ("zh", "zh-CN"),
-            ("zh-Hans", "zh-CN"),
-            ("zh-TW", "zh-CN"),
-            ("ar-EG", "ar"),
-            ("pt-BR-x-private", "pt-BR"),  # strips right-to-left until it hits a match
+            ("FR", "fr"),
+            ("es-419", "es"),  # Latin-American Spanish falls back to the shipped Spanish
+            ("it-CH", "it"),
+            ("de-DE-x-private", "de"),  # strips right-to-left until it hits a match
         ],
     )
     def test_canonicalises(self, raw: str, expected: str) -> None:
         assert i18n.normalize_locale(raw) == expected
 
-    @pytest.mark.parametrize("raw", [None, "", "   ", "klingon", "xx", "!!", "123", "e"])
+    @pytest.mark.parametrize(
+        "raw",
+        # `pt`/`zh-Hans`/`ar` were shipped locales once; they must reject
+        # cleanly now, not resolve to something stale.
+        [None, "", "   ", "klingon", "xx", "!!", "123", "e", "pt", "zh-Hans", "ar", "ja"],
+    )
     def test_rejects_unsupported_and_malformed(self, raw: str | None) -> None:
         assert i18n.normalize_locale(raw) is None
 
@@ -42,14 +42,14 @@ class TestAcceptLanguage:
         assert i18n.parse_accept_language(header) == ["de", "fr", "en"]
 
     def test_missing_q_defaults_to_one_and_keeps_header_order(self) -> None:
-        assert i18n.parse_accept_language("de, fr;q=0.9, ja") == ["de", "ja", "fr"]
+        assert i18n.parse_accept_language("de, fr;q=0.9, it") == ["de", "it", "fr"]
 
     def test_drops_unsupported_and_q_zero(self) -> None:
         assert i18n.parse_accept_language("klingon, de;q=0, fr") == ["fr"]
 
     def test_deduplicates_after_normalisation(self) -> None:
         # de-DE and de-AT both normalise to `de`; the better q wins, once.
-        assert i18n.parse_accept_language("de-DE;q=0.9, de-AT;q=0.8, ja;q=0.5") == ["de", "ja"]
+        assert i18n.parse_accept_language("de-DE;q=0.9, de-AT;q=0.8, it;q=0.5") == ["de", "it"]
 
     def test_survives_garbage(self) -> None:
         assert i18n.parse_accept_language("de;q=notanumber, ,;;, fr") == ["de", "fr"]
@@ -61,7 +61,7 @@ class TestAcceptLanguage:
 
 class TestNegotiate:
     def test_stored_preference_beats_header(self) -> None:
-        assert i18n.negotiate("de,fr", preferred="ja") == "ja"
+        assert i18n.negotiate("de,fr", preferred="it") == "it"
 
     def test_falls_through_to_header_when_preference_unsupported(self) -> None:
         assert i18n.negotiate("de,fr", preferred="klingon") == "de"
@@ -75,46 +75,20 @@ class TestPluralCategory:
     @pytest.mark.parametrize(
         ("locale", "count", "expected"),
         [
-            # Germanic/Romance: `one` is exactly 1.
+            # Germanic/Italian/Spanish: `one` is exactly 1.
             ("en", 0, "other"),
             ("en", 1, "one"),
             ("en", 2, "other"),
             ("de", 1, "one"),
-            ("nl", 2, "other"),
+            ("de", 2, "other"),
             ("it", 1, "one"),
+            ("it", 3, "other"),
             ("es", 1, "one"),
-            ("tr", 1, "one"),
-            ("tr", 3, "other"),
-            # French and Brazilian Portuguese group 0 with 1.
+            ("es", 0, "other"),
+            # French groups 0 with 1 — the case English gets wrong.
             ("fr", 0, "one"),
             ("fr", 1, "one"),
             ("fr", 2, "other"),
-            ("pt-BR", 0, "one"),
-            ("pt-BR", 5, "other"),
-            # No grammatical plural at all.
-            ("ja", 0, "other"),
-            ("ja", 1, "other"),
-            ("ko", 7, "other"),
-            ("zh-CN", 1, "other"),
-            # Polish: one / few / many.
-            ("pl", 1, "one"),
-            ("pl", 2, "few"),
-            ("pl", 4, "few"),
-            ("pl", 5, "many"),
-            ("pl", 12, "many"),  # 12–14 are `many`, not `few`
-            ("pl", 13, "many"),
-            ("pl", 22, "few"),  # …but 22 is `few` again
-            ("pl", 25, "many"),
-            # Arabic uses all six.
-            ("ar", 0, "zero"),
-            ("ar", 1, "one"),
-            ("ar", 2, "two"),
-            ("ar", 3, "few"),
-            ("ar", 10, "few"),
-            ("ar", 11, "many"),
-            ("ar", 99, "many"),
-            ("ar", 100, "other"),
-            ("ar", 103, "few"),  # 103 % 100 == 3
         ],
     )
     def test_cldr_rules(self, locale: str, count: int, expected: str) -> None:
@@ -129,12 +103,47 @@ class TestPluralCategory:
 
 
 class TestDirection:
-    def test_arabic_is_rtl_everything_else_ltr(self) -> None:
-        assert i18n.direction("ar") == "rtl"
-        assert i18n.direction("ar-EG") == "rtl"
-        assert i18n.direction("en") == "ltr"
-        assert i18n.direction("ja") == "ltr"
+    def test_every_shipped_locale_is_ltr(self) -> None:
+        # No RTL locale ships today; the mechanism stays for the day one returns.
+        for code in i18n.SUPPORTED_LOCALES:
+            assert i18n.direction(code) == "ltr"
         assert i18n.direction("klingon") == "ltr"
+
+
+class TestReplyLanguageName:
+    """What the AI writes is not limited to what the interface renders."""
+
+    def test_every_shipped_locale_can_be_named(self) -> None:
+        for code in i18n.SUPPORTED_LOCALES:
+            assert i18n.reply_language_name(code) is not None
+
+    @pytest.mark.parametrize(
+        ("tag", "expected"),
+        [
+            ("ja", "Japanese"),
+            ("tr", "Turkish"),
+            ("ar", "Arabic"),
+            ("zh-CN", "Simplified Chinese"),
+            ("pt", "Portuguese"),
+            ("pt-BR", "Portuguese (Brazil)"),
+        ],
+    )
+    def test_names_languages_we_do_not_ship(self, tag: str, expected: str) -> None:
+        # The whole point: `normalize_locale` returns None for all of these, and
+        # routing the reply-language setting through it silently threw the
+        # workspace's configuration away.
+        assert i18n.normalize_locale(tag) is None
+        assert i18n.reply_language_name(tag) == expected
+
+    @pytest.mark.parametrize("tag", ["de-AT", "de_DE", "fr-CA", " es-419 "])
+    def test_falls_back_from_region_to_base_language(self, tag: str) -> None:
+        assert i18n.reply_language_name(tag) in {"German", "French", "Spanish"}
+
+    @pytest.mark.parametrize("tag", [None, "", "   ", "klingon", "!!", "e"])
+    def test_returns_none_when_it_cannot_name_the_language(self, tag: str | None) -> None:
+        # None means "mirror the customer" — better than telling a model to
+        # "always reply in xx".
+        assert i18n.reply_language_name(tag) is None
 
 
 class TestTranslate:
@@ -166,7 +175,6 @@ class TestTranslate:
             assert i18n.t("api.auth.logged_out", code) != "api.auth.logged_out"
 
     def test_fallback_chain_shape(self) -> None:
-        assert i18n.fallback_chain("pt-BR") == ["pt-BR", "en"]
         assert i18n.fallback_chain("de") == ["de", "en"]
         assert i18n.fallback_chain("en") == ["en"]
 

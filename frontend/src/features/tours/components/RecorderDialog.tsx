@@ -142,8 +142,7 @@ export function RecorderDialog({
 
           <Step n={2} title={t('tours.point_it_at_this_stept')}>
             <p className="text-xs text-muted-foreground">
-              Open the Stept side panel, then sign in with your Stept email and password using this
-              server address:
+              {t('tours.open_the_stept_side_panel_then')}
             </p>
             <CopyField
               value={info?.api_base ?? ''}

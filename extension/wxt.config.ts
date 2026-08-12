@@ -24,8 +24,18 @@ export default defineConfig({
   outDir: 'dist',
   zip: { name: 'stept-extension' },
   manifest: {
-    name: 'Stept Recorder',
-    description: 'Record, edit, preview and drive Stept product tours.',
+    // Chrome resolves `__MSG_key__` against `_locales/<ui language>/messages.json`
+    // (copied from `src/public/_locales/`), falling back to `default_locale`. This
+    // is a separate mechanism from `src/i18n/` — the side panel's own strings are
+    // ours to render, but the extension's *name* and store description are read by
+    // the browser before any of our code runs.
+    //
+    // `default_locale` is load-bearing: with `_locales/` present and this unset —
+    // or with a `__MSG_` key missing from the default catalog — Chrome refuses to
+    // load the extension at all.
+    default_locale: 'en',
+    name: '__MSG_appName__',
+    description: '__MSG_appDescription__',
     version: '0.2.0',
     minimum_chrome_version: '116',
     homepage_url: 'https://stepped.ai',
@@ -46,13 +56,13 @@ export default defineConfig({
     host_permissions: ['<all_urls>'],
     side_panel: { default_path: 'sidepanel.html' },
     action: {
-      default_title: 'Stept — record a tour',
+      default_title: '__MSG_actionTitle__',
       default_icon: { 16: 'icon/16.png', 48: 'icon/48.png', 128: 'icon/128.png' },
     },
     commands: {
       'toggle-recording': {
         suggested_key: { default: 'Ctrl+Shift+S', mac: 'Command+Shift+S' },
-        description: 'Start or stop recording a Stept tour',
+        description: '__MSG_commandToggleRecording__',
       },
     },
   },

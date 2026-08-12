@@ -23,15 +23,15 @@ afterEach(async () => {
 describe('normalizeLocale', () => {
   it.each([
     ['de-DE', 'de'],
-    ['pt', 'pt-BR'],
-    ['zh-Hans', 'zh-CN'],
-    ['ar-EG', 'ar'],
+    ['fr-CA', 'fr'],
+    ['es-419', 'es'],
+    ['it-CH', 'it'],
   ])('canonicalises %s → %s', (raw, expected) => {
     expect(normalizeLocale(raw)).toBe(expected)
   })
 
-  it('rejects languages we do not ship', () => {
-    expect(normalizeLocale('klingon')).toBeNull()
+  it.each(['klingon', 'pt', 'zh-Hans', 'ja', 'ar'])('rejects %s, which we do not ship', (raw) => {
+    expect(normalizeLocale(raw)).toBeNull()
   })
 })
 
@@ -45,11 +45,12 @@ describe('t', () => {
     expect(t('common.save')).toBe('Speichern')
   })
 
-  it('falls back to English for a key the locale has not translated yet', async () => {
-    await setLocale('de')
-    // The dashboard is translated in waves, so most keys are still English-only.
-    // Asserting against a genuinely untranslated key — rather than a stub
-    // catalog — checks the real shipped state: readable English, never a key.
+  it('falls back to English key by key when a catalog is partial', async () => {
+    // Shipped catalogs are complete, so a partial one has to be seeded: this
+    // pins the behaviour a half-loaded or half-translated catalog would get.
+    registerCatalog('es', { 'common.save': 'Guardar' })
+    await setLocale('es')
+    expect(t('common.save')).toBe('Guardar')
     expect(t('ai.agent_saved')).toBe('Agent saved')
   })
 
@@ -71,11 +72,12 @@ describe('t', () => {
 
 describe('plurals', () => {
   it('uses the locale’s own CLDR categories', async () => {
-    // English and Polish disagree about 5, and Polish disagrees with itself
-    // about 12 vs 22 — the case a naive `n === 1 ? a : b` gets wrong.
-    expect(t('time.days', { count: 3 })).toBe('3d')
-    await setLocale('pl')
-    expect(t('time.days', { count: 3 })).toBe('3 dn.')
+    // English and French disagree about 0: French groups it with 1 ("0 jour"),
+    // the case a naive `n === 1 ? a : b` gets wrong.
+    registerCatalog('fr', { stars_one: '{{count}} étoile', stars_other: '{{count}} étoiles' })
+    await setLocale('fr')
+    expect(t('stars', { count: 0 })).toBe('0 étoile')
+    expect(t('stars', { count: 2 })).toBe('2 étoiles')
   })
 })
 
@@ -92,15 +94,17 @@ describe('tParts', () => {
 })
 
 describe('direction', () => {
-  it('is rtl for Arabic only', async () => {
-    await setLocale('ar')
-    expect(dir()).toBe('rtl')
-    await setLocale('ja')
+  it('is ltr for every shipped locale, and for junk', async () => {
+    // No RTL locale ships today; the mechanism stays for the day one returns.
+    for (const { code } of LOCALES) {
+      expect(localeDirection(code)).toBe('ltr')
+    }
+    expect(localeDirection('klingon')).toBe('ltr')
     expect(dir()).toBe('ltr')
   })
 
   it('resolves regional tags before deciding', () => {
-    expect(localeDirection('ar-EG')).toBe('rtl')
+    expect(localeDirection('de-AT')).toBe('ltr')
   })
 })
 
@@ -111,12 +115,12 @@ describe('applyDocumentLocale', () => {
   })
 
   it('sets lang and dir, which screen readers and RTL both need', () => {
-    applyDocumentLocale('ar')
-    expect(document.documentElement.lang).toBe('ar')
-    expect(document.documentElement.dir).toBe('rtl')
-
     applyDocumentLocale('de')
     expect(document.documentElement.lang).toBe('de')
+    expect(document.documentElement.dir).toBe('ltr')
+
+    applyDocumentLocale('it-CH')
+    expect(document.documentElement.lang).toBe('it')
     expect(document.documentElement.dir).toBe('ltr')
   })
 })
@@ -146,7 +150,5 @@ describe('formatting follows the app language, not the browser', () => {
     expect(timeAgo(twoMinutesAgo)).toBe('2m')
     await setLocale('de')
     expect(timeAgo(twoMinutesAgo)).toBe('2 Min.')
-    await setLocale('ja')
-    expect(timeAgo(twoMinutesAgo)).toBe('2分')
   })
 })

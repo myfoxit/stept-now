@@ -1,6 +1,7 @@
 import { interactiveAncestor } from '@stept/dom-capture';
 import { resolveStepTarget } from '../dom/resolve-step';
 import { placeTooltip, type GuideActionSpec, type GuideStepPayload } from '../guide/guide-core';
+import { t } from '../i18n';
 import type { BgToGuideContent, ContentToBg } from '../messages';
 
 /** Guide-mode overlay: spotlights the recorded element on the live page and
@@ -211,7 +212,7 @@ class GuideSession {
       on('input', (ev) => {
         if (this.hits(ev.target)) {
           this.typed = true;
-          this.setHint('Press Enter or click away when done.');
+          this.setHint(t('overlay.press_enter_done'));
         }
       });
       on('change', (ev) => {
@@ -307,7 +308,10 @@ class GuideSession {
     const tip = document.createElement('div');
     tip.className = 'tip enter';
     tip.setAttribute('role', 'dialog');
-    tip.setAttribute('aria-label', `${s.tourName}: step ${s.index + 1} of ${s.total}`);
+    tip.setAttribute(
+      'aria-label',
+      t('overlay.dialog_aria', { tour: s.tourName, current: s.index + 1, total: s.total }),
+    );
 
     const head = document.createElement('div');
     head.className = 'head';
@@ -319,7 +323,7 @@ class GuideSession {
     count.textContent = `${s.index + 1} / ${s.total}`;
     const x = document.createElement('button');
     x.className = 'x';
-    x.setAttribute('aria-label', 'Exit guide');
+    x.setAttribute('aria-label', t('overlay.exit'));
     x.textContent = '×';
     x.addEventListener('click', () => send({ type: 'guide-event', event: 'stop', index: s.index }));
     head.append(brand, count, x);
@@ -339,8 +343,7 @@ class GuideSession {
     if (missing) {
       const warn = document.createElement('div');
       warn.className = 'warn';
-      warn.textContent =
-        'This element is not on the page right now — it may have moved since the recording. Do the step manually, or skip it.';
+      warn.textContent = t('overlay.element_missing');
       tip.appendChild(warn);
     } else if (s.detail || s.body) {
       const sub = document.createElement('div');
@@ -356,13 +359,13 @@ class GuideSession {
       text.textContent = s.value;
       const copy = document.createElement('button');
       copy.className = 'copy';
-      copy.textContent = 'Copy';
+      copy.textContent = t('overlay.copy');
       copy.addEventListener('click', () => {
         void navigator.clipboard
           ?.writeText(s.value ?? '')
           .then(() => {
-            copy.textContent = 'Copied';
-            setTimeout(() => (copy.textContent = 'Copy'), 1400);
+            copy.textContent = t('overlay.copied');
+            setTimeout(() => (copy.textContent = t('overlay.copy')), 1400);
           })
           .catch(() => {});
       });
@@ -374,14 +377,15 @@ class GuideSession {
     row.className = 'row';
     const back = document.createElement('button');
     back.className = 'b';
-    back.textContent = 'Back';
+    back.textContent = t('overlay.back');
     back.disabled = s.index === 0;
     back.addEventListener('click', () => send({ type: 'guide-event', event: 'back', index: s.index }));
     const spacer = document.createElement('div');
     spacer.className = 'spacer';
     const next = document.createElement('button');
     next.className = 'b primary';
-    next.textContent = s.index + 1 >= s.total ? 'Finish' : s.waitsForAction ? 'Skip' : 'Next';
+    next.textContent =
+      s.index + 1 >= s.total ? t('overlay.finish') : s.waitsForAction ? t('overlay.skip') : t('overlay.next');
     next.addEventListener('click', () => this.complete());
     row.append(back, spacer, next);
     tip.appendChild(row);
@@ -392,7 +396,7 @@ class GuideSession {
       const dot = document.createElement('span');
       dot.className = 'dot';
       const label = document.createElement('span');
-      label.textContent = 'Continues automatically when you do it';
+      label.textContent = t('overlay.auto_advance');
       hint.append(dot, label);
     }
     tip.appendChild(hint);

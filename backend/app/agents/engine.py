@@ -62,7 +62,13 @@ from app.ai.registry import resolve_chat
 from app.core.db import utcnow, uuid7
 from app.core.errors import ConflictError
 from app.core.events import Actor, Event, EventNames, emit, on
-from app.core.i18n import DEFAULT_LOCALE, LOCALES, normalize_locale, translate
+from app.core.i18n import (
+    DEFAULT_LOCALE,
+    LOCALES,
+    normalize_locale,
+    reply_language_name,
+    translate,
+)
 from app.core.permissions import Perm, resolve_permissions
 from app.core.queue import enqueue
 from app.core.scheduler import scheduled
@@ -276,14 +282,16 @@ def _language_prompt(
     and even then the model is told to follow the customer if they switch.
 
     A workspace that must answer in one fixed language — a regulated market, a
-    team that only reads Japanese — sets `settings.reply_language`.
+    team that only reads Japanese — sets `settings.reply_language`. That setting
+    is **not** limited to the locales our interface ships: the model can write a
+    language we have no catalog for, so it is resolved through
+    `reply_language_name`, not `normalize_locale`.
     """
-    configured = normalize_locale(settings.get("reply_language"))
+    configured = reply_language_name(settings.get("reply_language"))
     if configured:
-        name = LOCALES[configured].english_name
         return (
-            f"Always reply in {name}, whatever language the customer writes in. "
-            f"If they write in another language, still answer in {name}."
+            f"Always reply in {configured}, whatever language the customer writes in. "
+            f"If they write in another language, still answer in {configured}."
         )
     if reply_locale and reply_locale in LOCALES:
         name = LOCALES[reply_locale].english_name

@@ -11,6 +11,7 @@ import {
   Square,
   TriangleAlert,
 } from 'lucide-react';
+import { t } from '../../../i18n';
 import type { DriveState } from '../../../types';
 import { sendBg, STEP_ICONS } from '../lib';
 
@@ -40,10 +41,13 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
           </span>
           <span className="run-sub">
             {drive.status === 'completed'
-              ? 'Finished — every step executed'
+              ? t('drive.finished')
               : drive.status === 'error'
-                ? 'Stopped on an error'
-                : `Driving step ${Math.min(drive.index + 1, drive.total)} of ${drive.total}`}
+                ? t('drive.stopped_on_error')
+                : t('drive.driving_step', {
+                    current: Math.min(drive.index + 1, drive.total),
+                    total: drive.total,
+                  })}
           </span>
         </span>
       </div>
@@ -51,12 +55,9 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
       {drive.transport === 'synthetic' && running && (
         <div className="banner warn" role="status">
           <span className="banner-title">
-            <ShieldAlert size={13} /> Using simulated clicks
+            <ShieldAlert size={13} /> {t('drive.simulated_title')}
           </span>
-          <span className="banner-body">
-            Chrome's debugger was not attached, so input is dispatched from the page instead of the
-            browser. Most apps behave the same; a few reject untrusted events.
-          </span>
+          <span className="banner-body">{t('drive.simulated_body')}</span>
         </div>
       )}
 
@@ -73,11 +74,11 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
       {drive.status === 'completed' && (
         <div className="banner ok" role="status">
           <span className="banner-title">
-            <PartyPopper size={13} /> Done
+            <PartyPopper size={13} /> {t('drive.done')}
           </span>
           <span className="banner-actions">
             <button className="btn primary" onClick={() => void sendBg({ type: 'drive-stop' })}>
-              Close
+              {t('drive.close')}
             </button>
           </span>
         </div>
@@ -86,28 +87,29 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
       {drive.error && (
         <div className="banner danger" role="alert">
           <span className="banner-title">
-            <TriangleAlert size={13} /> Step {Math.min(drive.index + 1, drive.total)} failed
+            <TriangleAlert size={13} />{' '}
+            {t('drive.step_failed', { step: Math.min(drive.index + 1, drive.total) })}
           </span>
           <span className="banner-body">{drive.error}</span>
           <span className="banner-actions">
             {drive.awaitingDecision ? (
               <>
                 <button className="btn" onClick={() => void sendBg({ type: 'drive-decide', decision: 'retry' })}>
-                  Retry
+                  {t('drive.retry')}
                 </button>
                 <button className="btn" onClick={() => void sendBg({ type: 'drive-decide', decision: 'skip' })}>
-                  <SkipForward size={13} /> Skip
+                  <SkipForward size={13} /> {t('drive.skip')}
                 </button>
                 <button
                   className="btn danger-outline"
                   onClick={() => void sendBg({ type: 'drive-decide', decision: 'abort' })}
                 >
-                  Abort
+                  {t('drive.abort')}
                 </button>
               </>
             ) : (
               <button className="btn" onClick={() => void sendBg({ type: 'drive-stop' })}>
-                Close
+                {t('drive.close')}
               </button>
             )}
           </span>
@@ -129,7 +131,9 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
               <span className="run-step-title truncate" title={s.title}>
                 {s.title}
               </span>
-              <span className="run-step-status">{status === 'pending' ? '' : status}</span>
+              <span className="run-step-status">
+                {status === 'pending' ? '' : t(`drive.status_${status}`)}
+              </span>
               <Icon size={12} className="run-step-type" />
             </div>
           );
@@ -143,9 +147,9 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
             onClick={() => void sendBg({ type: 'drive-pause', paused: drive.status !== 'paused' })}
           >
             {drive.status === 'paused' ? <Play size={13} /> : <Pause size={13} />}
-            {drive.status === 'paused' ? 'Resume' : 'Pause'}
+            {drive.status === 'paused' ? t('drive.resume') : t('drive.pause')}
           </button>
-          <div className="speed" role="group" aria-label="Playback speed">
+          <div className="speed" role="group" aria-label={t('drive.playback_speed')}>
             {SPEEDS.map((s) => (
               <button
                 key={s}
@@ -159,7 +163,7 @@ export function DrivePanel({ drive }: { drive: DriveState }) {
           </div>
           <span className="spacer" />
           <button className="btn danger-outline" onClick={() => void sendBg({ type: 'drive-stop' })}>
-            <Square size={11} fill="currentColor" /> Stop
+            <Square size={11} fill="currentColor" /> {t('drive.stop')}
           </button>
         </div>
       )}

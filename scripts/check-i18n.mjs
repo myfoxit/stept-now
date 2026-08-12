@@ -30,18 +30,20 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 /**
  * Catalog sets to check.
  *
- * `minCoverage` is the fraction of English keys each locale must define. It is
- * 1 everywhere a catalog is small enough to keep complete, and lower for the
- * dashboard, whose ~1,000 keys are being translated in waves. A gap there is
- * not a bug — `t` falls back to English key by key — but it must be *measured*,
- * because the failure mode of a partially translated app is that nobody notices
- * which parts are missing. Raise the floor as waves land; never lower it.
+ * `minCoverage` is the fraction of English keys each locale must define, and it
+ * is 1 everywhere. That is the whole point of shipping five languages instead of
+ * thirteen: "Stept speaks German" has to mean every German string exists, on
+ * every surface. `t` still falls back to English key by key, so a gap degrades
+ * rather than crashes — but a half-translated screen is precisely the failure
+ * nobody reports, so the build refuses it instead of measuring it. Never lower a
+ * floor to make a wave pass; finish the wave, or drop the locale.
  */
 const CATALOG_SETS = [
   { label: 'backend', dir: join(ROOT, 'backend/app/i18n'), minCoverage: 1 },
   { label: 'widget', dir: join(ROOT, 'widget/public/i18n'), minCoverage: 1 },
-  { label: 'dashboard', dir: join(ROOT, 'frontend/src/i18n/catalogs'), minCoverage: 0.16 },
+  { label: 'dashboard', dir: join(ROOT, 'frontend/src/i18n/catalogs'), minCoverage: 1 },
   { label: 'extension', dir: join(ROOT, 'extension/src/i18n/catalogs'), minCoverage: 1 },
+  { label: 'landing', dir: join(ROOT, 'landing/src/i18n'), minCoverage: 1 },
 ]
 
 /** Files that each keep a copy of the locale registry. */
@@ -49,6 +51,7 @@ const REGISTRY_MIRRORS = [
   join(ROOT, 'widget/src/i18n/locales.ts'),
   join(ROOT, 'frontend/src/i18n/locales.ts'),
   join(ROOT, 'extension/src/i18n/locales.ts'),
+  join(ROOT, 'landing/src/i18n/index.ts'),
 ]
 
 const SOURCE_LOCALE = 'en'
@@ -58,13 +61,6 @@ const failures = []
 const fail = (message) => failures.push(message)
 /** [set, locale, coverage, missingCount] — printed as a table at the end. */
 const coverageRows = []
-
-/** Strip a trailing plural category so `csat.star_one` and `csat.star_few` agree. */
-function baseKey(key) {
-  const at = key.lastIndexOf('_')
-  if (at === -1) return key
-  return PLURAL_CATEGORIES.has(key.slice(at + 1)) ? key.slice(0, at) : key
-}
 
 function placeholders(text) {
   return new Set([...String(text).matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]))
@@ -112,14 +108,36 @@ function checkCatalogSet({ label, dir, minCoverage = 1 }) {
 
   const source = catalogs[SOURCE_LOCALE]
   if (!source) return
-  const sourceBases = new Set(Object.keys(source).map(baseKey))
 
-  // Plural keys are the ones English spells with a category suffix.
+  // Which keys are *really* plurals? English spells a plural with every category
+  // it uses, so a genuine one appears under two or more suffixes (`_one` **and**
+  // `_other`). A lone `_one` is a slug whose English text merely ends in the word
+  // "one" — "Create one" was extracted as `ai.create_one` — and reading that as a
+  // plural makes the guard demand an `_other` twin from every translator, for a
+  // form nothing will ever render.
+  const sourceCategories = new Map()
+  for (const key of Object.keys(source)) {
+    const at = key.lastIndexOf('_')
+    if (at === -1) continue
+    const category = key.slice(at + 1)
+    if (!PLURAL_CATEGORIES.has(category)) continue
+    const base = key.slice(0, at)
+    if (!sourceCategories.has(base)) sourceCategories.set(base, new Set())
+    sourceCategories.get(base).add(category)
+  }
   const pluralBases = new Set(
-    Object.keys(source)
-      .filter((k) => PLURAL_CATEGORIES.has(k.slice(k.lastIndexOf('_') + 1)))
-      .map(baseKey),
+    [...sourceCategories].filter(([, cats]) => cats.size >= 2).map(([base]) => base),
   )
+
+  /** Collapse a plural sibling onto its base; leave every other key untouched. */
+  const baseKey = (key) => {
+    const at = key.lastIndexOf('_')
+    if (at === -1) return key
+    const base = key.slice(0, at)
+    return PLURAL_CATEGORIES.has(key.slice(at + 1)) && pluralBases.has(base) ? base : key
+  }
+
+  const sourceBases = new Set(Object.keys(source).map(baseKey))
 
   for (const locale of locales) {
     const catalog = catalogs[locale]
@@ -192,9 +210,16 @@ function checkRegistryMirrors() {
   const present = REGISTRY_MIRRORS.filter(existsSync)
   if (present.length < 2) return
 
+  // Two shapes declare the same thing: the three app runtimes list
+  // `{ code: 'de', … }` records, the landing keeps a bare `locales = ['en', …]`
+  // tuple. Both have to be readable here — a landing that quietly disagrees is a
+  // locale the product offers and the marketing site has no page for.
   const extract = (path) => {
     const text = readFileSync(path, 'utf8')
-    return [...text.matchAll(/code:\s*'([^']+)'/g)].map((m) => m[1])
+    const records = [...text.matchAll(/code:\s*'([^']+)'/g)].map((m) => m[1])
+    if (records.length > 0) return records
+    const tuple = text.match(/locales\s*=\s*\[([^\]]*)\]/)
+    return tuple ? [...tuple[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : []
   }
 
   const [first, ...rest] = present
@@ -213,11 +238,76 @@ function checkRegistryMirrors() {
     }
   }
   console.log(`  registry: ${present.length} mirrors agree on ${expected.length} locales`)
+  return expected
+}
+
+/**
+ * The extension's *manifest* catalogs — a different mechanism from
+ * `extension/src/i18n/`, and a harsher one.
+ *
+ * Chrome reads the name, description, toolbar tooltip and shortcut label before
+ * any of our code runs, resolving `__MSG_key__` against
+ * `_locales/<ui language>/messages.json`. If a referenced key is missing from the
+ * `default_locale` catalog, Chrome does not fall back or render the key — it
+ * refuses to load the extension. So this is checked as a build failure, not a
+ * coverage percentage.
+ */
+function checkExtensionManifestLocales(shipped) {
+  const config = join(ROOT, 'extension/wxt.config.ts')
+  const localesDir = join(ROOT, 'extension/src/public/_locales')
+  if (!existsSync(config) || !existsSync(localesDir)) return
+
+  const text = readFileSync(config, 'utf8')
+  // Only quoted placeholders count. Matching bare `__MSG_x__` would also pick up
+  // the ones named in prose in this file's own comments.
+  const referenced = new Set([...text.matchAll(/['"]__MSG_(\w+)__['"]/g)].map((m) => m[1]))
+  if (referenced.size === 0) return
+
+  const defaultLocale = text.match(/default_locale:\s*'([^']+)'/)?.[1]
+  if (!defaultLocale) {
+    fail('extension manifest: uses __MSG_ placeholders but sets no default_locale')
+    return
+  }
+
+  // Chrome spells regional locales with an underscore (`pt_BR`), unlike BCP-47.
+  const dirFor = (locale) => locale.replace(/-/g, '_')
+  const expected = shipped?.length ? shipped : [defaultLocale]
+
+  for (const locale of expected) {
+    const path = join(localesDir, dirFor(locale), 'messages.json')
+    if (!existsSync(path)) {
+      fail(`extension manifest: no _locales/${dirFor(locale)}/messages.json for shipped locale ${locale}`)
+      continue
+    }
+    let messages
+    try {
+      messages = JSON.parse(readFileSync(path, 'utf8'))
+    } catch (err) {
+      fail(`extension manifest/${locale}: ${err.message}`)
+      continue
+    }
+    for (const key of referenced) {
+      const entry = messages[key]
+      if (entry === undefined) {
+        fail(`extension manifest/${locale}: missing "${key}" (the manifest references __MSG_${key}__)`)
+      } else if (typeof entry?.message !== 'string' || entry.message.trim() === '') {
+        fail(`extension manifest/${locale}: "${key}" has no message string`)
+      }
+    }
+    for (const key of Object.keys(messages)) {
+      if (!referenced.has(key)) {
+        fail(`extension manifest/${locale}: unused key "${key}" (nothing references __MSG_${key}__)`)
+      }
+    }
+  }
+  console.log(
+    `  extension manifest: ${expected.length} locales define ${referenced.size} __MSG_ keys`,
+  )
 }
 
 console.log('Checking i18n catalogs…')
 for (const set of CATALOG_SETS) checkCatalogSet(set)
-checkRegistryMirrors()
+checkExtensionManifestLocales(checkRegistryMirrors())
 
 if (coverageRows.length > 0) {
   console.log('\nTranslation coverage')

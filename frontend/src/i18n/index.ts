@@ -15,9 +15,9 @@
  * dependency also keeps the repo's "no new dependencies" rule intact.
  *
  * English is bundled so the app renders instantly and a failed chunk load
- * degrades to English rather than raw keys. The other twelve are dynamic
- * imports, which Vite code-splits into their own chunks — a German user
- * downloads German, nobody downloads Japanese.
+ * degrades to English rather than raw keys. The other four are dynamic imports,
+ * which Vite code-splits into their own chunks — a German user downloads German
+ * and none of the rest.
  */
 
 import en from './catalogs/en.json'

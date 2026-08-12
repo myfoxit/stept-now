@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { KeyRound, LogIn, Route, ShieldCheck, Sparkles } from 'lucide-react';
+import { t } from '../../../i18n';
 import type { SignInResult, SimpleResult } from '../../../messages';
 import type { AuthState, WorkspaceChoice } from '../../../types';
 import { Logo, sendBg } from '../lib';
@@ -27,7 +28,7 @@ export function Login({ auth }: { auth: AuthState }) {
     setBusy(false);
     setPassword(''); // never keep it in component state longer than the request
     if (!r?.ok) {
-      setError(r?.error ?? 'Sign-in failed.');
+      setError(r?.error ?? t('login.signin_failed'));
       return;
     }
     if (r.workspaces?.length) setChoices(r.workspaces);
@@ -41,23 +42,23 @@ export function Login({ auth }: { auth: AuthState }) {
         {/* The panel's front door — the one screen here where the logo is the
             subject, so it gets the split rather than the chrome mono. */}
         <Logo size={46} variant="split" />
-        <h1 className="login-title">Stept Recorder</h1>
-        <p className="login-sub">Sign in to record product tours straight from any page.</p>
+        <h1 className="login-title">{t('login.title')}</h1>
+        <p className="login-sub">{t('login.subtitle')}</p>
       </div>
       <ul className="login-points">
         <li>
-          <Sparkles size={13} /> Record once — get a publishable tour with screenshots
+          <Sparkles size={13} /> {t('login.point_record')}
         </li>
         <li>
-          <Route size={13} /> Replay it as a guided walkthrough, or let Stept drive
+          <Route size={13} /> {t('login.point_replay')}
         </li>
         <li>
-          <ShieldCheck size={13} /> Passwords and API keys are masked before capture
+          <ShieldCheck size={13} /> {t('login.point_masked')}
         </li>
       </ul>
 
       <label className="fld">
-        <span>Stept URL</span>
+        <span>{t('login.stept_url')}</span>
         <input
           value={apiBase}
           onChange={(e) => setApiBase(e.target.value)}
@@ -66,7 +67,7 @@ export function Login({ auth }: { auth: AuthState }) {
         />
       </label>
       <label className="fld">
-        <span>Email</span>
+        <span>{t('login.email')}</span>
         <input
           type="email"
           value={email}
@@ -76,7 +77,7 @@ export function Login({ auth }: { auth: AuthState }) {
         />
       </label>
       <label className="fld">
-        <span>Password</span>
+        <span>{t('login.password')}</span>
         <input
           type="password"
           value={password}
@@ -99,11 +100,9 @@ export function Login({ auth }: { auth: AuthState }) {
         disabled={busy || !apiBase.trim() || !email.trim() || !password}
         onClick={() => void submit()}
       >
-        <LogIn size={14} /> {busy ? 'Signing in…' : 'Sign in'}
+        <LogIn size={14} /> {busy ? t('login.signing_in') : t('login.sign_in')}
       </button>
-      <p className="login-consent">
-        Only a workspace-scoped token is stored. Your password is never saved.
-      </p>
+      <p className="login-consent">{t('login.consent')}</p>
 
       <TokenFallback apiBase={apiBase} />
     </div>
@@ -117,8 +116,8 @@ function WorkspaceChooser({ choices, onBack }: { choices: WorkspaceChoice[]; onB
     <div className="login">
       <div className="login-hero">
         <Logo size={40} />
-        <h1 className="login-title">Choose a workspace</h1>
-        <p className="login-sub">Tours you record are saved here.</p>
+        <h1 className="login-title">{t('login.choose_workspace')}</h1>
+        <p className="login-sub">{t('login.tours_saved_here')}</p>
       </div>
       {error && (
         <div className="banner danger" role="alert">
@@ -136,16 +135,16 @@ function WorkspaceChooser({ choices, onBack }: { choices: WorkspaceChoice[]; onB
               setError(null);
               const r = await sendBg<SimpleResult>({ type: 'choose-workspace', workspaceId: w.id });
               setBusy(null);
-              if (!r?.ok) setError(r?.error ?? 'Could not connect that workspace.');
+              if (!r?.ok) setError(r?.error ?? t('login.workspace_connect_failed'));
             }}
           >
             <span className="ws-name">{w.name}</span>
-            <span className="ws-role">{busy === w.id ? 'Connecting…' : w.role}</span>
+            <span className="ws-role">{busy === w.id ? t('login.connecting') : w.role}</span>
           </button>
         ))}
       </div>
       <button className="btn ghost" onClick={onBack}>
-        Back
+        {t('login.back')}
       </button>
     </div>
   );
@@ -160,11 +159,11 @@ function TokenFallback({ apiBase }: { apiBase: string }) {
   return (
     <details className="adv">
       <summary>
-        <KeyRound size={12} /> Advanced: paste a token
+        <KeyRound size={12} /> {t('login.advanced_token')}
       </summary>
       <div className="login-adv">
         <label className="fld">
-          <span>Extension or recorder token</span>
+          <span>{t('login.token_label')}</span>
           <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="eyJhbGciOi…" />
         </label>
         {error && (
@@ -180,10 +179,10 @@ function TokenFallback({ apiBase }: { apiBase: string }) {
             setError(null);
             const r = await sendBg<SimpleResult>({ type: 'adopt-token', apiBase, token: token.trim() });
             setBusy(false);
-            if (!r?.ok) setError(r?.error ?? 'That token did not work.');
+            if (!r?.ok) setError(r?.error ?? t('login.token_invalid'));
           }}
         >
-          {busy ? 'Checking…' : 'Use token'}
+          {busy ? t('login.checking') : t('login.use_token')}
         </button>
       </div>
     </details>

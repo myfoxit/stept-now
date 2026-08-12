@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { BgToDriver, DriverResolveResult } from '../messages';
 import type { DriveStepStatus, TourStep } from '../types';
 import { wildcardMatch } from '../url-pattern';
@@ -192,7 +193,7 @@ export class DriveRunner {
   private async runInformational(step: TourStep): Promise<string | null> {
     await toDriver(this.tabId, {
       type: 'driver-banner',
-      text: step.title || 'Stept is driving this page',
+      text: step.title || t('runner.driving'),
       ms: 0,
     });
     // an authored `advance: {on:"delay"}` is a deliberate dwell — honour it
@@ -200,7 +201,7 @@ export class DriveRunner {
     const dwell = step.advance.on === 'delay' ? (step.advance.delay_ms ?? TOOLTIP_DWELL_MS) : TOOLTIP_DWELL_MS;
     if (step.selector || step.target) {
       const hit = await this.locateStep(step);
-      if (!hit) return `Could not find the element for "${step.title}" on this page.`;
+      if (!hit) return t('runner.element_not_found', { title: step.title });
       await toDriver(this.tabId, { type: 'driver-highlight', step, ms: dwell / this.speed });
     }
     await this.pace(dwell);
@@ -209,11 +210,15 @@ export class DriveRunner {
 
   private async runAction(step: TourStep): Promise<string | null> {
     const action = step.action;
-    if (!action) return 'This action step has no action configured.';
+    if (!action) return t('runner.no_action');
 
     if (action.kind === 'navigate') {
-      if (!action.url) return 'This navigate step has no URL.';
-      await toDriver(this.tabId, { type: 'driver-banner', text: `Opening ${action.url}`, ms: 0 });
+      if (!action.url) return t('runner.no_url');
+      await toDriver(this.tabId, {
+        type: 'driver-banner',
+        text: t('runner.opening', { url: action.url }),
+        ms: 0,
+      });
       await chrome.tabs.update(this.tabId, { url: action.url }).catch(() => {});
       await sleep(NAV_SETTLE_MS);
       await toDriver(this.tabId, {
@@ -226,11 +231,11 @@ export class DriveRunner {
 
     await toDriver(this.tabId, {
       type: 'driver-banner',
-      text: step.title || (action.kind === 'fill' ? 'Filling a field' : 'Clicking'),
+      text: step.title || (action.kind === 'fill' ? t('runner.filling') : t('runner.clicking')),
       ms: 0,
     });
     const hit = await this.locateStep(step);
-    if (!hit) return `Could not find the element for "${step.title}" on this page.`;
+    if (!hit) return t('runner.element_not_found', { title: step.title });
     await toDriver(this.tabId, { type: 'driver-highlight', step, ms: 600 });
     await this.pace(320);
 
@@ -250,7 +255,7 @@ export class DriveRunner {
         kind: action.kind,
         value: action.value,
       });
-      if (!res?.found) return `Could not act on "${step.title}".`;
+      if (!res?.found) return t('runner.act_failed', { title: step.title });
     }
 
     await toDriver(this.tabId, {
@@ -266,7 +271,7 @@ export class DriveRunner {
     const spec = step.wait;
     if (!spec) return null;
     const timeout = spec.timeout_ms || 10_000;
-    await toDriver(this.tabId, { type: 'driver-banner', text: step.title || 'Waiting…', ms: 0 });
+    await toDriver(this.tabId, { type: 'driver-banner', text: step.title || t('runner.waiting'), ms: 0 });
     if (spec.for === 'url') {
       const pattern = spec.url_pattern ?? '';
       const deadline = Date.now() + timeout;
@@ -274,12 +279,14 @@ export class DriveRunner {
         if (this.stopped) return null;
         const tab = await chrome.tabs.get(this.tabId).catch(() => null);
         if (tab?.url && (!pattern || wildcardMatch(pattern, tab.url))) return null;
-        if (Date.now() >= deadline) return `The page never reached ${pattern || 'the expected URL'}.`;
+        if (Date.now() >= deadline) {
+          return t('runner.never_reached', { target: pattern || t('runner.expected_url') });
+        }
         await sleep(300);
       }
     }
     const res = await toDriver(this.tabId, { type: 'driver-wait-element', step, timeoutMs: timeout });
-    return res?.found ? null : `The element this step waits for never appeared.`;
+    return res?.found ? null : t('runner.element_never_appeared');
   }
 
   // ---- shared plumbing ---------------------------------------------------

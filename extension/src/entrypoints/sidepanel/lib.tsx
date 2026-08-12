@@ -12,6 +12,7 @@ import {
   Type as TypeIcon,
   Upload,
 } from 'lucide-react';
+import { t } from '../../i18n';
 import type { PanelToBg } from '../../messages';
 import type { TourStepType } from '../../types';
 
@@ -103,10 +104,10 @@ export function timeAgo(iso: string | null | undefined): string {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return '';
   const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 60) return t('time.just_now');
+  if (s < 3600) return t('time.minutes_ago', { count: Math.floor(s / 60) });
+  if (s < 86400) return t('time.hours_ago', { count: Math.floor(s / 3600) });
+  return t('time.days_ago', { count: Math.floor(s / 86400) });
 }
 
 /** Copy to clipboard with a transient "Copied" state for the caller's button. */

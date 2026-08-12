@@ -14,7 +14,7 @@ between surfaces without rewriting it:
   browser surfaces get natively from ``Intl.PluralRules``.
 
 Python has no ``Intl``, so `plural_category` implements the CLDR rules for the
-thirteen locales we ship. That is a bounded, checkable amount of code; a general
+five locales we ship. That is a bounded, checkable amount of code; a general
 CLDR engine would not be. Adding a locale means adding its rule here *and* to
 the ``PLURAL_CATEGORIES`` test fixture, which is deliberate friction — shipping
 a locale whose plurals silently fall back to English is worse than not shipping
@@ -64,15 +64,7 @@ LOCALES: dict[str, LocaleInfo] = {
     "de": LocaleInfo("de", "German", "Deutsch"),
     "fr": LocaleInfo("fr", "French", "Français"),
     "es": LocaleInfo("es", "Spanish", "Español"),
-    "pt-BR": LocaleInfo("pt-BR", "Portuguese (Brazil)", "Português (Brasil)"),
     "it": LocaleInfo("it", "Italian", "Italiano"),
-    "nl": LocaleInfo("nl", "Dutch", "Nederlands"),
-    "pl": LocaleInfo("pl", "Polish", "Polski"),
-    "tr": LocaleInfo("tr", "Turkish", "Türkçe"),
-    "ja": LocaleInfo("ja", "Japanese", "日本語"),
-    "ko": LocaleInfo("ko", "Korean", "한국어"),
-    "zh-CN": LocaleInfo("zh-CN", "Chinese (Simplified)", "简体中文"),
-    "ar": LocaleInfo("ar", "Arabic", "العربية", direction="rtl"),
 }
 
 SUPPORTED_LOCALES: tuple[str, ...] = tuple(LOCALES)
@@ -81,21 +73,82 @@ SUPPORTED_LOCALES: tuple[str, ...] = tuple(LOCALES)
 #: Region-stripping (``de-AT`` → ``de``) is handled generically in
 #: `normalize_locale`; this table is only for the cases where the *base*
 #: language alone would resolve wrongly or not at all.
-_ALIASES: dict[str, str] = {
-    "pt": "pt-BR",  # we ship only Brazilian Portuguese; pt-PT speakers read it fine
-    "zh": "zh-CN",
-    "zh-hans": "zh-CN",
-    "zh-sg": "zh-CN",
-    "zh-hant": "zh-CN",  # not ideal for tw/hk, but far better than English
-    "zh-tw": "zh-CN",
-    "zh-hk": "zh-CN",
-    "he": "ar",  # neither language nor script matches; see note below
-    "iw": "ar",
+_ALIASES: dict[str, str] = {}
+# Empty since the shipped set shrank to five base-language locales; the
+# mechanism stays for the day a regional locale (pt-BR, zh-CN, …) returns.
+
+#: English names for languages the *agent* can be told to reply in.
+#:
+#: Deliberately far wider than `LOCALES`, because those are two different
+#: questions. `LOCALES` answers "which languages is our interface translated
+#: into"; `agent.settings.reply_language` answers "which language should the AI
+#: write in". A workspace whose customers are Japanese can want Japanese replies
+#: while its own agents read the English dashboard — resolving that setting
+#: through `normalize_locale` tied the two together and silently discarded any
+#: configured language we happened to have no catalog for.
+#:
+#: Same doctrine as `app.services.language`, which recognises more languages than
+#: it can render: naming is cheap, rendering is not.
+_REPLY_LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "pt-br": "Portuguese (Brazil)",
+    "nl": "Dutch",
+    "pl": "Polish",
+    "tr": "Turkish",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese",
+    "zh-cn": "Simplified Chinese",
+    "zh-hans": "Simplified Chinese",
+    "zh-tw": "Traditional Chinese",
+    "zh-hant": "Traditional Chinese",
+    "ar": "Arabic",
+    "he": "Hebrew",
+    "ru": "Russian",
+    "uk": "Ukrainian",
+    "sv": "Swedish",
+    "da": "Danish",
+    "no": "Norwegian",
+    "nb": "Norwegian Bokmål",
+    "fi": "Finnish",
+    "is": "Icelandic",
+    "cs": "Czech",
+    "sk": "Slovak",
+    "hu": "Hungarian",
+    "ro": "Romanian",
+    "bg": "Bulgarian",
+    "el": "Greek",
+    "hr": "Croatian",
+    "sr": "Serbian",
+    "sl": "Slovenian",
+    "et": "Estonian",
+    "lv": "Latvian",
+    "lt": "Lithuanian",
+    "ca": "Catalan",
+    "gl": "Galician",
+    "eu": "Basque",
+    "ga": "Irish",
+    "id": "Indonesian",
+    "ms": "Malay",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "tl": "Tagalog",
+    "fil": "Filipino",
+    "hi": "Hindi",
+    "bn": "Bengali",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "mr": "Marathi",
+    "ur": "Urdu",
+    "fa": "Persian",
+    "sw": "Swahili",
+    "af": "Afrikaans",
 }
-# NOTE: the `he`/`iw` entries exist only so Hebrew browsers get an RTL layout
-# instead of an LTR English one. Hebrew is not a shipped locale and the copy
-# will render in Arabic, which is wrong. Remove these two lines the moment a
-# real `he` catalog lands.
 
 # Subtags are 1–8 chars, not 2–8: BCP-47 singletons (`-x-` for private use,
 # `-u-` for Unicode extensions) are a single character, and `de-DE-u-co-phonebk`
@@ -133,6 +186,34 @@ def normalize_locale(raw: str | None) -> str | None:
                 return code
         if candidate in _ALIASES:
             return _ALIASES[candidate]
+    return None
+
+
+def reply_language_name(raw: str | None) -> str | None:
+    """English name for a configured agent reply language, or `None`.
+
+    Unlike `normalize_locale` this is **not** restricted to the shipped locales:
+    what language the AI writes is independent of what languages the interface
+    is translated into. A regional tag keeps its own name where we have one
+    (``pt-BR`` → Portuguese (Brazil)) and otherwise falls back to its base
+    language (``de-AT`` → German).
+
+    `None` means "mirror the customer instead". That is the right answer for a
+    tag we cannot name: instructing a model to "always reply in xx" is worse
+    than letting it follow the language the customer is already writing in.
+    """
+    if not raw:
+        return None
+    tag = raw.strip().replace("_", "-")
+    if not tag or not _TAG_RE.match(tag):
+        return None
+
+    parts = tag.lower().split("-")
+    while parts:
+        name = _REPLY_LANGUAGE_NAMES.get("-".join(parts))
+        if name is not None:
+            return name
+        parts.pop()
     return None
 
 
@@ -219,7 +300,7 @@ def direction(locale: str) -> str:
 def plural_category(locale: str, count: float) -> str:
     """CLDR plural category for `count` in `locale`.
 
-    Implements only the thirteen shipped locales; anything else is treated as
+    Implements only the five shipped locales; anything else is treated as
     English. Counts are compared as integers where the rule is integer-only,
     which is what every call site here passes.
     """
@@ -229,40 +310,13 @@ def plural_category(locale: str, count: float) -> str:
     is_int = n == i
 
     match code:
-        case "ja" | "ko" | "zh-CN":
-            # No grammatical plural: one form covers every count.
-            return "other"
         case "fr":
             # French treats 0 and 1 alike ("0 message", "1 message").
             return "one" if i in (0, 1) else "other"
-        case "pt-BR":
-            return "one" if i in (0, 1) else "other"
-        case "pl":
-            if is_int and i == 1:
-                return "one"
-            if is_int and i % 10 in (2, 3, 4) and i % 100 not in (12, 13, 14):
-                return "few"
-            if is_int:
-                return "many"
-            return "other"
-        case "ar":
-            if not is_int:
-                return "other"
-            if i == 0:
-                return "zero"
-            if i == 1:
-                return "one"
-            if i == 2:
-                return "two"
-            if 3 <= i % 100 <= 10:
-                return "few"
-            if 11 <= i % 100 <= 99:
-                return "many"
-            return "other"
-        case "es" | "tr":
+        case "es":
             return "one" if n == 1 else "other"
         case _:
-            # en, de, nl, it: `one` only for the integer 1.
+            # en, de, it: `one` only for the integer 1.
             return "one" if is_int and i == 1 else "other"
 
 

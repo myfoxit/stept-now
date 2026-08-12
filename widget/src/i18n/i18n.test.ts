@@ -26,18 +26,19 @@ describe('normalizeLocale', () => {
     ['EN', 'en'],
     ['de-DE', 'de'],
     ['de_AT', 'de'],
-    ['pt', 'pt-BR'],
-    ['pt-PT', 'pt-BR'],
-    ['zh', 'zh-CN'],
-    ['zh-Hans', 'zh-CN'],
-    ['ar-EG', 'ar'],
+    ['fr-CA', 'fr'],
+    ['es-419', 'es'],
+    ['it-CH', 'it'],
   ])('canonicalises %s → %s', (raw, expected) => {
     expect(normalizeLocale(raw)).toBe(expected)
   })
 
-  it.each([null, undefined, '', '   ', 'klingon', 'xx', '!!', '1'])('rejects %s', (raw) => {
-    expect(normalizeLocale(raw as string | null)).toBeNull()
-  })
+  it.each([null, undefined, '', '   ', 'klingon', 'xx', '!!', '1', 'pt', 'ja', 'ar'])(
+    'rejects %s',
+    (raw) => {
+      expect(normalizeLocale(raw as string | null)).toBeNull()
+    },
+  )
 })
 
 describe('t', () => {
@@ -59,7 +60,7 @@ describe('t', () => {
   })
 
   it('falls back to English rather than showing a raw key', () => {
-    setLocale('ja')
+    setLocale('it')
     // Every shipped locale resolves every key today; assert the mechanism by
     // checking a locale never renders the key itself.
     for (const key of ['header.close', 'composer.send', 'csat.submit']) {
@@ -73,27 +74,22 @@ describe('t', () => {
       expect(t('csat.star', { count: 3 })).toBe('3 stars')
     })
 
-    it('Polish: one / few / many are three different words', () => {
-      setLocale('pl')
-      expect(t('csat.star', { count: 1 })).toBe('1 gwiazdka')
-      expect(t('csat.star', { count: 3 })).toBe('3 gwiazdki')
-      expect(t('csat.star', { count: 5 })).toBe('5 gwiazdek')
-      // 12–14 are `many` even though they end in 2–4 — the classic Polish trap.
-      expect(t('csat.star', { count: 12 })).toBe('12 gwiazdek')
-      expect(t('csat.star', { count: 22 })).toBe('22 gwiazdki')
+    it('French: 0 takes the singular form, unlike English', () => {
+      // The case a naive `n === 1 ? a : b` gets wrong: CLDR French groups 0
+      // with 1 ("0 étoile"), English does not ("0 stars").
+      setLocale('fr')
+      expect(t('csat.star', { count: 0 })).toBe('0 étoile')
+      expect(t('csat.star', { count: 1 })).toBe('1 étoile')
+      expect(t('csat.star', { count: 3 })).toBe('3 étoiles')
     })
 
-    it('Arabic: uses the zero/one/two forms', () => {
-      setLocale('ar')
-      expect(t('csat.star', { count: 0 })).toBe('لا نجوم')
-      expect(t('csat.star', { count: 1 })).toBe('نجمة واحدة')
-      expect(t('csat.star', { count: 2 })).toBe('نجمتان')
-    })
-
-    it('Japanese: one form for every count', () => {
-      setLocale('ja')
-      expect(t('csat.star', { count: 1 })).toBe('星 1 つ')
-      expect(t('csat.star', { count: 5 })).toBe('星 5 つ')
+    it('German and Italian: one is exactly 1', () => {
+      setLocale('de')
+      expect(t('csat.star', { count: 1 })).toBe('1 Stern')
+      expect(t('csat.star', { count: 5 })).toBe('5 Sterne')
+      setLocale('it')
+      expect(t('csat.star', { count: 1 })).toBe('1 stella')
+      expect(t('csat.star', { count: 2 })).toBe('2 stelle')
     })
   })
 })
@@ -105,13 +101,13 @@ describe('tParts', () => {
     expect(after).toBe('')
   })
 
-  it('lets a translation put the emphasised value first', () => {
-    // Turkish phrases it as "Asistan şunu yapmak istiyor: <action>", Japanese
-    // trails the verb — both must survive without the component knowing.
-    setLocale('ja')
+  it('lets a translation move the value into the middle of the sentence', () => {
+    // German trails its verb ("… auf {{page}} arbeiten") — the placeholder
+    // lands mid-sentence, which must survive without the component knowing.
+    setLocale('de')
     const [before, after] = tParts('page_assist.allow', 'page')
-    expect(before).toBe('')
-    expect(after).toBe(' でアシスタントに操作を任せる')
+    expect(before).toBe('Der Assistent darf für mich auf ')
+    expect(after).toBe(' arbeiten')
   })
 
   it('falls back to the whole string when the placeholder is absent', () => {
@@ -122,16 +118,14 @@ describe('tParts', () => {
 })
 
 describe('direction', () => {
-  it('is rtl only for Arabic', () => {
-    setLocale('ar')
-    expect(dir()).toBe('rtl')
+  it('is ltr for every shipped locale, and for junk', () => {
+    // No RTL locale ships today; the mechanism stays for the day one returns.
+    for (const { code } of LOCALES) {
+      expect(localeDirection(code)).toBe('ltr')
+    }
+    expect(localeDirection('klingon')).toBe('ltr')
     setLocale('de')
     expect(dir()).toBe('ltr')
-  })
-
-  it('resolves regional tags before deciding', () => {
-    expect(localeDirection('ar-EG')).toBe('rtl')
-    expect(localeDirection('klingon')).toBe('ltr')
   })
 })
 
@@ -155,15 +149,15 @@ describe('setLocale', () => {
 describe('resolveLocale', () => {
   it('prefers what the visitor writes over everything else', () => {
     // The whole point: an en-US browser on a German site, but this person
-    // types Turkish. They get Turkish.
+    // types Italian. They get Italian.
     expect(
       resolveLocale({
-        learned: 'tr',
+        learned: 'it',
         explicit: 'de',
         browser: ['en-US'],
         workspaceDefault: 'de',
       }),
-    ).toBe('tr')
+    ).toBe('it')
   })
 
   it('honours the host’s setting when there is nothing learned yet', () => {
@@ -177,15 +171,15 @@ describe('resolveLocale', () => {
   })
 
   it('skips browser languages we do not ship', () => {
-    expect(resolveLocale({ browser: ['is-IS', 'sw', 'nl-BE'] })).toBe('nl')
+    expect(resolveLocale({ browser: ['is-IS', 'sw', 'it-CH'] })).toBe('it')
   })
 
   it('lets a host lock the language against the visitor’s evidence', () => {
-    expect(resolveLocale({ explicit: 'de', learned: 'tr', lockLocale: true })).toBe('de')
+    expect(resolveLocale({ explicit: 'de', learned: 'es', lockLocale: true })).toBe('de')
   })
 
   it('ignores lockLocale when the locked locale is not one we ship', () => {
-    expect(resolveLocale({ explicit: 'klingon', learned: 'tr', lockLocale: true })).toBe('tr')
+    expect(resolveLocale({ explicit: 'klingon', learned: 'es', lockLocale: true })).toBe('es')
   })
 })
 
@@ -241,8 +235,8 @@ describe('lazy catalog loading', () => {
     const i18n = await freshModule()
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
 
-    await i18n.ensureCatalog('ja', 'https://api.example.com')
-    i18n.setLocale('ja')
+    await i18n.ensureCatalog('it', 'https://api.example.com')
+    i18n.setLocale('it')
     expect(i18n.t('composer.send')).toBe('Send message')
   })
 

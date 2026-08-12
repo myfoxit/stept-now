@@ -2,4 +2,12 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://stepped.ai/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://stepped.ai/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://stepped.ai/de/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://stepped.ai/de/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://stepped.ai/fr/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://stepped.ai/fr/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://stepped.ai/es/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://stepped.ai/es/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://stepped.ai/it/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://stepped.ai/it/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
 </urlset>
