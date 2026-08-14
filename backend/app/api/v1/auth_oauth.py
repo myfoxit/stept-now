@@ -5,18 +5,19 @@ same ``stept_refresh`` cookie POST /auth/login does (reusing that route's own
 helper) and 302s into the SPA, which bootstraps through its normal refresh
 flow — no token ever rides in a URL. Mid-flight failures 302 back to
 ``{app_base_url}/login?error=<code>`` (codes: oauth_denied, email_unverified,
-oauth_failed) — never a raw error page in the user's face.
+oauth_failed, signup_disabled) — never a raw error page in the user's face.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 from app.api.v1.auth import _client_meta, _set_refresh_cookie
 from app.core.config import get_settings
 from app.core.deps import Db
-from app.core.errors import AppError, BadRequestError
+from app.core.errors import AppError, BadRequestError, ForbiddenError
 from app.core.logging import log
 from app.core.ratelimit import RateLimit
 from app.services import auth as auth_service
@@ -47,10 +48,23 @@ def _set_nonce_cookie(response: RedirectResponse, nonce: str) -> None:
     )
 
 
+class SocialLoginProvidersOut(BaseModel):
+    """Login-page bootstrap. Lives here rather than app/schemas/auth.py because
+    it belongs to this router alone — nothing else renders login buttons."""
+
+    providers: list[str]
+    #: False ⇒ the instance is invite-only; the SPA should hide the signup form.
+    allow_signup: bool
+
+
 @router.get("/oauth/providers")
-async def social_login_providers() -> dict[str, list[str]]:
-    """Public: which social-login buttons the SPA should render."""
-    return {"providers": oauth.configured_providers()}
+async def social_login_providers() -> SocialLoginProvidersOut:
+    """Public: which social-login buttons the SPA should render, and whether
+    open registration is offered at all (``STEPT_ALLOW_SIGNUP``)."""
+    return SocialLoginProvidersOut(
+        providers=oauth.configured_providers(),
+        allow_signup=get_settings().allow_signup,
+    )
 
 
 @router.get(
@@ -125,6 +139,15 @@ async def social_login_callback(
             spec, credential, code=code, redirect_uri=oauth.redirect_uri_for(provider)
         )
         identity = await oauth.fetch_identity(spec, token_data)
+        # Invite-only instances: refuse a login that would CREATE a user
+        # (existing accounts, email links, and invited emails all pass).
+        await auth_service.ensure_oauth_signup_allowed(
+            session,
+            provider=identity.provider,
+            provider_user_id=identity.provider_user_id,
+            email=identity.email,
+            email_verified=identity.email_verified,
+        )
         user = await oauth.resolve_user(session, identity)
         invite_token = claims.get("invite")
         if invite_token:
@@ -134,6 +157,13 @@ async def social_login_callback(
             except AppError as exc:
                 logger.warning("invite accept during %s login failed: %s", provider, exc.message)
         refresh = await auth_service.issue_refresh_token(session, user, **_client_meta(request))
+    except ForbiddenError:
+        # Signup gate (uninvited first login on a closed instance). Same
+        # redirect discipline as every other failure — never a JSON 403 in the
+        # middle of a browser flow.
+        await session.rollback()
+        logger.info("%s login refused: signup is disabled and the account is uninvited", provider)
+        return _login_error_redirect("signup_disabled")
     except oauth.SocialLoginError as exc:
         await session.rollback()
         logger.info("%s login failed: %s", provider, exc.message)

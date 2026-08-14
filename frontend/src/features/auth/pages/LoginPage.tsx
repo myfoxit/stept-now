@@ -33,6 +33,7 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
   oauth_denied: 'auth.sign_in_was_cancelled_at_the',
   email_unverified: 'auth.your_email_address_isn_t_verified',
   oauth_failed: 'auth.social_sign_in_didn_t_complete',
+  signup_disabled: 'auth.signup_is_disabled_on_this',
 }
 
 export function Component() {

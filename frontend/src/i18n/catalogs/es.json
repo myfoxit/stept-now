@@ -151,6 +151,7 @@
   "auth.sign_up": "Registrarse",
   "auth.sign_up_join": "Registrarse y unirse",
   "auth.sign_up_to_join_your_team": "Regístrate para unirte a tu equipo",
+  "auth.signup_is_disabled_on_this": "El registro está desactivado en esta instancia; pídele una invitación a un administrador.",
   "auth.signup_failed": "No se pudo crear la cuenta",
   "auth.social_sign_in_didn_t_complete": "No se pudo completar el inicio de sesión con el proveedor. Inténtalo de nuevo o inicia sesión con tu contraseña.",
   "auth.something_went_wrong_try_again": "Algo salió mal: inténtalo de nuevo",

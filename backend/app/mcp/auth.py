@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import ratelimit
+from app.core.config import get_settings
 from app.core.db import get_session_factory, utcnow
 from app.core.events import Actor
 from app.core.permissions import Perm, scopes_to_permissions
@@ -35,6 +37,15 @@ from app.models.api_key import ApiKey
 
 #: stdio transport has no HTTP headers — the key comes from the environment.
 STDIO_KEY_ENV = "STEPT_API_KEY"
+
+#: JSON-RPC error code for a rate-limited MCP request — server-error range,
+#: next to the agent endpoint's tool codes (-32010…-32012).
+RATE_LIMITED_RPC_CODE = -32013
+
+RATE_LIMITED_MESSAGE = (
+    "Rate limit exceeded for this API key — slow down and retry shortly. "
+    "Operators tune the ceiling with STEPT_MCP_RATE_LIMIT_PER_MINUTE."
+)
 
 #: Set by ``app/mcp_stdio.py`` at startup. The env-var key is only honored when
 #: this process IS the stdio bridge (see `request_raw_key`).
@@ -139,6 +150,29 @@ def request_raw_key() -> str | None:
 async def resolve_request_key(session: AsyncSession) -> ResolvedMcpKey | None:
     """Resolve the current MCP request's key for the workspace surface."""
     return await resolve_key(session, request_raw_key())
+
+
+async def consume_rate_limit(raw_key: str | None) -> bool:
+    """Spend one MCP call from the per-key window; True = allowed.
+
+    Both HTTP surfaces call this once per bearer-carrying request (the /mcp
+    mount shim and the /mcp/agents/{id} route), so a leaked key cannot turn
+    ``ask_knowledge_base`` into unmetered LLM spend. The bucket keys on the
+    hashed bearer — one bucket per physical key across both surfaces, whether
+    or not the key is valid. Reuses ``app.core.ratelimit``'s window primitives
+    (its private functions on purpose: the public ``RateLimit`` is a FastAPI
+    dependency wanting a Request); without Redis the window is per-process,
+    which that module's docstring accepts explicitly. stdio is exempt — it has
+    no headers and only serves the operator's own machine.
+    """
+    settings = get_settings()
+    limit = settings.mcp_rate_limit_per_minute
+    if limit <= 0 or not settings.rate_limit_enabled or not raw_key:
+        return True
+    bucket = f"rl:mcp:{hash_api_key(raw_key)[:32]}"
+    if settings.redis_url:
+        return await ratelimit._check_redis(bucket, limit, 60.0)
+    return ratelimit._check_memory(bucket, limit, 60.0)
 
 
 def authorization_error() -> dict[str, str]:

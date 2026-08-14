@@ -11,15 +11,83 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import security
 from app.core.config import get_settings
 from app.core.db import utcnow
-from app.core.errors import ConflictError, UnauthorizedError
+from app.core.errors import ConflictError, ForbiddenError, UnauthorizedError
 from app.core.logging import log
-from app.models.user import RefreshToken, User
+from app.models.user import RefreshToken, User, UserIdentity
+from app.models.workspace import Invitation
 
 logger = log("auth")
+
+SIGNUP_DISABLED_MESSAGE = "Signup is disabled on this instance — ask an admin for an invitation"
+
+
+async def _has_pending_invitation(session: AsyncSession, email: str) -> bool:
+    """A live (unaccepted, unexpired) invitation addressed to this email."""
+    row = (
+        await session.execute(
+            select(Invitation.id)
+            .where(
+                Invitation.email == email,
+                Invitation.accepted_at.is_(None),
+                Invitation.expires_at > utcnow(),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return row is not None
+
+
+async def ensure_oauth_signup_allowed(
+    session: AsyncSession,
+    *,
+    provider: str,
+    provider_user_id: str,
+    email: str | None,
+    email_verified: bool,
+) -> None:
+    """Gate FIRST-TIME social-login account creation when the instance is closed.
+
+    Mirrors ``auth_oauth.resolve_user``'s resolution order without changing it:
+    an already-linked identity or a provider-verified email matching an existing
+    user is a login/link and always passes; only a login that would CREATE a
+    user is refused — unless the email holds a live invitation. Missing or
+    unverified emails pass through so ``resolve_user`` can answer with its more
+    precise ``email_unverified`` error.
+    """
+    if get_settings().allow_signup:
+        return
+    linked = (
+        await session.execute(
+            select(UserIdentity.id)
+            .where(
+                UserIdentity.provider == provider,
+                UserIdentity.provider_user_id == provider_user_id,
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if linked is not None:
+        return
+    if not email or not email_verified:
+        return  # resolve_user refuses these itself, with the right error code
+    email = email.strip().lower()
+    existing = (
+        await session.execute(select(User.id).where(User.email == email).limit(1))
+    ).scalar_one_or_none()
+    if existing is not None:
+        return
+    if await _has_pending_invitation(session, email):
+        return
+    raise ForbiddenError(SIGNUP_DISABLED_MESSAGE)
 
 
 async def signup(session: AsyncSession, *, email: str, name: str, password: str) -> User:
     email = email.strip().lower()
+    if not get_settings().allow_signup and not await _has_pending_invitation(session, email):
+        # Closed instance: only invited emails may create an account. The invite
+        # token itself is redeemed by POST /invitations/accept right after
+        # signup — here the pending row is what proves the invitation.
+        raise ForbiddenError(SIGNUP_DISABLED_MESSAGE)
     existing = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if existing is not None:
         raise ConflictError("An account with this email already exists")

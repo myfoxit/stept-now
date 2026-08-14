@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     scheduler_tick_seconds: float = 15.0
 
+    # Open registration. False turns an internet-facing instance invite-only:
+    # password signup and first-time social login are refused unless the email
+    # holds a pending invitation — existing accounts and invitation acceptance
+    # are never affected.
+    allow_signup: bool = True
+
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
     # Reuse of a just-rotated refresh token within this window is treated as a
@@ -108,6 +114,10 @@ class Settings(BaseSettings):
     refresh_rotation_grace_seconds: int = 60
     invitation_ttl_days: int = 7
     rate_limit_enabled: bool = True
+    # Per-API-key ceiling for MCP traffic (the /mcp workspace surface and
+    # /mcp/agents/{id} alike), calls per 60s window. 0 disables. Without Redis
+    # the window is per-process, like every limit in app/core/ratelimit.py.
+    mcp_rate_limit_per_minute: int = 120
     # How many reverse proxies append to X-Forwarded-For before the request
     # reaches us. 0 (default) = we are the edge, so the header is untrusted.
     trusted_proxy_hops: int = 0

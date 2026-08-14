@@ -151,6 +151,7 @@
   "auth.sign_up": "Registrati",
   "auth.sign_up_join": "Registrati e unisciti",
   "auth.sign_up_to_join_your_team": "Registrati per unirti al tuo team",
+  "auth.signup_is_disabled_on_this": "La registrazione è disattivata su questa istanza: chiedi un invito a un amministratore.",
   "auth.signup_failed": "Registrazione non riuscita",
   "auth.social_sign_in_didn_t_complete": "L'accesso social non è stato completato. Riprova, oppure accedi con la tua password.",
   "auth.something_went_wrong_try_again": "Qualcosa è andato storto: riprova",

@@ -62,6 +62,8 @@ INTERNAL_ERROR = -32603
 TOOL_NOT_EXPOSED = -32010
 TOOL_DENIED = -32011
 APPROVAL_REQUIRED = -32012
+#: Kept equal to app.mcp.auth.RATE_LIMITED_RPC_CODE (both surfaces, one code).
+RATE_LIMITED = -32013
 
 ASK_AGENT = "ask_agent"
 ACTION_TOOL_PREFIX = "action_"
@@ -586,6 +588,16 @@ async def agent_mcp_endpoint(
     # Notifications get no JSON-RPC response — 202, EMPTY body.
     if msg_id is None or method.startswith("notifications/"):
         return Response(status_code=202)
+
+    # Per-key ceiling, after auth and before any tool/DB work. Sits below the
+    # notification return on purpose: JSON-RPC forbids answering those at all.
+    from app.mcp import auth as mcp_auth  # lazy, mirrors _resolve
+
+    if not await mcp_auth.consume_rate_limit(raw):
+        return JSONResponse(
+            status_code=429,
+            content=_rpc_error(msg_id, RATE_LIMITED, mcp_auth.RATE_LIMITED_MESSAGE),
+        )
 
     params = message.get("params")
     if not isinstance(params, dict):

@@ -151,6 +151,7 @@
   "auth.sign_up": "Sign up",
   "auth.sign_up_join": "Sign up & join",
   "auth.sign_up_to_join_your_team": "Sign up to join your team",
+  "auth.signup_is_disabled_on_this": "Signup is disabled on this instance — ask an admin for an invitation.",
   "auth.signup_failed": "Signup failed",
   "auth.social_sign_in_didn_t_complete": "Social sign-in didn't complete. Try again, or log in with your password.",
   "auth.something_went_wrong_try_again": "Something went wrong — try again",

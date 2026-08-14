@@ -25,6 +25,7 @@ from typing import Any, Literal, overload
 
 from mcp.server.mcpserver import Image
 
+from app.core.net import UnsafeUrlError, assert_public_url
 from app.core.permissions import Perm
 from app.mcp.server import mcp
 from app.services import remote_drive
@@ -77,6 +78,23 @@ async def _drive_auth() -> str | dict[str, Any]:
         error = auth.permission_error(Perm.TOURS_MANAGE)
         return error
     return str(resolved.workspace_id)
+
+
+def _url_error(url: str) -> dict[str, Any] | None:
+    """Validate a drive-target URL; None when fine, else the standard tool error.
+
+    These URLs open in the user's *signed-in* Chrome, so they get the same
+    egress guard as custom agent actions (``app.core.net.assert_public_url``):
+    http(s) schemes only, publicly-routable hosts only — a leaked tours:manage
+    key must not steer the user's authenticated browser at intranet, loopback,
+    or cloud-metadata targets. Returned, never raised, like every other
+    validation failure in this module.
+    """
+    try:
+        assert_public_url(url)
+    except UnsafeUrlError as exc:
+        return {"error": f"blocked: {exc}"}
+    return None
 
 
 def _truncate_lines(text: str, cap: int = ELEMENTS_CAP) -> str:
@@ -194,7 +212,11 @@ async def browser_open(url: str, include_screenshot: bool = False) -> Any:
     space is then used for coordinate clicks. Drive the page with browser_act /
     browser_navigate / browser_scroll / browser_key, read it with
     browser_page_text / browser_find / browser_extract, wait for slow UI with
-    browser_wait_for, and end the session with browser_close."""
+    browser_wait_for, and end the session with browser_close. Only public
+    http(s) URLs are allowed — intranet/localhost targets are refused."""
+    error = _url_error(url)
+    if error is not None:
+        return error
     return await _exec_snapshot("open", {"url": url}, include_screenshot)
 
 
@@ -271,7 +293,11 @@ async def browser_wait_for(
 @mcp.tool()
 async def browser_navigate(url: str) -> dict[str, Any]:
     """Navigate the driven tab to a URL; returns a fresh snapshot (element
-    indexes from before the navigation are no longer valid)."""
+    indexes from before the navigation are no longer valid). Only public
+    http(s) URLs are allowed — intranet/localhost targets are refused."""
+    error = _url_error(url)
+    if error is not None:
+        return error
     return await _exec_snapshot("navigate", {"url": url})
 
 
@@ -398,6 +424,11 @@ async def browser_record_start(url: str | None = None) -> dict[str, Any]:
     captured — performed by the user OR by you through the browser_* drive
     tools. Finish with browser_record_stop to save the capture as a draft
     product tour."""
+    if url is not None:
+        # Same guard as browser_open — this URL opens in the user's browser.
+        error = _url_error(url)
+        if error is not None:
+            return error
     gate = await _drive_auth()
     if isinstance(gate, dict):
         return gate

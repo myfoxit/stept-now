@@ -54,6 +54,34 @@ async def test_act_validates_kind_without_a_round_trip(mcp_caller):
     assert payload["error"] != NO_BROWSER_ERROR
 
 
+async def test_drive_urls_must_be_public_http(mcp_caller):
+    """browser_open/browser_navigate/browser_record_start steer the user's
+    SIGNED-IN Chrome, so they get the same egress guard as custom agent actions:
+    a leaked tours:manage key must not aim the browser at intranet, loopback,
+    metadata-service, or non-http targets."""
+    mcp_caller("ws-1", scopes=["write"])  # deliberately no browser registered
+
+    private = await tools_browser.browser_open(url="http://10.0.0.8/admin")
+    assert private["error"].startswith("blocked:")
+    assert "non-public" in private["error"]
+
+    loopback = await tools_browser.browser_navigate(url="https://localhost:8600/internal")
+    assert loopback["error"].startswith("blocked:")
+
+    metadata = await tools_browser.browser_navigate(url="http://169.254.169.254/latest/")
+    assert metadata["error"].startswith("blocked:")
+
+    scheme = await tools_browser.browser_open(url="file:///etc/passwd")
+    assert scheme["error"].startswith("blocked:")
+    assert "scheme" in scheme["error"]
+
+    record = await tools_browser.browser_record_start(url="http://192.168.1.1/router")
+    assert record["error"].startswith("blocked:")
+
+    # The guard short-circuits BEFORE device pick — not the no-browser error.
+    assert private["error"] != NO_BROWSER_ERROR
+
+
 async def test_scroll_validates_dir(mcp_caller):
     mcp_caller("ws-1", scopes=["write"])
     payload = await tools_browser.browser_scroll(dir="sideways")
@@ -338,6 +366,15 @@ async def test_rpc_act_validation_needs_no_browser(client, workspace_ctx):
     key = await _mint_key(client, workspace_ctx, ["write"])
     payload = await _call_tool(client, key, "browser_act", {"kind": "explode"})
     assert "kind must be one of" in payload["error"]
+
+
+async def test_rpc_navigate_rejects_private_url_as_tool_error(client, workspace_ctx):
+    """End-to-end through the mounted /mcp app: the URL guard comes back as the
+    standard tool-error payload, not an exception that kills the RPC."""
+    key = await _mint_key(client, workspace_ctx, ["write"])
+    payload = await _call_tool(client, key, "browser_navigate", {"url": "http://10.1.2.3/"})
+    assert payload["error"].startswith("blocked:")
+    assert "non-public" in payload["error"]
 
 
 async def test_rpc_snapshot_with_screenshot_returns_a_real_image_content_block(

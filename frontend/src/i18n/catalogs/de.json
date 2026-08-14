@@ -151,6 +151,7 @@
   "auth.sign_up": "Registrieren",
   "auth.sign_up_join": "Registrieren & beitreten",
   "auth.sign_up_to_join_your_team": "Registrieren Sie sich, um Ihrem Team beizutreten",
+  "auth.signup_is_disabled_on_this": "Die Registrierung ist auf dieser Instanz deaktiviert – bitten Sie einen Admin um eine Einladung.",
   "auth.signup_failed": "Registrierung fehlgeschlagen",
   "auth.social_sign_in_didn_t_complete": "Die Anmeldung über den Social-Login wurde nicht abgeschlossen. Versuchen Sie es erneut oder melden Sie sich mit Ihrem Passwort an.",
   "auth.something_went_wrong_try_again": "Etwas ist schiefgelaufen – bitte erneut versuchen",

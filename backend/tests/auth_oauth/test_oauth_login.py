@@ -50,7 +50,7 @@ def _app_url(path: str = "/") -> str:
 async def test_providers_endpoint_lists_configured(client):
     response = await client.get("/api/v1/auth/oauth/providers")
     assert response.status_code == 200
-    assert response.json() == {"providers": ["google", "github"]}
+    assert response.json() == {"providers": ["google", "github"], "allow_signup": True}
 
 
 async def test_providers_endpoint_empty_when_unconfigured(client, monkeypatch):
@@ -63,7 +63,15 @@ async def test_providers_endpoint_empty_when_unconfigured(client, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     reset_settings_cache()
     response = await client.get("/api/v1/auth/oauth/providers")
-    assert response.json() == {"providers": []}
+    assert response.json() == {"providers": [], "allow_signup": True}
+
+
+async def test_providers_endpoint_reports_closed_signup(client, monkeypatch):
+    """The login page reads this to know whether to offer the signup form."""
+    monkeypatch.setenv("STEPT_ALLOW_SIGNUP", "false")
+    reset_settings_cache()
+    response = await client.get("/api/v1/auth/oauth/providers")
+    assert response.json() == {"providers": ["google", "github"], "allow_signup": False}
 
 
 async def test_start_redirects_to_provider_authorize(client):
@@ -453,3 +461,89 @@ async def test_password_login_on_passwordless_account_gives_clear_error(client):
     )
     assert response.status_code == 401
     assert "social login" in response.json()["error"]["message"].lower()
+
+
+# ---------------------------------------------------------------------------
+# signup gate (STEPT_ALLOW_SIGNUP=false)
+# ---------------------------------------------------------------------------
+
+
+def _close_signup(monkeypatch) -> None:
+    monkeypatch.setenv("STEPT_ALLOW_SIGNUP", "false")
+    reset_settings_cache()
+
+
+async def _google_callback(client, *, invite: str | None = None) -> httpx.Response:
+    """One full mocked Google round trip (start → provider → callback)."""
+    params = {"invite": invite} if invite else {}
+    state = await start_state(client, "google", **params)
+    with respx.mock:
+        respx.post(GOOGLE_TOKEN_URL).mock(
+            return_value=httpx.Response(200, json=google_token_response())
+        )
+        return await run_callback(client, "google", state=state)
+
+
+async def test_oauth_first_login_refused_when_signup_disabled(client, monkeypatch):
+    """A closed instance must not accept drive-by account creation via Google
+    either — the browser is bounced to /login?error=signup_disabled and no
+    user, identity, or session comes into being."""
+    _close_signup(monkeypatch)
+    response = await _google_callback(client)
+    assert response.status_code == 302
+    assert response.headers["location"] == _login_url("error=signup_disabled")
+    assert await fetch_users() == []
+    assert await fetch_identities() == []
+    assert "stept_refresh" not in response.cookies
+
+
+async def test_oauth_existing_user_still_logs_in_when_signup_disabled(client, monkeypatch):
+    """The gate blocks CREATION only: a provider-verified email matching an
+    existing account still links + logs in."""
+    from tests.conftest import signup
+
+    await signup(client, "social@example.com", name="Existing User")
+    _close_signup(monkeypatch)
+    response = await _google_callback(client)
+    assert response.status_code == 302
+    assert response.headers["location"] == _app_url("/")
+    (user,) = await fetch_users()
+    (identity,) = await fetch_identities()
+    assert identity.user_id == user.id
+
+
+async def test_oauth_invited_email_creates_account_when_signup_disabled(
+    client, workspace_ctx, monkeypatch
+):
+    """An invitation authorizes the account creation the gate otherwise refuses
+    — the invited user lands signed in AND joined to the workspace."""
+    invite = await client.post(
+        f"{workspace_ctx.base}/invitations",
+        json={"email": "social@example.com", "role": "agent"},
+        headers=workspace_ctx.owner_headers,
+    )
+    assert invite.status_code == 201, invite.text
+    async with get_session_factory()() as db:
+        token = (
+            await db.execute(
+                select(Invitation.token).where(Invitation.email == "social@example.com")
+            )
+        ).scalar_one()
+
+    _close_signup(monkeypatch)
+    response = await _google_callback(client, invite=token)
+    assert response.status_code == 302
+    assert response.headers["location"] == _app_url("/")
+
+    social_user = next(u for u in await fetch_users() if u.email == "social@example.com")
+    async with get_session_factory()() as db:
+        membership = (
+            await db.execute(
+                select(Membership).where(
+                    Membership.workspace_id == workspace_ctx.id,
+                    Membership.user_id == social_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+    assert membership is not None
+    assert membership.role == "agent"
