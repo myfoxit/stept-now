@@ -62,6 +62,12 @@ export interface WidgetConfig {
   launcher_position?: 'left' | 'right'
   require_identity?: boolean
   ai_agent_id?: string | null
+  /**
+   * Workspace policy for backend-pushed tours (`ask` | `auto` | `never`,
+   * normalized server-side). The app forwards it to the loader in READY —
+   * only the loader plays tours, and it has no token to fetch the config.
+   */
+  tour_autostart_policy?: string
   [key: string]: unknown
 }
 

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { envelope, MSG, type MessageType } from '../protocol'
 import { MSG_EXTRA } from './api-extra'
-import { Controller } from './controller'
+import { Controller, type BootParams } from './controller'
 
 class FakeWebSocket {
   static OPEN = 1
@@ -77,8 +77,8 @@ const campaignConv = {
 
 let controller: Controller | null = null
 
-function makeController(): Controller {
-  controller = new Controller({ workspaceKey: 'wk_t', apiBase: 'http://api:8600' })
+function makeController(extra: Partial<BootParams> = {}): Controller {
+  controller = new Controller({ workspaceKey: 'wk_t', apiBase: 'http://api:8600', ...extra })
   return controller
 }
 
@@ -652,6 +652,126 @@ describe('searchEverything', () => {
     expect(c.getState().homeSearch).not.toBeNull()
     await c.searchEverything('')
     expect(c.getState().homeSearch).toBeNull()
+  })
+})
+
+// --- READY payload -------------------------------------------------------------
+
+describe('emitReady', () => {
+  it('forwards the boot-config tour_autostart_policy to the loader', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([
+      {
+        method: 'POST',
+        path: '/api/widget/boot',
+        body: { ...bootBody, config: { tour_autostart_policy: 'never' } },
+      },
+    ])
+    const posted: Array<{ type?: string; payload?: Record<string, unknown> }> = []
+    vi.spyOn(window, 'postMessage').mockImplementation((data: unknown) => {
+      posted.push(data as { type?: string; payload?: Record<string, unknown> })
+    })
+
+    const c = makeController()
+    await c.boot()
+
+    const ready = posted.find((p) => p?.type === MSG.READY)
+    expect(ready).toBeDefined()
+    // The loader has no token to fetch the config — READY is its only source.
+    expect(ready!.payload).toMatchObject({ token: 'tok-1', tour_autostart_policy: 'never' })
+  })
+})
+
+// --- host-page interface locale -------------------------------------------------
+
+describe('host-page locale params', () => {
+  it('honours lockLocale even against the language the visitor writes', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([
+      {
+        method: 'POST',
+        path: '/api/widget/boot',
+        body: { ...bootBody, contact: { ...bootBody.contact, locale: 'fr' } },
+      },
+    ])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController({ locale: 'de', lockLocale: true })
+    expect(c.getState().locale).toBe('de') // locked before boot even resolves
+    await c.boot()
+    expect(c.getState().locale).toBe('de') // the learned 'fr' did not win
+    c.adoptDetectedLocale('fr') // the visitor writes French mid-session
+    expect(c.getState().locale).toBe('de') // still locked
+  })
+
+  it('treats an unlocked host locale as a hint the visitor may override', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([{ method: 'POST', path: '/api/widget/boot', body: bootBody }])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController({ locale: 'de' })
+    await c.boot()
+    expect(c.getState().locale).toBe('de') // no visitor evidence yet → host wins
+    c.adoptDetectedLocale('fr')
+    expect(c.getState().locale).toBe('fr') // their own language beats the hint
+  })
+
+  it('keeps the default browser-derived path when the host sets nothing', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    mockFetch([{ method: 'POST', path: '/api/widget/boot', body: bootBody }])
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    const c = makeController()
+    await c.boot()
+    expect(c.getState().locale).toBe('en') // jsdom navigator: en-US
+  })
+})
+
+// --- bridge origin pinning ------------------------------------------------------
+
+describe('parentOrigin pinning through BootParams', () => {
+  it('pins outbound posts and drops loader messages from a foreign origin', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const calls = mockFetch([
+      { method: 'POST', path: '/api/widget/boot', body: bootBody },
+      {
+        method: 'POST',
+        path: '/api/widget/campaigns/camp1/trigger',
+        body: { skipped: true, conversation_id: null },
+      },
+    ])
+    const posted: Array<[unknown, unknown]> = []
+    vi.spyOn(window, 'postMessage').mockImplementation(((data: unknown, target: unknown) => {
+      posted.push([data, target])
+    }) as never)
+
+    const c = makeController({ parentOrigin: 'https://host.example' })
+    await c.boot()
+    expect(posted.length).toBeGreaterThan(0) // READY at least
+    expect(posted.every(([, target]) => target === 'https://host.example')).toBe(true)
+
+    // CAMPAIGN_DUE from the wrong origin: no trigger POST may happen.
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: envelope(MSG.CAMPAIGN_DUE, { campaignId: 'camp1' }),
+        origin: 'https://evil.example',
+        source: window,
+      }),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(calls.some((call) => call.url.includes('/campaigns/camp1/trigger'))).toBe(false)
+
+    // The same frame from the pinned origin (and our parent) is honoured.
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: envelope(MSG.CAMPAIGN_DUE, { campaignId: 'camp1' }),
+        origin: 'https://host.example',
+        source: window,
+      }),
+    )
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('/campaigns/camp1/trigger'))).toBe(true)
+    })
   })
 })
 

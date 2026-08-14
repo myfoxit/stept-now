@@ -237,6 +237,14 @@ describe('autostart policy', () => {
     expect(pill()).toBeNull()
   })
 
+  it('lets host-page SteptSettings beat the READY policy when both are present', async () => {
+    const tour = makeTour('tour-1', ['One'])
+    experiencesData = { tours: [tour], checklists: [], surveys: [] }
+    tourById['tour-1'] = tour
+    await bootHost({ tourAutostartPolicy: 'auto' }, { tour_autostart_policy: 'never' })
+    expect(tipText()).toContain('One') // the host's `auto` won — playing, not suppressed
+  })
+
   it('renders a pushed banner immediately under ask — announcements are never pill-gated', async () => {
     const banner = makeBanner('banner-1', 'New: AI answers')
     experiencesData = { tours: [banner], checklists: [], surveys: [] }
@@ -256,6 +264,30 @@ describe('autostart policy', () => {
     await bootHost({ tourAutostartPolicy: 'never' })
     expect(document.querySelector('.stept-tour-banner')).toBeNull()
     expect(pill()).toBeNull()
+  })
+})
+
+describe('bridge origin pinning', () => {
+  it('posts to the app pinned to the apiBase origin, never *', async () => {
+    const { frame } = await bootHost()
+    host!.openPanel()
+    const calls = vi.mocked(frame.contentWindow!.postMessage).mock.calls as unknown as Array<
+      [{ type?: string } | null, unknown]
+    >
+    const open = calls.find((c) => c[0]?.type === MSG.OPEN)
+    expect(open?.[1]).toBe('http://api.test')
+    expect(calls.length).toBeGreaterThan(0)
+    expect(calls.some((c) => c[1] === '*')).toBe(false)
+  })
+
+  it('hands the app its own origin (and the locale settings) in the frame hash', async () => {
+    const { frame } = await bootHost({ locale: 'de', lockLocale: true })
+    const raw = new URL(frame.src).hash.slice(1)
+    const params = JSON.parse(decodeURIComponent(raw)) as Record<string, unknown>
+    expect(params.parentOrigin).toBe(window.location.origin)
+    // The host page's locale settings ride the same hash — the readParams contract.
+    expect(params.locale).toBe('de')
+    expect(params.lockLocale).toBe(true)
   })
 })
 

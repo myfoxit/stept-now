@@ -52,6 +52,13 @@ export interface BootParams {
   locale?: string
   /** `SteptSettings.lockLocale` — honour `locale` even against what the visitor writes. */
   lockLocale?: boolean
+  /**
+   * The embedding page's origin, sent by the loader in the frame hash. Pins the
+   * postMessage bridge in both directions; absent (an older cached loader.js)
+   * leaves the bridge in its legacy accept-any mode so mixed-version
+   * deployments keep working.
+   */
+  parentOrigin?: string
 }
 
 export type Screen =
@@ -183,6 +190,8 @@ export class Controller {
   constructor(params: BootParams) {
     this.params = params
     this.api = new WidgetApi(params.apiBase)
+    // Pin the bridge to the loader's page before anything is posted or bound.
+    bridge.setParentOrigin(params.parentOrigin ?? null)
     // Pick a language before the first paint. Boot refines this once the
     // server tells us what this contact actually writes in; doing it here means
     // the loading and error screens are already in the right language, which is
@@ -587,6 +596,10 @@ export class Controller {
       accent: this.state.config.accent_color,
       position: this.state.config.launcher_position,
       unread: this.unreadCount(),
+      // The loader gates backend-pushed tours on this and cannot fetch the
+      // boot config itself (no token) — READY is its only source. Host-page
+      // SteptSettings still wins over it loader-side.
+      tour_autostart_policy: this.state.config.tour_autostart_policy,
     })
   }
 

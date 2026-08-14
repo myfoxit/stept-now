@@ -317,12 +317,17 @@ export class WidgetHost {
   }
 
   private frameSrc(): string {
+    const origin = window.location.origin
     const params = {
       workspaceKey: this.widgetKey,
       apiBase: this.apiBase,
       identity: this.settings.identity,
       locale: this.settings.locale,
       lockLocale: this.settings.lockLocale,
+      // Lets the app pin its bridge to this page. An opaque origin (file://,
+      // sandboxed frame) is not a valid postMessage target — send nothing and
+      // the app stays in its legacy accept-any mode.
+      parentOrigin: origin && origin !== 'null' ? origin : undefined,
     }
     const hash = encodeURIComponent(JSON.stringify(params))
     return `${this.apiBase}/widget-assets/app.html#${hash}`
@@ -605,7 +610,17 @@ export class WidgetHost {
   }
 
   private post(type: MessageType, payload: unknown): void {
-    this.frame?.contentWindow?.postMessage(envelope(type, payload), '*')
+    this.frame?.contentWindow?.postMessage(envelope(type, payload), this.appOrigin())
+  }
+
+  /** The iframe app is served from apiBase, so its origin is the only valid
+   * postMessage target ('*' only if apiBase is somehow unparseable). */
+  private appOrigin(): string {
+    try {
+      return new URL(this.apiBase).origin
+    } catch {
+      return '*'
+    }
   }
 
   private applyAccent(accent: string): void {
