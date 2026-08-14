@@ -66,7 +66,7 @@ Two ways to get email into an inbox:
 1. **Provider webhooks** — point your ESP's inbound parse at the tokened URL for the inbox:
 
    ```
-   POST /api/channels/inbound/{resend|postmark|sendgrid|mailgun|ses}/{inbox_id}/{token}
+   POST /api/channels/email/inbound/{resend|postmark|sendgrid|mailgun|ses}/{inbox_id}/{token}
    ```
 
    The token is generated per inbox; payload parsing is provider-specific.

@@ -113,6 +113,9 @@ make seed           # creates a demo workspace + data (idempotent)
 make dev            # backend on :8600, dashboard on :5273
 ```
 
+`make dev` also builds the embeddable widget loader on first run, so the widget and tour
+player work without a separate build step.
+
 Open **http://localhost:5273** and log in with the seeded account:
 
 ```
@@ -124,7 +127,9 @@ password: stept-demo
 > disposable and is *not* migrated automatically — after pulling schema changes, run
 > `rm backend/stept.db && make seed`. (A half-migrated DB makes `make seed` fail and roll
 > back, which then breaks login.) Postgres deployments migrate with
-> `cd backend && uv run alembic upgrade head`.
+> `cd backend && uv run alembic upgrade head` — but a Postgres DB that was *first created
+> by dev mode* (auto table creation) has no `alembic_version` table: run
+> `uv run alembic stamp head` once before the first upgrade.
 
 ## Full-fidelity mode (Postgres + Redis + Mailpit)
 
@@ -137,9 +142,11 @@ STEPT_REDIS_URL=redis://localhost:63790/0 \
   make dev
 ```
 
-Configuration is all `STEPT_`-prefixed env vars (or a `.env` file) — see
-[`.env.example`](.env.example) for the full list. Providers, models, and channel
-credentials are configured per-workspace in the UI and encrypted at rest.
+Configuration is all `STEPT_`-prefixed env vars (or a `.env` file) —
+[`.env.example`](.env.example) covers the common dev settings; the full reference is
+[docs.stepped.ai/reference/configuration](https://docs.stepped.ai/reference/configuration/).
+Providers, models, and channel credentials are configured per-workspace in the UI and
+encrypted at rest.
 
 ## Commands
 
@@ -165,6 +172,13 @@ with your key, is shown in **Settings → Channels**):
 
 For logged-in users, verify identity with an HMAC of their id (computed server-side with
 your workspace's identity secret) so conversation history is secure across devices.
+
+## Self-hosting
+
+The production stack is Docker Compose behind Caddy (automatic HTTPS), built from source
+with [`deploy/docker-compose.standalone.yml`](deploy/docker-compose.standalone.yml) —
+Postgres+pgvector, Redis, API, worker, scheduler, and the static frontends. The guide:
+[docs.stepped.ai/getting-started/self-hosting](https://docs.stepped.ai/getting-started/self-hosting/).
 
 ## Architecture
 

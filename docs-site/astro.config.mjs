@@ -41,6 +41,7 @@ export default defineConfig({
             { label: 'What is Stept?', slug: 'index' },
             { label: 'Quickstart (cloud)', slug: 'getting-started/quickstart' },
             { label: 'Self-hosting', slug: 'getting-started/self-hosting' },
+            { label: 'Local development', slug: 'getting-started/local-development' },
           ],
         },
         {
@@ -67,6 +68,7 @@ export default defineConfig({
           items: [
             { label: 'Configuration', slug: 'reference/configuration' },
             { label: 'REST API', slug: 'reference/api' },
+            { label: 'Webhooks', slug: 'reference/webhooks' },
           ],
         },
       ],

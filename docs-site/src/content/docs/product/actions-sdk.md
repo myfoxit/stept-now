@@ -11,8 +11,18 @@ server never calls your API and never holds your users' credentials.
 
 ## One line, with the script tag
 
-Anywhere after the [widget snippet](/product/widget/) (before it loads is fine — commands
-queue):
+Start from the canonical [widget snippet](/product/widget/) — the queue stub in it is what
+lets you register actions before the loader arrives:
+
+```html
+<script>
+  window.SteptSettings = { workspaceKey: "wk_..." };
+  window.Stept = window.Stept || function () { (window.Stept.q = window.Stept.q || []).push(arguments) };
+</script>
+<script src="https://your-stept-host/widget-assets/loader.js" async></script>
+```
+
+Then, anywhere after the stub (before the loader loads is fine — commands queue):
 
 ```html
 <script>
@@ -41,6 +51,13 @@ result — all of it in the run's trace in your dashboard.
 offers it goes away).
 
 ## With npm
+
+:::note
+`@stept/js` and `@stept/react` live in the repo
+([`packages/`](https://github.com/myfoxit/stept-now/tree/master/packages)) and are **not
+yet published to npm** — publish is imminent. The script-tag path above works today; until
+the packages land on npm, install them from the repo or vendor the files.
+:::
 
 `@stept/js` (framework-free, SSR-safe):
 
@@ -86,21 +103,32 @@ the assistant is never offered a verb the current screen doesn't have.
 | `requiresIdentity` | default `false` | Only offer this action when the visitor is [HMAC-identity-verified](/product/widget/#identity-verification). |
 | `run` | required | `(params) => result`. Runs in the page. Return a string or any JSON-able value; throw to report failure. |
 
-Results are truncated at 8&#8239;000 characters, handlers time out after 30&#8239;s, and a
-handler exception becomes an error the model reads and explains — it never breaks your
-page.
+Results are truncated at 8&#8239;000 characters in the browser (with a 24&#8239;000-character
+server-side backstop), handlers time out after 30&#8239;s, and a handler exception becomes
+an error the model reads and explains — it never breaks your page.
+
+If the visitor never answers a confirm card, it times out after 600&#8239;s (page-control
+operations after 90&#8239;s) and the run resumes with a decline — the agent is told the
+visitor didn't confirm, and carries on.
+
+**When a tool is missing, check the console.** Definitions that fail validation (bad name,
+oversized schema, over a cap) are dropped per-definition — the rest still register — and
+the server echoes back what it accepted. The SDK logs a `console.warn` listing the
+accepted names, so a silently absent action is one DevTools glance away.
 
 ## Guardrails
 
 - **Registering is the opt-in.** Actions come from code you shipped, so there is no
-  per-visitor consent gate (unlike [page control](/product/widget/#the-in-app-assistant),
-  which touches the DOM). The visitor-facing `confirm` card is on by default anyway.
+  per-visitor consent gate (unlike
+  [page control](/product/widget/#the-in-app-ai-assistant-page-control), which touches the
+  DOM). The visitor-facing `confirm` card is on by default anyway.
 - **Per-agent switch.** Agent → *Client actions* turns the whole surface off for an
   agent, and each `app_*` tool takes the same per-tool policies (auto / require approval /
   disabled) as every other tool.
-- **Caps everywhere.** 20 actions per conversation, 10 action calls per run, schema
-  validation before anything reaches the browser, and results size-capped again
-  server-side.
+- **Caps everywhere.** 20 actions per conversation, 10 action calls per run, a
+  4&#8239;000-character schema budget per action and 16&#8239;000 characters of stored
+  definitions total, schema validation before anything reaches the browser, and results
+  size-capped again server-side.
 - **Identity gating.** With `requiresIdentity`, anonymous visitors never even see the
   tool — it is withheld from the model, not refused at call time.
 - **Full trace.** Every call, confirm, and result is an `AgentStep` on the run, labeled

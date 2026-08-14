@@ -525,6 +525,73 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     across 5 manifest catalogs). Alembic heads still **one** — no migration; the shipped locale set
     is code, not data.
 
+- [x] **DX bang-for-buck wave (2026-08-14, dated — from the developer-first audit)** — a four-sweep
+  code-vs-docs audit (widget/SDK, agent+MCP, REST/webhooks, self-host; findings in the session's
+  "Stept DX Audit" artifact) found the product developer-first on the inside and unreachable from
+  the outside. This wave fixed the highest-leverage findings; the remaining gate (repo public, npm
+  publish, public images) is operator work, not code. Worktree `../stept-now-dxfix`
+  (branch `feature/dx-bang-for-buck`), 5 parallel agents, no migrations.
+  - **Engine settings can finally persist.** `AgentSettings` typed only 5 keys while both write
+    paths persist `model_dump()` — so the Agent-builder's Client-actions toggle never stuck,
+    `settings.reply_language` (shipped in the i18n wave, read at `engine.py:290`) was unsettable
+    via the API, and any save wiped ORM-set values. Now typed (`client_actions.enabled`,
+    `reply_language`, `retrieval.context_tokens`), with the invariant documented in the schema and
+    round-trip tests through the API (the old tests wrote the ORM directly, which is why this
+    survived). Also: `agent_run.started` was subscribable but never emitted — now fired on first
+    claim (once across park/resume, never in sandbox).
+  - **`requiresIdentity` gates on the session, not the contact row.** It checked
+    `bool(contact.external_id)` — satisfiable by a CSV-imported id on an anonymous boot. Now
+    `WidgetPrincipal.identified` = external_id AND this inbox's `ContactInbox.hmac_verified`
+    (zero extra queries; the principal already loads the row).
+  - **Invites/resets survive SMTP-less installs.** `_to_text` stripped anchors, so the console
+    fallback — and the text/plain part of real emails — contained no link at all. Anchors now
+    render `label (url)`.
+  - **Invite-only mode.** `STEPT_ALLOW_SIGNUP=false` refuses uninvited password signup and
+    first-time OAuth creation (pending-invitation emails pass; existing users unaffected); the
+    providers endpoint exposes `allow_signup`; login page maps `?error=signup_disabled`
+    (+1 key × 5 locales). Previously any internet-facing instance had open registration.
+  - **MCP hardened.** `browser_open`/`browser_navigate`/`browser_record_start` now require public
+    http(s) URLs via the same `assert_public_url` custom actions use (a leaked `tours:manage` key
+    could previously steer the user's authenticated browser at intranet addresses); both MCP
+    surfaces get a per-key rate limit (`STEPT_MCP_RATE_LIMIT_PER_MINUTE`, default 120, 0 off)
+    answering JSON-RPC `-32013`, closing the W10 "unmetered LLM spend" follow-up.
+  - **The embed snippet ships the queue stub.** The dashboard snippet had no `window.Stept` shim,
+    so the documented pre-load `Stept('action', …)` pattern threw `ReferenceError`. The generated
+    snippet now includes the 1-line queue stub the loader has always drained.
+  - **Widget bridge truthfulness.** `emitReady` now forwards `tour_autostart_policy` (the boot
+    config was resolved server-side and then never crossed the bridge — only the host-page
+    override worked; loader tests had faked the payload); `readParams` passes `locale`/
+    `lockLocale` into the iframe (host-set language finally reaches the messenger, doctrine
+    unchanged: lock wins, otherwise the visitor's own language does); both postMessage directions
+    are origin-pinned (loader → app origin, app pins `parentOrigin` from the frame hash, wildcard
+    fallback for 5-min-cached older loaders). +46 B gzipped.
+  - **OpenAPI declares its auth.** `securitySchemes` (BearerAuth for user JWTs + `sk_stept_…`
+    keys, WidgetToken) with global security and `security: []` on the public trees; generated
+    clients now send Authorization. Regenerating `schema.d.ts` surfaced field-level drift the
+    path-diff missed (`TourStats.step_blocked` from the dogfood wave was never regenerated).
+  - **Self-host actually possible.** New `deploy/docker-compose.standalone.yml` +
+    `Caddyfile.standalone`: build-from-source (image overrides for later), api+web+worker+
+    scheduler+postgres+redis+caddy, no landing/docs coupling, no external network (`config -q`
+    validated, Caddyfile `caddy validate`d). `make dev` builds the widget loader when missing
+    (fresh clones no longer 404 the embed); CI now builds docs-site; webhook UI picker gained the
+    8 events the backend accepts but the UI hid; landing quickstart gained `make seed`.
+  - **Docs truth pass** (docs-site was 2 waves stale): all 14 wrong claims fixed (email inbound
+    path that 404'd as written, "tours play" vs the ask-pill default, per-agent client-actions
+    switch, 29 MCP tools incl. `browser_wait_for`, broken anchor, 8k/24k caps, …); new
+    `reference/webhooks.md` (23-event catalog + Python/Node signature verification) and
+    `getting-started/local-development.md`; configuration reference gained 13 missing vars
+    (Stripe, social login, crawler UA/proxy, the new gates); self-hosting rewritten around the
+    standalone compose with Backups/Upgrading sections (incl. the `alembic stamp head` trap);
+    honest not-yet-on-npm callouts on `@stept/js`/`@stept/react`.
+  - **Deliberately not in this wave** (operator or larger): repo flip + `deploy/README.md` scrub,
+    npm org + publish workflow, public GHCR images, extension Web Store listing, eval harness,
+    token streaming, server SDKs, webhook delivery v2, PATs/idempotency/rate-limit headers.
+  - **Measured on the merged tree** (`make verify` green end to end): backend **1827** passed
+    (+8 pg-skipped), frontend **504**, widget **343**, extension **246**, dom-capture **107**,
+    `@stept/js` **5**, `@stept/react` **4**; ruff + ruff-format + mypy clean; tsc clean on all
+    packages; frontend/widget/landing/docs-site builds green; `make i18n-check` green. Alembic
+    heads still **one** — no migration.
+
 - [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
   `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
   untouched. Postgres containers used for migration validation may still be up on 54329

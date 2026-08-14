@@ -31,18 +31,18 @@ use. Test it in the agent sandbox — you see the full tool-call trace of every 
 
 ## 4. Embed the widget
 
-Under your widget inbox settings you get an embed snippet:
+Under your widget inbox settings you get an embed snippet with your key filled in:
 
 ```html
 <script>
-  window.SteptSettings = {
-    workspaceKey: "YOUR_WORKSPACE_KEY",
-    // optional: identify logged-in users (HMAC-verified)
-    // identity: { external_id: "user-123", name: "Ada", email: "ada@example.com", hash: "..." },
-  };
+  window.SteptSettings = { workspaceKey: "wk_..." };
+  window.Stept = window.Stept || function () { (window.Stept.q = window.Stept.q || []).push(arguments) };
 </script>
-<script async src="https://app.stepped.ai/widget-assets/loader.js"></script>
+<script src="https://app.stepped.ai/widget-assets/loader.js" async></script>
 ```
+
+(The second line is the pre-load command queue; all the settings — identity verification,
+locale, tour autostart — are on the [widget page](/product/widget/).)
 
 Put it on your site and open the page — the widget connects to your inbox, and the agent
 answers with citations from the knowledge you added in step 2. When it can't help, it hands

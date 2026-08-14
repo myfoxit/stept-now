@@ -25,6 +25,11 @@ workspace-bound, shown once, and sent as `Authorization: Bearer sk_stept_…`. S
 `read` (all read endpoints), `write` (read + conversations, contacts, knowledge, tours
 mutations), `admin` (everything except workspace deletion).
 
+Two boundaries: API keys are rejected on **user-scoped** endpoints (`/me`, workspace
+creation — those need a logged-in user), and keys minted on an agent's
+[MCP channel card](/integrations/mcp/#per-agent-endpoint) are agent-bound and rejected on
+the REST API entirely.
+
 ## Pagination
 
 - **Feeds** (conversations, messages) use cursors:
@@ -37,17 +42,31 @@ mutations), `admin` (everything except workspace deletion).
 Every error is one envelope with the matching HTTP status:
 
 ```json
-{ "error": { "code": "not_found", "message": "Source not found", "details": {} } }
+{ "error": { "code": "not_found", "message": "Source not found" } }
 ```
 
 Codes include `bad_request` (400), `unauthorized` (401), `forbidden` (403), `not_found`
-(404), `conflict` (409), `validation_failed` (422, with per-field details) and
-`rate_limited` (429).
+(404), `conflict` (409), `validation_failed` (422) and `rate_limited` (429). A `details`
+object appears only when there is something in it — per-field errors on
+`validation_failed`, for example.
 
 ## Rate limits
 
 Abuse limits apply per route (for example login, signup, widget boot and public portal
 endpoints); exceeding one returns 429 with the `rate_limited` code. Back off and retry.
+
+## CORS
+
+The authenticated API is same-origin: browsers may call it from the dashboard origin
+(`STEPT_APP_BASE_URL`) plus anything you add to `STEPT_CORS_ORIGINS`. Only the public
+surfaces — `/api/widget` (the embedded messenger) and `/portal` (the help center) — allow
+any origin. Server-to-server calls with an API key are unaffected (CORS is a browser
+concern).
+
+## Outbound webhooks
+
+To get pushed instead of polling, subscribe a URL to domain events — signed deliveries,
+retries and a delivery log. See [Webhooks](/reference/webhooks/).
 
 ## OpenAPI
 

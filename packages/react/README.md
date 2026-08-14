@@ -3,6 +3,10 @@
 React bindings for the [Stept](https://github.com/myfoxit/stept-now) messenger +
 AI assistant.
 
+> **Not yet on npm.** This package lives in the repo and the publish is imminent;
+> until then, install it from the repo or use the script-tag path — see the
+> [Actions SDK docs](https://docs.stepped.ai/product/actions-sdk/).
+
 ```tsx
 import { SteptProvider, useSteptAction } from '@stept/react'
 
@@ -28,4 +32,5 @@ function Billing() {
 
 The action exists only while the component is mounted, re-registers when your
 declared deps change, and executes in the browser with the signed-in user's
-session. Full docs: the **Actions SDK** page on your Stept docs site.
+session. Full docs:
+[docs.stepped.ai/product/actions-sdk](https://docs.stepped.ai/product/actions-sdk/).

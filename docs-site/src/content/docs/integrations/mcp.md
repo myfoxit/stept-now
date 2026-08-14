@@ -17,6 +17,10 @@ Auth is a workspace API key (`sk_stept_…`) sent as a Bearer token. Create keys
 - `write` — read + notes, document creation, browser driving
 - `admin` — everything except workspace deletion
 
+Requests are rate limited **per key**: 120/minute by default, configurable on self-hosted
+instances via `STEPT_MCP_RATE_LIMIT_PER_MINUTE` (`0` disables — see
+[Configuration](/reference/configuration/)).
+
 ## Connect a client
 
 ```bash
@@ -55,23 +59,33 @@ STEPT_API_KEY=sk_stept_… uv run python -m app.mcp_stdio
 
 ## Tools
 
+The workspace endpoint exposes 29 tools:
+
 | Area | Tools |
 | ---- | ----- |
 | Knowledge & RAG | `search_knowledge`, `ask_knowledge_base` (answer + citations + confidence), `get_document`, `create_document` |
 | Help center | `search_articles`, `get_article` |
 | Tours | `list_tours`, `get_tour_steps`, `tours_health` (breakage rollup) |
 | Inbox | `search_conversations`, `get_conversation`, `add_conversation_note` |
-| Browser | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start` / `browser_record_stop` (records a tour), `browser_run_tour` |
+| Browser | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_wait_for` (`selector?`, `text?`, `timeout_s`), `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start` / `browser_record_stop` (records a tour), `browser_run_tour` |
 
 ## Driving a real browser
 
 The `browser_*` tools operate the user's real, logged-in Chrome through the Stept
 extension: install it, sign in, and leave **Let Stept control this browser** enabled — it
 keeps an outbound connection to the server. A client can then open pages, read indexed
-snapshots (`[3]<button "Save">`), click and type with trusted input, watch console and
-network, record a workflow as a tour, or replay one with `browser_run_tour` (waits for the
-result — useful to verify a tour still passes). Browser tools require the `write` scope
-and a connected extension; password fields are never typed into or read.
+snapshots (`[3]<button "Save">`), click and type with trusted input, wait for an element
+or text with `browser_wait_for`, watch console and network, record a workflow as a tour,
+or replay one with `browser_run_tour` (waits for the result — useful to verify a tour
+still passes). Browser tools require the `write` scope and a connected extension; password
+fields are never typed into or read.
+
+- **Targeting** — `browser_act` takes a snapshot index, or an accessible-name target
+  (`role` + `name`, e.g. `role: "button", name: "Save"`).
+- **Screenshots are opt-in** — pass `include_screenshot` and the tool returns a real MCP
+  image block alongside the text, so vision-capable clients see the page.
+- **URL hygiene** — `browser_open` and `browser_navigate` accept public `http(s)` URLs
+  only (no `file:`, no localhost/private ranges).
 
 ## Per-agent endpoint
 

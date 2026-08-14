@@ -15,6 +15,9 @@ Keys are ordinary workspace API keys (`sk_stept_…`). Scopes map to what the MC
 `read` → search/ask/read tools, `write` → notes + document creation + browser driving,
 `admin` → everything except workspace deletion.
 
+Requests are rate limited **per key**: 120/minute by default, configurable via
+`STEPT_MCP_RATE_LIMIT_PER_MINUTE` (`0` disables).
+
 ## 2. Point your client at the server
 
 Endpoint: `https://<your-stept-host>/mcp` (streamable HTTP).
@@ -51,13 +54,15 @@ Endpoint: `https://<your-stept-host>/mcp` (streamable HTTP).
 
 ## 3. What the tools can do
 
+29 tools:
+
 | Area | Tools |
 |---|---|
 | Knowledge & RAG | `search_knowledge`, `ask_knowledge_base` (answer + citations + confidence), `get_document`, `create_document` |
 | Help center | `search_articles`, `get_article` |
 | Tours (DAP) | `list_tours`, `get_tour_steps`, `tours_health` (self-healing/breakage rollup) |
 | Inbox | `search_conversations`, `get_conversation`, `add_conversation_note` |
-| Browser (via extension) | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start`/`browser_record_stop` (records a tour), `browser_run_tour` |
+| Browser (via extension) | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_wait_for` (`selector?`, `text?`, `timeout_s`), `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start`/`browser_record_stop` (records a tour), `browser_run_tour` |
 
 ## 4. Driving a real browser
 
@@ -66,10 +71,18 @@ Install the Stept Chrome extension and sign in. It keeps an outbound connection 
 drawer gates the whole capability (on by default while signed in, off kills the connection).
 
 A connected AI agent can then `browser_open` a page, read an indexed snapshot
-(`[3]<button "Save">` …), click/type/scroll with trusted input, watch console/network, record a
-workflow as a tour, or replay an existing tour — in the user's real, logged-in browser.
-Browser tools require a key with the `write` scope. Chrome shows its debugging banner while a
-drive session is attached; password fields are never typed into or read.
+(`[3]<button "Save">` …), click/type/scroll with trusted input, wait for an element or text
+with `browser_wait_for`, watch console/network, record a workflow as a tour, or replay an
+existing tour — in the user's real, logged-in browser. Browser tools require a key with the
+`write` scope. Chrome shows its debugging banner while a drive session is attached; password
+fields are never typed into or read.
+
+- `browser_act` targets a snapshot index, or an accessible name via `role` + `name`
+  (e.g. `role: "button", name: "Save"`).
+- Screenshots are opt-in: pass `include_screenshot` and the tool returns a real MCP image
+  block alongside the text.
+- `browser_open` / `browser_navigate` accept public `http(s)` URLs only (no `file:`, no
+  localhost/private ranges).
 
 ## 5. Exposing a single AI agent as a channel
 
@@ -80,4 +93,5 @@ and retrieval settings) plus the agent's own enabled tools.
 
 Write tools honor the card's **approval mode**: ask in chat (default — the client prompts its
 user), ask in Stept (calls pause until approved on the Approvals page), never ask, or deny.
-Keys minted on the card are bound to that agent and don't work anywhere else.
+Keys minted on the card are bound to that agent and don't work anywhere else — the workspace
+`/mcp` endpoint and the REST API both reject them. Agent-bound keys are MCP-only.

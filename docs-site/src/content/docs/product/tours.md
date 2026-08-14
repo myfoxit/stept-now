@@ -35,10 +35,16 @@ Step types: `tooltip`, `modal`, `banner`, `hotspot`, `action`, `wait`.
 ## Delivery: triggers, audience, frequency, priority
 
 - **`url_match` trigger** — auto-delivered: the widget asks for eligible experiences on
-  boot and on every SPA URL change, and plays live tours whose `url_pattern` glob matches
+  boot and on every SPA URL change, and picks live tours whose `url_pattern` glob matches
   the page (max 5 candidates, highest `priority` first).
 - **`manual` trigger** — never auto-delivered; played only via `Stept('startTour', id)` or
   by the AI agent.
+
+A matching flow tour is **offered, not forced**: by default
+([`tourAutostartPolicy: 'ask'`](/product/widget/#settings)) the widget shows a compact
+offer pill the visitor can accept or dismiss. `'auto'` restores the old
+play-immediately behavior, `'never'` suppresses autostart entirely. Banners and
+announcements always show regardless of the policy — only flow tours are gated.
 
 Per-contact **frequency** controls repeats: `once`, `until_completed`, `until_dismissed`
 (default), or `every_time` (optional `cooldown_hours`). **Audience** is `all` or contact
@@ -58,21 +64,30 @@ Preview ignores status, trigger and frequency.
 
 ## Recording with the Chrome extension
 
-1. **Tours → connect recorder** in the dashboard mints an extension token (30 days,
-   requires `tours:manage`); install the Stept Chrome extension and sign in.
-2. Record the flow in your real product — clicks and inputs are captured with robust
+1. **Install the extension.** The dashboard's extension page (**Tours → connect
+   recorder**) links the download. Until the Chrome Web Store listing ships, load it
+   unpacked: download the zip from your dashboard (self-hosters can build it with
+   `pnpm --filter @stept/extension zip`), then `chrome://extensions` → Developer mode →
+   **Load unpacked**.
+2. **Connect it.** The same dashboard page mints an extension token (30 days, requires
+   `tours:manage`); paste it into the extension to sign in.
+3. Record the flow in your real product — clicks and inputs are captured with robust
    selectors; secrets are redacted; screenshots are attached per step.
-3. Saving creates a **draft** tour. Edit steps in the dashboard, then publish.
+4. Saving creates a **draft** tour. Edit steps in the dashboard, then publish.
 
 ## Stats and events
 
-The widget reports `started`, `step_viewed`, `completed`, `dismissed` and `step_error`
-events. `GET /tours/{id}/stats` aggregates starts/completions; `GET /tours/{id}/events`
-lists the raw events — `step_error` tells you which selector broke where.
+The widget reports six events: `started`, `step_viewed`, `step_blocked`, `completed`,
+`dismissed` and `step_error`. `GET /tours/{id}/stats` aggregates starts/completions;
+`GET /tours/{id}/events` lists the raw events — `step_error` tells you which selector
+broke where, and `step_blocked` means the step's anchor genuinely wasn't on the page and
+the visitor was shown the can't-find-it card (visitors piling up on one `step_blocked`
+step usually means that step needs a `url` or a better trigger).
 
 ## Playing tours
 
-- **Automatically** — live `url_match` tours play via the widget when the URL matches.
+- **Automatically** — live `url_match` tours are offered via the widget when the URL
+  matches (played immediately only with `tourAutostartPolicy: 'auto'`).
 - **Programmatically** — `Stept('startTour', '<tour_id>')` from your own code.
 - **By the AI agent** — with page control enabled, the agent's `find_guide` tool searches
   live tours (name, description, step text, URL triggers) and `show_guide` plays the match
