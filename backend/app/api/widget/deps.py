@@ -42,6 +42,19 @@ class WidgetPrincipal:
     contact: Contact
     contact_inbox: ContactInbox
 
+    @property
+    def identified(self) -> bool:
+        """Did THIS widget session prove who the visitor is?
+
+        ``contact.external_id`` alone is a contact-ROW property: a CSV import
+        or a merge can stamp one onto a contact that later boots anonymously.
+        What ``requires_identity`` promises is the per-session signal — the
+        identity was verified with the workspace's HMAC secret on this
+        contact+inbox pair (``ContactInbox.hmac_verified``, set at boot) — so
+        both must hold.
+        """
+        return bool(self.contact.external_id) and bool(self.contact_inbox.hmac_verified)
+
 
 async def widget_auth(
     session: Db,

@@ -9,11 +9,16 @@ across visitors.
 from __future__ import annotations
 
 import httpx
+from sqlalchemy import select
 
 from app.agents import client_actions
+from app.agents import tools as tool_registry
 from app.core.db import get_session_factory, session_scope, uuid7
+from app.models.agent import Agent
 from app.models.agent_run import AgentRun
+from app.models.contact import Contact
 from app.models.conversation import Conversation
+from app.models.inbox import ContactInbox
 from tests.widget.conftest import auth_headers, boot, create_widget_setup, identity_payload
 from tests.widget.test_copilot import attach_agent, start_thread
 
@@ -97,6 +102,79 @@ async def test_an_identified_boot_marks_the_defs_identified(client, widget):
         headers=auth_headers(token),
     )
     assert (await stored(created.json()["id"]))[1] is True
+
+
+async def plan_for(workspace_id: str, agent_id: str, conversation_id: str):
+    async with session_scope() as session:
+        agent = await session.get(Agent, agent_id)
+        conversation = await session.get(Conversation, conversation_id)
+        assert agent is not None and conversation is not None
+        return await tool_registry.resolve_agent_tools(
+            session, workspace_id, agent, conversation=conversation
+        )
+
+
+async def test_an_imported_external_id_does_not_identify_an_anonymous_boot(client, widget):
+    """`identified` is a SESSION property (proven via HMAC at boot), not a
+    contact-row one: an external_id stamped by a CSV import or a merge must not
+    unlock requires_identity actions for a visitor who booted anonymously."""
+    token = (await boot(client, widget.widget_key, visitor_id="v-imported")).json()["token"]
+    async with session_scope() as session:
+        contact_id = (
+            await session.execute(
+                select(ContactInbox.contact_id).where(
+                    ContactInbox.workspace_id == widget.workspace_id,
+                    ContactInbox.source_id == "v-imported",
+                )
+            )
+        ).scalar_one()
+        contact = await session.get(Contact, contact_id)
+        assert contact is not None
+        contact.external_id = "crm-42"  # what an import/merge leaves behind
+        await session.commit()
+
+    gated = {**INVITE, "requires_identity": True}
+    created = await client.post(
+        "/api/widget/conversations",
+        json={"message": "hi", "client_actions": [gated]},
+        headers=auth_headers(token),
+    )
+    assert created.status_code == 201
+    conversation_id = created.json()["id"]
+    defs, identified = await stored(conversation_id)
+    assert [d["name"] for d in defs] == ["invite_teammate"]
+    assert identified is False
+
+    # Same rule on the page-context intake path.
+    await client.post(
+        f"/api/widget/conversations/{conversation_id}/page-context",
+        json={"url": "https://app.test/", "client_actions": [gated]},
+        headers=auth_headers(token),
+    )
+    assert (await stored(conversation_id))[1] is False
+
+    # The run's tool plan therefore withholds the action from the model.
+    agent_id = await attach_agent(conversation_id, widget.workspace_id, settings={})
+    plan = await plan_for(widget.workspace_id, agent_id, conversation_id)
+    assert "app_invite_teammate" not in {spec.name for spec in plan.specs}
+
+
+async def test_an_hmac_verified_boot_offers_identity_gated_actions(client, widget):
+    token = (await boot(client, widget.widget_key, identity=identity_payload("user-77"))).json()[
+        "token"
+    ]
+    created = await client.post(
+        "/api/widget/conversations",
+        json={"message": "hi", "client_actions": [{**INVITE, "requires_identity": True}]},
+        headers=auth_headers(token),
+    )
+    assert created.status_code == 201
+    conversation_id = created.json()["id"]
+    assert (await stored(conversation_id))[1] is True
+
+    agent_id = await attach_agent(conversation_id, widget.workspace_id, settings={})
+    plan = await plan_for(widget.workspace_id, agent_id, conversation_id)
+    assert "app_invite_teammate" in plan.client
 
 
 # --- intake with page context -------------------------------------------------

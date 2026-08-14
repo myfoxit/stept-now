@@ -210,7 +210,7 @@ def _store_client_actions(
     defs = client_actions.normalize_defs(raw)
     attributes = dict(conversation.attributes or {})
     attributes[client_actions.ATTR_KEY] = client_actions.stored_block(
-        defs, identified=bool(principal.contact.external_id)
+        defs, identified=principal.identified
     )
     conversation.attributes = attributes
 

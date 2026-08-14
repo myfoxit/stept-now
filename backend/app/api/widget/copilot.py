@@ -99,7 +99,7 @@ async def set_page_context(
     if body.client_actions is not None:
         defs = client_actions.normalize_defs(body.client_actions)
         attributes[client_actions.ATTR_KEY] = client_actions.stored_block(
-            defs, identified=bool(principal.contact.external_id)
+            defs, identified=principal.identified
         )
         accepted = [str(entry["name"]) for entry in defs]
     conversation.attributes = attributes
