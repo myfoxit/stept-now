@@ -17,8 +17,29 @@ from app.core.queue import TaskContext, task
 logger = log("email")
 
 
+_ANCHOR_RE = re.compile(
+    r"<a\b[^>]*?href\s*=\s*(?:\"([^\"]*)\"|'([^']*)')[^>]*>(.*?)</a>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _anchor_to_text(match: re.Match[str]) -> str:
+    url = match.group(1) or match.group(2) or ""
+    label = re.sub(r"<[^>]+>", "", match.group(3)).strip()
+    if not label or unescape(label) == unescape(url):
+        return url
+    return f"{label} ({url})"
+
+
 def _to_text(html: str) -> str:
-    text = re.sub(r"<br\s*/?>", "\n", html)
+    """Plain-text rendering — the console fallback AND the text/plain part.
+
+    Anchors keep their URL (``label (url)``): invite and reset emails carry
+    their link only inside an ``<a href>``, so stripping tags naively leaves
+    both renderings without the one thing the email exists to deliver.
+    """
+    text = _ANCHOR_RE.sub(_anchor_to_text, html)
+    text = re.sub(r"<br\s*/?>", "\n", text)
     text = re.sub(r"</p>", "\n\n", text)
     text = re.sub(r"<[^>]+>", "", text)
     return unescape(text).strip()
