@@ -23,6 +23,7 @@ import type {
   SimpleResult,
 } from '../messages';
 import { RemoteDriveController } from '../remote/drive-controller';
+import { keepaliveNeeded } from '../remote/keepalive';
 import { deviceName, ensureDeviceId, RunClient } from '../remote/run-client';
 import {
   emptyPanelState,
@@ -238,19 +239,48 @@ export default defineBackground(() => {
     }
   }
 
-  void restore();
+  /** Resolves once `restore()` has rehydrated module state from storage.
+   *
+   * Load-bearing for the keepalive alarm below: the alarm firing is what
+   * REVIVED this worker, so its listener runs against a module that is still
+   * blank — no session, no runClient, every flag false — while `restore()` is
+   * still awaiting its first storage read. */
+  const restored = restore();
+  // The alarm listener attaches its handler only when an alarm actually fires,
+  // so a restore that rejects before then would surface as an unhandled
+  // rejection. Marking it handled here costs nothing and keeps the worker quiet.
+  void restored.catch(() => {});
 
   // Keepalive: an idle MV3 worker is torn down, which would strand a recording
   // (or drop the gateway socket) mid-flight. A periodic alarm revives it
   // (re-running this script → restore()) and re-opens the WS if it died.
+  //
+  // The alarm is the ONLY thing that can revive a torn-down worker — RunClient's
+  // 3s reconnect timer is a setTimeout and dies with it. So clearing this alarm
+  // while a session is signed in strands the extension: it stays offline until
+  // the user reloads it by hand. Decide only against restored state.
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name !== KEEPALIVE_ALARM) return;
-    if (!state.recording && !state.guide && !state.drive && !runClient) {
-      chrome.alarms.clear(KEEPALIVE_ALARM);
-      return;
-    }
-    runClient?.ensureConnected();
-    void persist();
+    void restored.then(() => {
+      const needed = keepaliveNeeded({
+        recording: state.recording,
+        guide: state.guide,
+        drive: state.drive,
+        hasRunClient: runClient !== null,
+        hasSession: session !== null,
+        remoteControl: state.remoteControl,
+      });
+      if (!needed) {
+        chrome.alarms.clear(KEEPALIVE_ALARM);
+        return;
+      }
+      // Torn down mid-session: the socket went with the worker, so re-open it.
+      // startRunClient() no-ops without a session and is epoch-guarded against
+      // the copy restore() may be starting concurrently.
+      if (runClient) runClient.ensureConnected();
+      else startRunClient();
+      void persist();
+    });
   });
 
   function armKeepalive(): void {
