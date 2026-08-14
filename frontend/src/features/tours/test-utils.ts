@@ -78,6 +78,7 @@ export function makeStats(overrides: Partial<TourStats> = {}): TourStats {
     completion_rate: 0.35,
     unique_starts: 96,
     step_errors: 4,
+    step_blocked: 6,
     by_day: [
       { date: '2026-07-29', starts: 40, completions: 12 },
       { date: '2026-07-30', starts: 45, completions: 18 },

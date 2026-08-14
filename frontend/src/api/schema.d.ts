@@ -369,7 +369,8 @@ export interface paths {
     }
     /**
      * Social Login Providers
-     * @description Public: which social-login buttons the SPA should render.
+     * @description Public: which social-login buttons the SPA should render, and whether
+     *     open registration is offered at all (``STEPT_ALLOW_SIGNUP``).
      */
     get: operations['social_login_providers_api_v1_auth_oauth_providers_get']
     put?: never
@@ -3932,7 +3933,14 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** Record Widget Event */
+    /**
+     * Record Widget Event
+     * @description Playback lifecycle intake: `started` / `step_viewed` / `step_blocked` /
+     *     `completed` / `dismissed` (+ legacy `step_error`). Tolerant: unknown event
+     *     types are accepted and ignored, never 422 — an old backend must not break a
+     *     newer widget. Lifecycle events of agent-initiated tours also resume the
+     *     conversation's parked run and keep its transcript truthful (service seam).
+     */
     post: operations['record_widget_event_api_widget_tours__tour_id__events_post']
     delete?: never
     options?: never
@@ -4151,8 +4159,17 @@ export interface components {
       /** Trigger Message Id */
       trigger_message_id: string | null
     }
-    /** AgentSettings */
+    /**
+     * AgentSettings
+     * @description Everything the engine reads out of ``agent.settings`` — keep it that way.
+     *
+     *     Both API write paths persist ``model_dump()`` of this model, so a key the
+     *     engine reads but this schema does not declare can never be set over the API
+     *     and is silently wiped on every save. If the engine grows a new settings
+     *     key, it gets a typed field here in the same change.
+     */
     AgentSettings: {
+      client_actions?: components['schemas']['ClientActionsSettings']
       guardrails?: components['schemas']['GuardrailSettings']
       /**
        * Handoff Message
@@ -4161,6 +4178,8 @@ export interface components {
       handoff_message: string
       mcp?: components['schemas']['McpChannelSettings']
       page_control?: components['schemas']['PageControlSettings']
+      /** Reply Language */
+      reply_language?: string | null
       retrieval?: components['schemas']['RetrievalSettings']
     }
     /** AgentStepOut */
@@ -4839,6 +4858,8 @@ export interface components {
     /** BootRequest */
     BootRequest: {
       identity?: components['schemas']['BootIdentity'] | null
+      /** Locale */
+      locale?: string | null
       /** Visitor Id */
       visitor_id?: string | null
       /** Widget Key */
@@ -5268,6 +5289,21 @@ export interface components {
       title: string
       /** Url */
       url?: string | null
+    }
+    /**
+     * ClientActionsSettings
+     * @description May this agent call the actions the host page registers (``Stept('action', …)``)?
+     *
+     *     ON by default: registering an action is the developer's own opt-in (see
+     *     `app.agents.client_actions.enabled`), so this switch exists only to turn a
+     *     specific agent off.
+     */
+    ClientActionsSettings: {
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean
     }
     /** ClientOpAck */
     ClientOpAck: {
@@ -7480,6 +7516,8 @@ export interface components {
     }
     /** RetrievalSettings */
     RetrievalSettings: {
+      /** Context Tokens */
+      context_tokens?: number | null
       /**
        * Enabled
        * @default true
@@ -7893,6 +7931,17 @@ export interface components {
       bytes: number
       /** Key */
       key: string
+    }
+    /**
+     * SocialLoginProvidersOut
+     * @description Login-page bootstrap. Lives here rather than app/schemas/auth.py because
+     *     it belongs to this router alone — nothing else renders login buttons.
+     */
+    SocialLoginProvidersOut: {
+      /** Allow Signup */
+      allow_signup: boolean
+      /** Providers */
+      providers: string[]
     }
     /** SourceCreate */
     SourceCreate: {
@@ -8594,6 +8643,11 @@ export interface components {
       /** Starts */
       starts: number
       /**
+       * Step Blocked
+       * @default 0
+       */
+      step_blocked: number
+      /**
        * Step Errors
        * @default 0
        */
@@ -8610,6 +8664,8 @@ export interface components {
     TourStepIn: {
       action?: components['schemas']['StepAction'] | null
       advance?: components['schemas']['StepAdvance']
+      /** Advance On Click */
+      advance_on_click?: boolean | null
       /**
        * Body
        * @default
@@ -8657,6 +8713,8 @@ export interface components {
        * @enum {string}
        */
       type: 'tooltip' | 'modal' | 'banner' | 'hotspot' | 'action' | 'wait'
+      /** Url */
+      url?: string | null
       wait?: components['schemas']['StepWait'] | null
     }
     /**
@@ -8666,6 +8724,8 @@ export interface components {
     TourStepOut: {
       action?: components['schemas']['StepAction'] | null
       advance?: components['schemas']['StepAdvance']
+      /** Advance On Click */
+      advance_on_click?: boolean | null
       /**
        * Body
        * @default
@@ -8712,6 +8772,8 @@ export interface components {
        * @enum {string}
        */
       type: 'tooltip' | 'modal' | 'banner' | 'hotspot' | 'action' | 'wait'
+      /** Url */
+      url?: string | null
       wait?: components['schemas']['StepWait'] | null
     }
     /** TourStepStat */
@@ -8795,6 +8857,8 @@ export interface components {
       email: string
       /** Id */
       id: string
+      /** Locale */
+      locale?: string | null
       /** Name */
       name: string
     }
@@ -8802,6 +8866,8 @@ export interface components {
     UserUpdate: {
       /** Avatar Url */
       avatar_url?: string | null
+      /** Locale */
+      locale?: string | null
       /** Name */
       name?: string | null
       /** Preferences */
@@ -9017,6 +9083,8 @@ export interface components {
        * Format: date-time
        */
       created_at: string
+      /** Detected Locale */
+      detected_locale?: string | null
       /** Direction */
       direction: string
       /** Id */
@@ -9060,13 +9128,15 @@ export interface components {
        */
       completed: boolean
     }
-    /** WidgetTourEventIn */
+    /**
+     * WidgetTourEventIn
+     * @description Telemetry intake is TOLERANT by contract: `event` is a free string so an
+     *     unknown type is accepted (and ignored server-side, see
+     *     `tours.KNOWN_TOUR_EVENTS`) instead of 422ing a newer widget build.
+     */
     WidgetTourEventIn: {
-      /**
-       * Event
-       * @enum {string}
-       */
-      event: 'started' | 'step_viewed' | 'completed' | 'dismissed' | 'step_error'
+      /** Event */
+      event: string
       /** Meta */
       meta?: {
         [key: string]: unknown
@@ -10036,9 +10106,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': {
-            [key: string]: string[]
-          }
+          'application/json': components['schemas']['SocialLoginProvidersOut']
         }
       }
     }
@@ -18185,6 +18253,7 @@ export interface operations {
     parameters: {
       query?: {
         query?: string
+        locale?: string
       }
       header?: {
         'x-widget-token'?: string | null

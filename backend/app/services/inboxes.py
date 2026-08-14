@@ -88,12 +88,19 @@ def get_secrets(inbox: Inbox) -> dict[str, Any]:
 
 
 def embed_snippet(inbox: Inbox) -> str | None:
-    """Copy-paste embed snippet for widget inboxes (loader served by this API)."""
+    """Copy-paste embed snippet for widget inboxes (loader served by this API).
+
+    The inline script also installs the queue stub the loader drains
+    (widget/src/loader-core.ts ``installStept``): ``Stept(...)`` calls made
+    before loader.js arrives collect in ``window.Stept.q`` instead of throwing.
+    """
     if inbox.channel_type != ChannelType.WIDGET or not inbox.widget_key:
         return None
     base = get_settings().public_base_url
     return (
-        f'<script>window.SteptSettings={{workspaceKey:"{inbox.widget_key}"}}</script>\n'
+        f'<script>window.SteptSettings={{workspaceKey:"{inbox.widget_key}"}};'
+        "window.Stept=window.Stept||"
+        "function(){(window.Stept.q=window.Stept.q||[]).push(arguments)};</script>\n"
         f'<script src="{base}/widget-assets/loader.js" async></script>'
     )
 

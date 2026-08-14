@@ -32,6 +32,14 @@ async def test_widget_embed_snippet(client, workspace_ctx):
     assert f'window.SteptSettings={{workspaceKey:"{inbox["widget_key"]}"}}' in snippet
     assert "http://localhost:8600/widget-assets/loader.js" in snippet
     assert snippet.count("<script") == 2
+    # The inline script must also install the queue stub the loader drains
+    # (loader-core.ts installStept) so pre-load Stept(...) calls never throw.
+    assert snippet == (
+        f'<script>window.SteptSettings={{workspaceKey:"{inbox["widget_key"]}"}};'
+        "window.Stept=window.Stept||"
+        "function(){(window.Stept.q=window.Stept.q||[]).push(arguments)};</script>\n"
+        '<script src="http://localhost:8600/widget-assets/loader.js" async></script>'
+    )
 
 
 async def test_create_inbox_with_secrets_encrypted_at_rest(client, workspace_ctx):

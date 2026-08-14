@@ -6,6 +6,7 @@ import contextlib
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -41,6 +42,22 @@ OPEN_CORS_PREFIXES = ("/api/widget", "/portal", "/widget-assets", "/extension-as
 # The widget iframe app and the help-center portal are *meant* to be framed by
 # customer sites, so they are the one place we must not send a framing ban.
 FRAMEABLE_PREFIXES = ("/widget-assets", "/portal")
+
+# Route trees that authenticate by other means (widget token, signed OAuth
+# state, provider webhook signatures, refresh cookie) or not at all. The
+# OpenAPI document lifts its global bearer requirement per-operation for these,
+# so generated clients don't demand an Authorization header that would be
+# wrong to send.
+PUBLIC_PATH_PREFIXES = (
+    "/api/widget",
+    "/api/channels",
+    "/portal",
+    "/api/stripe",
+    "/api/integrations",
+    "/api/v1/auth",
+    "/api/v1/healthz",
+    "/extension-assets",
+)
 
 # Sent on every response. No CSP here: the dashboard is a Vite SPA served by the
 # edge (which owns its policy), and the responses this app returns that could
@@ -227,6 +244,53 @@ def create_app() -> FastAPI:
         application.mount(
             "/widget-assets", StaticFiles(directory=widget_dist), name="widget-assets"
         )
+
+    base_openapi = application.openapi
+
+    def openapi_with_security() -> dict[str, Any]:
+        """The generated schema plus an honest auth declaration.
+
+        FastAPI only emits security metadata for routes using its Security()
+        dependencies, which ours don't — so without this, generated clients
+        never send Authorization. Declared here: a global bearer requirement
+        (user JWTs and workspace API keys share the header), the widget's
+        header token as a named scheme, and per-operation ``security: []`` on
+        the public trees. ``base_openapi`` caches; every mutation below is
+        idempotent, so re-entry on the cached schema is harmless.
+        """
+        schema = base_openapi()
+        components = schema.setdefault("components", {})
+        components["securitySchemes"] = {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": (
+                    "`Authorization: Bearer <token>` — either a user access token "
+                    "(JWT from POST /api/v1/auth/login) or a workspace API key "
+                    "(`sk_stept_…`, minted in Settings → API keys)."
+                ),
+            },
+            "WidgetToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Widget-Token",
+                "description": (
+                    "Visitor session token for the /api/widget tree, issued by the "
+                    "widget bootstrap endpoint. Those operations are marked public "
+                    "(`security: []`) because bootstrap itself runs pre-token."
+                ),
+            },
+        }
+        schema["security"] = [{"BearerAuth": []}]
+        for path, item in schema.get("paths", {}).items():
+            if not path.startswith(PUBLIC_PATH_PREFIXES):
+                continue
+            for operation in item.values():
+                if isinstance(operation, dict):  # skips path-item strings/lists
+                    operation["security"] = []
+        return schema
+
+    application.openapi = openapi_with_security  # type: ignore[method-assign]
 
     return application
 
