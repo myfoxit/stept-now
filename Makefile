@@ -2,12 +2,12 @@
 SHELL := /bin/bash
 COMPOSE := $(shell command -v docker-compose >/dev/null 2>&1 && echo docker-compose || echo docker compose)
 
-.PHONY: help setup dev dev-backend dev-frontend services services-down seed types \
-        verify test test-backend test-frontend lint format e2e e2e-ui build clean \
+.PHONY: help setup dev dev-backend dev-frontend widget-dist services services-down seed types \
+        verify test test-backend test-frontend lint format i18n-check e2e e2e-ui build clean \
         db-upgrade db-revision
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Install all dependencies (backend uv env + pnpm workspaces)
 	cd backend && uv sync --all-extras
@@ -19,13 +19,20 @@ services: ## Start Postgres/Redis/Mailpit (docker)
 services-down: ## Stop docker services
 	$(COMPOSE) down
 
-dev-backend: ## Run API on :8600 (reload)
+# widget/dist is gitignored and the backend only mounts /widget-assets when it
+# exists (backend/app/main.py), so on a fresh clone `make dev` would serve an
+# embed snippet whose loader 404s. Order-only prereq: build once when missing,
+# never force a rebuild when present (`make build` owns freshness).
+widget-dist: ## Build the embeddable widget if widget/dist is missing
+	@test -f widget/dist/loader.js || pnpm --filter @stept/widget build
+
+dev-backend: | widget-dist ## Run API on :8600 (reload)
 	cd backend && uv run uvicorn app.main:app --port 8600 --reload
 
 dev-frontend: ## Run dashboard on :5273
 	pnpm --filter @stept/frontend dev
 
-dev: ## Run backend + frontend together
+dev: | widget-dist ## Run backend + frontend together
 	@$(MAKE) -j2 dev-backend dev-frontend
 
 seed: ## Seed demo workspace/data (idempotent)

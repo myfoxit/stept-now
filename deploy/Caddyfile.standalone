@@ -1,0 +1,69 @@
+# Stept standalone ingress — one domain, the whole product behind it.
+#
+#   https://{$DOMAIN}  → API-owned paths to api:8600, everything else (dashboard
+#                        SPA + /widget-assets/* widget bundle) to web:80
+#
+# Derived from the production Caddyfile (deploy/Caddyfile) minus the landing,
+# docs and co-tenant sites. ACME is HTTP-01; if this box sits behind a CDN, make
+# sure port-80 challenges are forwarded.
+{
+	email {$ACME_EMAIL}
+}
+
+# Transport-level headers only. Framing, referrer, nosniff and permissions are
+# set by whoever actually produces the response, because only they know whether
+# the path is meant to be embedded in a customer's site (the widget iframe, the
+# help-center portal) — a blanket framing ban from out here would break those.
+# API/portal responses: backend/app/main.py (security_headers_for).
+# SPA + static responses: deploy/nginx.conf + deploy/nginx-static.conf.
+(transport_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+
+# Every path the API owns.
+(stept_api_routes) {
+	# WebSockets: dashboard realtime + widget realtime.
+	@ws path /ws /ws/*
+	handle @ws {
+		reverse_proxy api:8600
+	}
+
+	# REST API, public help-center portal, recorder-extension downloads.
+	@api path /api/* /portal/* /extension-assets/*
+	handle @api {
+		reverse_proxy api:8600 {
+			# Uploads and knowledge ingestion can take a while.
+			transport http {
+				read_timeout 300s
+			}
+		}
+	}
+
+	# MCP: AI clients (Claude, Cursor, …) call workspace + browser-drive tools
+	# here. Long-poll heavy — browser_run_tour legitimately holds the request
+	# open for up to 15 minutes, so this cannot share @api's 300s budget.
+	# The bare /mcp form matters: the backend 307-rewrites it to /mcp/ itself,
+	# and MCP clients do not reliably follow redirects issued from out here.
+	@mcp path /mcp /mcp/*
+	handle @mcp {
+		reverse_proxy api:8600 {
+			transport http {
+				read_timeout 960s
+			}
+		}
+	}
+}
+
+{$DOMAIN} {
+	import transport_headers
+	import stept_api_routes
+
+	# Everything else — the dashboard SPA and the widget bundle. nginx in the
+	# web image serves /widget-assets/* itself, so it needs no route up here.
+	handle {
+		reverse_proxy web:80
+	}
+}

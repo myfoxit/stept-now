@@ -93,6 +93,14 @@ jobs:
         run: |
           pnpm install --ignore-workspace --frozen-lockfile
           pnpm build
+      # Same story as the landing: docs-site sits outside the pnpm workspace with
+      # its own lockfile, so `pnpm -r` never touches it and a broken docs build
+      # otherwise only surfaces when deploy assembles the Docker image.
+      - name: Build the docs site
+        working-directory: docs-site
+        run: |
+          pnpm install --ignore-workspace --frozen-lockfile
+          pnpm build
 
   e2e:
     name: End-to-end (Playwright)
