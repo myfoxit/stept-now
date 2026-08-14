@@ -35,6 +35,9 @@ class RetrievalSettings(BaseModel):
     enabled: bool = True
     k: int = Field(default=6, ge=1, le=20)
     source_ids: list[str] | None = None
+    #: Token budget for the assembled knowledge context (`app.agents.tools`
+    #: clamps to >= 200 at read time). None = the engine default.
+    context_tokens: int | None = Field(default=None, ge=200, le=200_000)
 
 
 class GuardrailSettings(BaseModel):
@@ -71,12 +74,36 @@ class PageControlSettings(BaseModel):
     allow_actions: bool = False
 
 
+class ClientActionsSettings(BaseModel):
+    """May this agent call the actions the host page registers (``Stept('action', …)``)?
+
+    ON by default: registering an action is the developer's own opt-in (see
+    `app.agents.client_actions.enabled`), so this switch exists only to turn a
+    specific agent off.
+    """
+
+    enabled: bool = True
+
+
 class AgentSettings(BaseModel):
+    """Everything the engine reads out of ``agent.settings`` — keep it that way.
+
+    Both API write paths persist ``model_dump()`` of this model, so a key the
+    engine reads but this schema does not declare can never be set over the API
+    and is silently wiped on every save. If the engine grows a new settings
+    key, it gets a typed field here in the same change.
+    """
+
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
     handoff_message: str = "Let me connect you with a teammate who can help."
     guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)
     page_control: PageControlSettings = Field(default_factory=PageControlSettings)
     mcp: McpChannelSettings = Field(default_factory=McpChannelSettings)
+    client_actions: ClientActionsSettings = Field(default_factory=ClientActionsSettings)
+    #: Fixed language for every AI reply ("ja", "pt-BR", …), resolved through
+    #: `app.core.i18n.reply_language_name` — deliberately wider than the shipped
+    #: interface locales. None = mirror the visitor's own language.
+    reply_language: str | None = Field(default=None, max_length=100)
 
 
 class AgentCreate(BaseModel):

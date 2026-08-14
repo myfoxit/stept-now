@@ -6,10 +6,13 @@ from __future__ import annotations
 from app.agents import engine
 from app.ai.base import ChatResult, Usage
 from app.core.db import session_scope
+from app.core.events import EventNames
 from app.models.tag import Tag
 from tests.agents.conftest import (
+    capture_events,
     conversation_with_message,
     get_conversation,
+    get_pending_approval,
     get_run,
     get_steps,
     make_agent,
@@ -18,6 +21,7 @@ from tests.agents.conftest import (
     seed_rag_docs,
     step_kinds,
 )
+from tests.conftest import drain_tasks
 
 
 async def test_happy_path_search_and_cite(actx):
@@ -332,3 +336,53 @@ async def test_open_conversation_stays_with_humans(actx):
     await add_contact_message(actx, conversation_id, "still here")
     conversation = await get_conversation(conversation_id)
     assert conversation.status == "open"
+
+
+async def test_run_emits_started_and_completed_events(actx):
+    """`agent_run.started` pairs `agent_run.completed` — same payload shape,
+    emitted when the run first flips to running (it used to be a dead name in
+    EventNames that no code path ever emitted)."""
+    agent_id = await make_agent(actx)
+    conversation_id, _ = await conversation_with_message(actx, "Just a plain question")
+    with capture_events(EventNames.AGENT_RUN_STARTED, EventNames.AGENT_RUN_COMPLETED) as captured:
+        run_id = await run_now(actx, agent_id, conversation_id)
+
+    assert [e.name for e in captured] == ["agent_run.started", "agent_run.completed"]
+    started, completed = captured
+    assert started.workspace_id == actx.workspace_id
+    assert started.payload == {
+        "run_id": run_id,
+        "conversation_id": conversation_id,
+        "status": "running",
+    }
+    assert started.actor.type == "agent" and started.actor.id == agent_id
+    assert completed.payload == {
+        "run_id": run_id,
+        "conversation_id": conversation_id,
+        "status": "completed",
+    }
+
+
+async def test_started_fires_once_across_a_park_and_resume(actx, client):
+    """A resumed run re-claims its lease but did not start again — one started
+    per run, however many pauses it survives."""
+    agent_id = await make_agent(actx)  # close_conversation defaults to require_approval
+    conversation_id, _ = await conversation_with_message(
+        actx, 'Close it [[tool:close_conversation {"closing_message": "All set!"}]]'
+    )
+    with capture_events(EventNames.AGENT_RUN_STARTED, EventNames.AGENT_RUN_COMPLETED) as captured:
+        run_id = await run_now(actx, agent_id, conversation_id)
+        assert (await get_run(run_id)).status == "awaiting_approval"
+        approval = await get_pending_approval(run_id)
+        decided = await client.post(
+            f"{actx.base}/ai/approvals/{approval.id}/decide",
+            json={"approved": True},
+            headers=actx.owner_headers,
+        )
+        assert decided.status_code == 200, decided.text
+        await drain_tasks()
+
+    assert (await get_run(run_id)).status == "completed"
+    names = [e.name for e in captured]
+    assert names.count("agent_run.started") == 1
+    assert names.count("agent_run.completed") == 1

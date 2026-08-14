@@ -8,6 +8,8 @@ is fully deterministic); approvals resume through the real API decide + queue.
 
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +17,7 @@ import pytest
 from sqlalchemy import select
 
 from app.agents import engine
+from app.core import events
 from app.core.db import get_session_factory, session_scope, uuid7
 from app.core.events import Actor
 from app.models.agent import Agent
@@ -67,6 +70,24 @@ async def actx(workspace_ctx) -> AgentsCtx:
         session.add(contact)
         await session.commit()
         return AgentsCtx(wc=workspace_ctx, inbox_id=inbox.id, contact_id=contact.id)
+
+
+@contextlib.contextmanager
+def capture_events(*names: str) -> Iterator[list[events.Event]]:
+    """Record emitted domain events without disturbing app subscribers
+    (same pattern as the integrations suite)."""
+    captured: list[events.Event] = []
+
+    async def _handler(session: Any, event: events.Event) -> None:
+        captured.append(event)
+
+    for name in names:
+        events._subscribers.setdefault(name, []).append(_handler)
+    try:
+        yield captured
+    finally:
+        for name in names:
+            events._subscribers[name].remove(_handler)
 
 
 # --- builders (all commit so background/API sessions see them) ---------------

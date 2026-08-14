@@ -7,8 +7,10 @@ import httpx
 import respx
 from sqlalchemy import func, select
 
+from app.agents import client_actions, engine
+from app.agents import tools as tool_registry
 from app.core.db import session_scope
-from app.models.agent import CustomAction
+from app.models.agent import Agent, CustomAction
 from app.models.agent_run import AgentRun
 from tests.agents.conftest import (
     conversation_with_message,
@@ -68,6 +70,80 @@ async def test_agent_crud_authz(actx, client):
     assert (
         await client.post(f"{actx.base}/ai/agents", json=AGENT_BODY, headers=agent)
     ).status_code == 403
+
+
+ENGINE_SETTINGS = {
+    "client_actions": {"enabled": False},
+    "reply_language": "Japanese",
+    "retrieval": {"enabled": True, "k": 6, "context_tokens": 1200},
+}
+
+
+async def _create_agent_with_engine_settings(actx, client) -> str:
+    created = await client.post(
+        f"{actx.base}/ai/agents",
+        json={**AGENT_BODY, "settings": ENGINE_SETTINGS},
+        headers=actx.owner_headers,
+    )
+    assert created.status_code == 201, created.text
+    return created.json()["id"]
+
+
+async def test_agent_settings_persist_the_keys_the_engine_reads(actx, client):
+    """`client_actions.enabled` / `reply_language` / `retrieval.context_tokens`
+    are read by the engine from the stored settings dict — an untyped key is
+    silently dropped by AgentSettings, so it could never persist over the API
+    (which is exactly how this bug survived the direct-ORM engine tests)."""
+    agent_id = await _create_agent_with_engine_settings(actx, client)
+
+    fetched = await client.get(f"{actx.base}/ai/agents/{agent_id}", headers=actx.owner_headers)
+    settings = fetched.json()["settings"]
+    assert settings["client_actions"]["enabled"] is False
+    assert settings["reply_language"] == "Japanese"
+    assert settings["retrieval"]["context_tokens"] == 1200
+
+    # The engine-facing accessors read this exact dict.
+    assert client_actions.enabled(settings) is False
+    assert tool_registry._context_budget(Agent(settings=settings)) == 1200
+
+    # A resolvable tag reaches the prompt through `reply_language_name`.
+    patched = await client.patch(
+        f"{actx.base}/ai/agents/{agent_id}",
+        json={"settings": {**settings, "reply_language": "ja"}},
+        headers=actx.owner_headers,
+    )
+    assert patched.status_code == 200, patched.text
+    assert "Always reply in Japanese" in engine._language_prompt(patched.json()["settings"], None)
+
+
+async def test_patching_an_unrelated_field_keeps_the_engine_settings(actx, client):
+    """Both save shapes the dashboard produces: a PATCH without settings, and a
+    full settings round-trip with one unrelated field changed. Before these keys
+    were typed, the round-trip shape wiped them on every save."""
+    agent_id = await _create_agent_with_engine_settings(actx, client)
+
+    renamed = await client.patch(
+        f"{actx.base}/ai/agents/{agent_id}",
+        json={"name": "Renamed"},
+        headers=actx.owner_headers,
+    )
+    assert renamed.status_code == 200, renamed.text
+    settings = renamed.json()["settings"]
+    assert settings["client_actions"]["enabled"] is False
+    assert settings["reply_language"] == "Japanese"
+    assert settings["retrieval"]["context_tokens"] == 1200
+
+    resaved = await client.patch(
+        f"{actx.base}/ai/agents/{agent_id}",
+        json={"settings": {**settings, "handoff_message": "A teammate will take over."}},
+        headers=actx.owner_headers,
+    )
+    assert resaved.status_code == 200, resaved.text
+    settings = resaved.json()["settings"]
+    assert settings["handoff_message"] == "A teammate will take over."
+    assert settings["client_actions"]["enabled"] is False
+    assert settings["reply_language"] == "Japanese"
+    assert settings["retrieval"]["context_tokens"] == 1200
 
 
 async def test_action_crud_masks_header_values(actx, client):

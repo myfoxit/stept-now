@@ -587,6 +587,7 @@ async def execute_run(
                 run.finished_at = utcnow()
                 await session.flush()
                 return ExecutionResult("canceled", None, [], _run_citations(run))
+        first_start = run.started_at is None
         claim_result = _claim(run)
         if claim_result == "skip":
             return ExecutionResult(run.status, None, [], _run_citations(run))
@@ -595,6 +596,24 @@ async def execute_run(
             sink = _StepSink(session, run, mode, await _max_ord(session, run.id) + 1)
             return await _fail(ctx, sink, "worker lease expired mid-run")
         await session.flush()
+        if first_start:
+            # Once per run — a resume re-claims the lease but did not *start*
+            # anything. Mirrors the `agent_run.completed` emit in `_complete`:
+            # same payload shape, emitted after the flush that made the status
+            # visible, still inside the transaction.
+            await emit(
+                session,
+                Event(
+                    name=EventNames.AGENT_RUN_STARTED,
+                    workspace_id=run.workspace_id,
+                    payload={
+                        "run_id": run.id,
+                        "conversation_id": run.conversation_id,
+                        "status": run.status,
+                    },
+                    actor=actor,
+                ),
+            )
 
     workspace = await session.get(Workspace, run.workspace_id)
     workspace_name = workspace.name if workspace is not None else "our team"
