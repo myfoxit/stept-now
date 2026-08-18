@@ -65,6 +65,39 @@ Knowledge/tours/conversations tools (owner BE-A1, `app/mcp/tools_knowledge.py`):
 | `add_conversation_note` | conversation_id, body | CONVERSATIONS_WRITE | posts a private note as the API key actor; audited |
 | `create_document` | title, content_markdown, source_id? | KNOWLEDGE_WRITE | creates authored doc + queues ingest; audited |
 
+### Authoring / analytics / diagnosis (added post-W10 — `tools_{authoring,analytics,diagnose}.py`)
+
+Design notes for these live in `docs/research/usertour-gaps.md`. Two invariants hold across
+the whole group and are the reason it is safe to let a model write here:
+
+1. **Every write routes through the REST API's own Pydantic schema** (`TourCreate`,
+   `ChecklistUpdate`, …). There is no second set of rules for MCP, so a step the dashboard
+   would reject is rejected here, with `{"error", "details":[{loc,message}]}`.
+2. **Diagnosis never re-derives delivery.** Gates are evaluated with the same helpers the
+   widget bootstrap uses, and `diagnose_contact` takes its "showing" list from
+   `deliverable_*` itself. A diagnosis that can disagree with delivery is worse than none.
+
+| tool | args | perm | returns |
+|---|---|---|---|
+| `get_authoring_guide` | section?: string[] | — | sectioned authoring contract + TOC; no args → core sections (`lifecycle`, `publish-requirements`). Unknown ids reported, valid ones still returned |
+| `get_experience_schema` | type | — | `{type, create, update}` JSON Schemas — the ones the write tools validate against |
+| `create_tour` / `update_tour` | name, steps, kind, trigger, audience, schedule, frequency, settings, theme, priority | TOURS_MANAGE | draft tour summary; `steps` is a FULL replacement on update; audited |
+| `publish_tour` / `pause_tour` | tour_id | TOURS_MANAGE | status transition via the service (emits the same events as the dashboard) |
+| `create_checklist` / `update_checklist` / `publish_checklist` / `pause_checklist` | name, items, trigger, audience, theme, launcher, priority | TOURS_MANAGE | as above; `items` is a FULL replacement |
+| `create_survey` / `update_survey` / `publish_survey` / `pause_survey` | name, questions, presentation, trigger, audience, schedule, frequency, theme, thanks_message, priority | TOURS_MANAGE | as above; `questions` is a FULL replacement |
+| `validate_experience` | type, experience_id | TOURS_READ | `{ok, errors[], warnings[]}` — catches well-formed content that cannot render or cannot be reached (`app/mcp/validation.py`) |
+| `get_tour_analytics` | tour_id | REPORTS_READ | starts/completions/rate, funnel with per-step `reach_rate`/`drop_off_rate` + `biggest_drop_off`, by_day, playback health |
+| `get_checklist_analytics` | checklist_id | REPORTS_READ | per-item completion + `stalls_at` (steepest fall from the item above) |
+| `get_survey_results` | survey_id | REPORTS_READ | question list + NPS/rating/select distributions (completed only) + text verbatims (incl. partials) |
+| `get_adoption_overview` | days=30 | REPORTS_READ | every tour/checklist/survey ranked by reach, capped at 50 with `truncated`; draft + paused rows included |
+| `diagnose_experience` | type, experience_id, url?, contact_id? | TOURS_READ | `{verdict, summary, gates[], conditions[]}` — gates pass/fail/unknown; `unknown` means the fact was not supplied. Unmatched audience conditions carry the contact's `actual` value |
+| `diagnose_contact` | contact_id, url | TOURS_READ | `{showing[], blocked[]}` — showing comes from `deliverable_*`; each blocked row names the first failing gate (or `delivery_cap`) |
+
+Tool annotations (`app/mcp/annotations.py`): read tools are `readOnlyHint`; write tools take
+their set from the verb prefix — `delete_|remove_|archive_` → destructive,
+`update_|upsert_|publish_|pause_|restore_|set_|add_` → idempotent, everything else → additive
+create. `openWorldHint` is false everywhere (tools act on the caller's own workspace).
+
 Resources: `stept://articles/{id}`, `stept://documents/{id}`, `stept://tours/{id}` (markdown).
 
 Browser tools (owner BE-B, `app/mcp/tools_browser.py`) — ALL require TOURS_MANAGE; delegate to

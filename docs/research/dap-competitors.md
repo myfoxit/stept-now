@@ -46,10 +46,14 @@ NextStepjs). Full citations in the research transcript; key engineering takeaway
 
 ## OSS landscape
 
-- **Usertour** (AGPL, self-host): the only real OSS DAP platform — WYSIWYG builder, tours/
-  checklists/surveys/NPS/launchers/banners, themes, segmentation, environments, analytics.
-  Lacks: branching, resource-center depth, do-it-for-me, A/B, localization, self-healing,
-  and any support/inbox integration.
+- **Usertour** — the only real OSS DAP platform. **This entry is superseded by
+  `docs/research/usertour-gaps.md` (2026-08-18, source-level, v0.9.2).** Two things it got
+  wrong: the licence is now **MIT community + a proprietary `LICENSE.enterprise`** (not AGPL) —
+  SSO and the admin panel are the paid tier — and the feature list predates v0.8.5–v0.9.2,
+  which added localization with AI translation, OIDC SSO, announcements, cross-entity segments,
+  a public v2 REST API and a 67-tool MCP server. Still lacks: branching, do-it-for-me driving,
+  A/B, self-healing selectors, its own browser bridge (their docs pair with Chrome DevTools MCP
+  for selectors), and any support/inbox integration.
 - **Flows** (flows.sh): headless bring-your-own-components; platform proprietary.
 - driver.js / Shepherd (AGPL) / intro.js (AGPL) / Onborda / NextStepjs: renderers only — no
   state, targeting, analytics, builder.

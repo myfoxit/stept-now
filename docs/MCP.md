@@ -54,15 +54,52 @@ Endpoint: `https://<your-stept-host>/mcp` (streamable HTTP).
 
 ## 3. What the tools can do
 
-29 tools:
+50 tools:
 
 | Area | Tools |
 |---|---|
 | Knowledge & RAG | `search_knowledge`, `ask_knowledge_base` (answer + citations + confidence), `get_document`, `create_document` |
 | Help center | `search_articles`, `get_article` |
+| Authoring | `get_authoring_guide`, `get_experience_schema`, `create_tour`/`update_tour`/`publish_tour`/`pause_tour`, the same four for `checklist` and `survey`, `validate_experience` |
+| Adoption analytics | `get_adoption_overview` (everything ranked by reach), `get_tour_analytics` (funnel + biggest drop-off + playback health), `get_checklist_analytics`, `get_survey_results` |
+| Diagnosis | `diagnose_experience` ("why isn't this showing?"), `diagnose_contact` ("what would this visitor see?") |
 | Tours (DAP) | `list_tours`, `get_tour_steps`, `tours_health` (self-healing/breakage rollup) |
 | Inbox | `search_conversations`, `get_conversation`, `add_conversation_note` |
 | Browser (via extension) | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_wait_for` (`selector?`, `text?`, `timeout_s`), `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start`/`browser_record_stop` (records a tour), `browser_run_tour` |
+
+### Building onboarding with an AI assistant
+
+The server's `initialize` instructions carry a routing map, so a connected client knows the
+order without being told. The path that works:
+
+1. **`get_authoring_guide`** — call it with no arguments for the lifecycle + publish contract
+   and a table of contents, then fetch the sections for your content type in one call
+   (`section` takes an array, e.g. `["tour-steps", "targets", "targeting"]`). Authoring from
+   guesswork produces content that publishes green and never renders; this is the contract that
+   prevents it.
+2. **`get_experience_schema("tour"|"checklist"|"survey")`** when a field shape is unclear — it
+   returns the exact JSON Schema the create/update tools validate against.
+3. **Record instead of guessing selectors.** With the extension connected, `browser_open` →
+   `browser_record_start` → drive the flow with `browser_act` → `browser_record_stop` captures
+   real selectors, healing descriptors and per-step URLs. Hand-written selectors are the
+   fallback, not the default.
+4. **`create_*`** — everything lands as a **draft** and reaches nobody until published.
+5. **`validate_experience`** — the dry run. Returns `{ok, errors, warnings}`; errors mean the
+   content cannot render or cannot be reached, warnings mean it renders but maybe not to whom
+   you intended.
+6. **`publish_*`**, then **`diagnose_experience`** if it still does not appear.
+
+Two things worth knowing before the first call: `steps` / `items` / `questions` are **full
+replacements** on update (an entry you omit is deleted), and a `manual` trigger is never
+auto-delivered — it only runs when something asks for it by id.
+
+### Reading the results
+
+`get_adoption_overview` ranks every tour, checklist and survey by reach in one call — start
+there, then deep-dive. `get_tour_analytics` returns the step funnel already differenced into
+per-step drop-off with `biggest_drop_off` naming the worst step, plus playback health, because
+a poor completion rate caused by a broken selector needs a different fix from one caused by
+bad copy. Analytics need only `reports:read`, so an analyst's key cannot edit anything.
 
 ## 4. Driving a real browser
 

@@ -592,6 +592,74 @@ docs/       PLAN, CONTRACTS, ARCHITECTURE, research/*, guides
     packages; frontend/widget/landing/docs-site builds green; `make i18n-check` green. Alembic
     heads still **one** — no migration.
 
+- [x] **MCP authoring wave (2026-08-18, dated — from the Usertour v0.9.2 gap analysis)** —
+  Usertour shipped an MCP server that *authors* onboarding, and Stept's could only read tours
+  and record them by demonstration, so "build me an onboarding flow" ended at a draft someone
+  finished by hand. Analysis: `docs/research/usertour-gaps.md` (source-level, from a fresh clone
+  of their tree). Worktree `../stept-now-usertour` (branch `feature/usertour-parity`). No
+  migration — every model this needed already existed.
+  - **The MCP surface went 29 → 50 tools.** Authoring: `create/update/publish/pause` for tours,
+    checklists and surveys, plus `get_experience_schema` (the exact JSON Schema the write tools
+    validate against) and `validate_experience`. Analytics: `get_adoption_overview`,
+    `get_tour_analytics`, `get_checklist_analytics`, `get_survey_results`. Diagnosis:
+    `diagnose_experience`, `diagnose_contact`.
+  - **Every write routes through the REST API's own Pydantic schema.** There is deliberately no
+    second rulebook for MCP: a step the dashboard would reject is rejected here, returning
+    `{"error", "details":[{loc,message}]}` so the caller can fix a field instead of guessing.
+    That is what makes it safe to let a model write — the per-step-type validators
+    (tooltip needs a selector, action needs an action, `javascript:` CTAs refused) are the
+    difference between content that renders and content that publishes green and never appears.
+  - **`get_authoring_guide` — the idea worth stealing.** Their 83KB sectioned guide, fetched on
+    demand, is why their agent authors content that works. Ported as `app/mcp/authoring_guide.py`
+    with the same division of labor: the handshake instructions stay a compact ROUTING MAP (paid
+    for on every connection), the deep contract is paid for only when authoring. Eleven sections
+    (lifecycle, tour-steps, targets, targeting, checklists, surveys, banners-announcements,
+    markdown, sdk, publish-requirements, diagnosis); no args → core sections + TOC. Every rule in
+    it mirrors a real validator — a guide that lies is worse than no guide, because the model
+    believes it.
+  - **`SERVER_INSTRUCTIONS` rewritten** from three sentences of prose into a routing map plus the
+    facts that prevent specific wrong first moves: manual triggers are never auto-delivered,
+    `steps`/`items`/`questions` are full replacements, banners are a tour `kind` not a type, the
+    5-per-page delivery cap, and that audience filters can never match an anonymous visitor.
+  - **`validate_experience`** (`app/mcp/validation.py`, MCP-free so the dashboard can call it):
+    catches well-formed content that cannot work — empty flow, banner with two steps, expired
+    schedule, checklist item pointing at a deleted tour, action/completion wired to *different*
+    tours, audience matching zero contacts, anchored step with neither fallbacks nor a captured
+    target. Errors block a sensible publish; warnings never do, because content shipped ahead of
+    its audience is legitimate.
+  - **Diagnosis never re-derives delivery.** Gates are evaluated with the same helpers the widget
+    bootstrap uses (`_in_schedule`, `_frequency_allows`, `_audience_matches`, the same `fnmatch`),
+    and `diagnose_contact` takes its "showing" list from `deliverable_*` itself — a test asserts
+    the two agree. `unknown` is load-bearing: it means the gate needs a fact the caller did not
+    supply, not that the check errored. Unmatched audience conditions carry the contact's
+    **actual** value, so they explain themselves without a follow-up lookup. Kept their
+    gate-vs-condition distinction (a gate is a judgment, a condition is a fact).
+  - **Analytics shaped for a readout, not a dashboard**: the funnel comes back differenced into
+    per-step `reach_rate`/`drop_off_rate` with `biggest_drop_off` naming the worst step, the
+    checklist report names where activation `stalls_at`, and playback health rides along with the
+    funnel because a bad completion rate from a broken selector needs a different fix from one
+    caused by bad copy. Analytics need only `reports:read` — an analyst's key cannot edit.
+  - **Tool annotations** (`app/mcp/annotations.py`): read tools `readOnlyHint`; write tools take
+    their set from the verb prefix, so a new `delete_*` cannot be born under-annotated.
+  - **Deliberately NOT ported** (their own wave, not a bolt-on): environments (prod/staging) and
+    immutable published versions — both touch every content row and every delivery query.
+    Also open: companies/accounts + cross-entity segments, per-content localization, OIDC SSO,
+    resource center, no-code event trackers, publish-history ledger, OAuth 2.1 MCP + a Claude
+    Code plugin. All recorded with reasoning in `usertour-gaps.md`.
+  - **Measured** (SQLite): backend **1881** passed, 8 pg-skipped — up from 1827, +54 tests
+    (authoring 21, diagnosis 12, validation 12, analytics 9). ruff + ruff-format clean, mypy
+    clean on 289 files. docs-site builds. No alembic change.
+  - **Verified live** (not just unit-tested): a real uvicorn on real Postgres, driven over HTTP
+    JSON-RPC end to end — signup → workspace → key → handshake (instructions carry the routing
+    map, `tools/list` returns 50 with correct annotations) → guide → schema → a bad step refused
+    with `details` → create → validate → publish → checklist wired to the tour → survey →
+    diagnose (unknown without facts; wrong URL fails the trigger gate; an unmatched audience
+    filter reports the contact's real `plan: free`) → overview + funnel + survey readout → authz
+    (read key refused authoring, allowed analytics; no key refused). **49/49 assertions.**
+    One assertion in the first pass was the *script's* error, not the code's: it diagnosed an
+    unpublished tour and expected `trigger`, but gates report the FIRST failure and `status`
+    legitimately precedes it.
+
 - [ ] Post-build notes for user: origin is `git@github.com:myfoxit/stept-now.git` (gh authed as
   `myfoxit`); master is pushed. Old stept containers on 8000/80/5173 are a PRIOR build —
   untouched. Postgres containers used for migration validation may still be up on 54329

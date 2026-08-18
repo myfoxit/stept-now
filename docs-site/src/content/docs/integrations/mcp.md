@@ -59,15 +59,55 @@ STEPT_API_KEY=sk_stept_… uv run python -m app.mcp_stdio
 
 ## Tools
 
-The workspace endpoint exposes 29 tools:
+The workspace endpoint exposes 50 tools:
 
 | Area | Tools |
 | ---- | ----- |
 | Knowledge & RAG | `search_knowledge`, `ask_knowledge_base` (answer + citations + confidence), `get_document`, `create_document` |
 | Help center | `search_articles`, `get_article` |
+| Authoring | `get_authoring_guide`, `get_experience_schema`, `create_tour` / `update_tour` / `publish_tour` / `pause_tour`, the same four for checklists and surveys, `validate_experience` |
+| Adoption analytics | `get_adoption_overview`, `get_tour_analytics`, `get_checklist_analytics`, `get_survey_results` |
+| Diagnosis | `diagnose_experience`, `diagnose_contact` |
 | Tours | `list_tours`, `get_tour_steps`, `tours_health` (breakage rollup) |
 | Inbox | `search_conversations`, `get_conversation`, `add_conversation_note` |
 | Browser | `browser_list`, `browser_open`, `browser_snapshot`, `browser_act`, `browser_navigate`, `browser_scroll`, `browser_key`, `browser_find`, `browser_wait_for` (`selector?`, `text?`, `timeout_s`), `browser_page_text`, `browser_console`, `browser_network`, `browser_extract`, `browser_close`, `browser_record_start` / `browser_record_stop` (records a tour), `browser_run_tour` |
+
+## Building onboarding with an AI assistant
+
+Connect a client and describe the experience you want — it can author, validate, publish and
+then measure it without leaving the conversation.
+
+The server ships a routing map in its `initialize` instructions, so the client knows the order.
+The path that works:
+
+1. **`get_authoring_guide`** — no arguments returns the lifecycle + publish contract plus a
+   table of contents; then fetch the sections for your type in one call (`section` takes an
+   array). This is the contract for content that actually renders — authoring from guesswork
+   produces flows that publish green and never appear.
+2. **`get_experience_schema`** for exact field shapes when in doubt.
+3. **Record rather than guess selectors.** With the extension connected: `browser_open` →
+   `browser_record_start` → drive the flow with `browser_act` → `browser_record_stop`. That
+   captures real selectors, self-healing target descriptors and per-step URLs.
+4. **`create_tour` / `create_checklist` / `create_survey`** — always a **draft**; drafts reach
+   nobody.
+5. **`validate_experience`** — `{ok, errors, warnings}`. Errors mean it cannot render or cannot
+   be reached (empty flow, checklist item pointing at a deleted tour, expired schedule);
+   warnings mean it renders but perhaps not to whom you intended (audience matching nobody, a
+   manual tour nothing starts, an anchored step with no fallback selectors).
+6. **`publish_*`**. If it still does not appear, **`diagnose_experience`** evaluates the same
+   delivery gates the widget applies — status, content, trigger, schedule, audience, frequency —
+   and each unmatched audience filter reports the contact's actual value. Pass `url` and
+   `contact_id` or gates come back `unknown`.
+
+`diagnose_contact(contact_id, url)` answers the support version of the question: what would this
+visitor see on this page right now, and what is blocking everything else.
+
+Two rules to know before the first write: `steps` / `items` / `questions` are **full
+replacements** on update — an entry you omit is deleted — and a `manual` trigger is never
+auto-delivered.
+
+Write tools carry MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`), so a
+client can confirm a publish without prompting on every read.
 
 ## Driving a real browser
 
