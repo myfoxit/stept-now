@@ -8,6 +8,7 @@
 #                                      separately-deployed poki stack
 #   docs.{$DOMAIN}  docs.stepped.ai  → the documentation site
 #   www.{$DOMAIN}                    → redirect to the apex
+#   capcity.stept.ai                 → the separately-deployed capaciti stack
 #   https://{IP}                     → the app on a self-signed cert, so the box
 #                                      stays reachable if DNS is broken
 #
@@ -120,6 +121,16 @@ docs.{$DOMAIN} {
 # ---- www convenience redirect ------------------------------------------------
 www.{$DOMAIN} {
 	redir https://{$DOMAIN}{uri} permanent
+}
+
+# ---- capaciti: a separately-deployed app sharing this box --------------------
+# Like poki: its own compose project (/opt/capaciti, repo myfoxit/capaciti) on
+# the shared `stepped_stepped` network, serving its SPA and /api itself. Only TLS
+# ends here. A literal host, not {$DOMAIN}-derived, because it is not a stept
+# name. If capaciti is down this host answers 502; nothing else is affected.
+capcity.stept.ai {
+	import transport_headers
+	reverse_proxy capaciti-web:80
 }
 
 # ---- bare IP: reachable before/without DNS, self-signed cert -----------------
